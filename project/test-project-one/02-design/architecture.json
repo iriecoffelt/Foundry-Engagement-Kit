@@ -1,0 +1,65 @@
+{
+  "edges": [
+    {
+      "id": "e1",
+      "source": "src1",
+      "target": "pipe1"
+    },
+    {
+      "id": "e2",
+      "source": "pipe1",
+      "target": "obj1"
+    },
+    {
+      "id": "e3",
+      "source": "obj1",
+      "target": "app1"
+    }
+  ],
+  "nodes": [
+    {
+      "data": {
+        "label": "Source System"
+      },
+      "id": "src1",
+      "position": {
+        "x": 0,
+        "y": 80
+      },
+      "type": "source"
+    },
+    {
+      "data": {
+        "label": "Sync Pipeline"
+      },
+      "id": "pipe1",
+      "position": {
+        "x": 220,
+        "y": 80
+      },
+      "type": "pipeline"
+    },
+    {
+      "data": {
+        "label": "Object Type"
+      },
+      "id": "obj1",
+      "position": {
+        "x": 440,
+        "y": 80
+      },
+      "type": "objectType"
+    },
+    {
+      "data": {
+        "label": "Workshop App"
+      },
+      "id": "app1",
+      "position": {
+        "x": 660,
+        "y": 80
+      },
+      "type": "workshop"
+    }
+  ]
+}
