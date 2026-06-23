@@ -1,7 +1,7 @@
 import { Calendar, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import type { FileEntry, ProjectMeta } from "../../types";
+import type { FileEntry } from "../../types";
 import { PrimaryButton } from "../forms/FormField";
 import { MarkdownPreview } from "../MarkdownPreview";
 import { StandupWizard } from "../wizards/StandupWizard";
@@ -14,14 +14,11 @@ interface DailyHubProps {
 
 export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubProps) {
   const [showWizard, setShowWizard] = useState(false);
-  const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [groups, setGroups] = useState<{ project: string; entries: FileEntry[] }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [content, setContent] = useState("");
 
   const load = useCallback(async () => {
-    const projs = await api.listProjectsWithMeta();
-    setProjects(projs);
     const entries = await api.listDirectory("daily", true);
     const byProject: Record<string, FileEntry[]> = {};
 
@@ -55,13 +52,6 @@ export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubP
     }
   }, [startWizard, onWizardConsumed]);
 
-  useEffect(() => {
-    if (startWizard) {
-      setShowWizard(true);
-      onWizardConsumed?.();
-    }
-  }, [startWizard, onWizardConsumed]);
-
   const openEntry = async (path: string) => {
     const text = await api.readFile(path);
     setSelected(path);
@@ -71,7 +61,6 @@ export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubP
   if (showWizard) {
     return (
       <StandupWizard
-        projects={projects}
         onCancel={() => setShowWizard(false)}
         onComplete={(path) => {
           setShowWizard(false);

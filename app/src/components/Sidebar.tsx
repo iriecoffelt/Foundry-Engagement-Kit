@@ -6,7 +6,6 @@ import {
   Home,
   RefreshCw,
   Settings,
-  Timer,
 } from "lucide-react";
 import type { Section } from "../types";
 

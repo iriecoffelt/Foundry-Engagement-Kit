@@ -112,7 +112,6 @@ export function ArchitectureEditor({ projectPath }: ArchitectureEditorProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [newLabel, setNewLabel] = useState("New node");
 
   useEffect(() => {
     api

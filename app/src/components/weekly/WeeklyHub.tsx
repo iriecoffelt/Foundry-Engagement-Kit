@@ -45,6 +45,13 @@ export function WeeklyHub({ onRefresh, startWizard, onWizardConsumed }: WeeklyHu
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (startWizard) {
+      setShowWizard(true);
+      onWizardConsumed?.();
+    }
+  }, [startWizard, onWizardConsumed]);
+
   const openEntry = async (path: string) => {
     const text = await api.readFile(path);
     setSelected(path);

@@ -3,7 +3,7 @@ import { ExternalLink, FileText, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { FileEntry } from "../../types";
-import { PrimaryButton, SecondaryButton } from "../forms/FormField";
+import { PrimaryButton } from "../forms/FormField";
 import { MarkdownPreview } from "../MarkdownPreview";
 
 export function LibraryHub() {

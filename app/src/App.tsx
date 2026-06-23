@@ -9,6 +9,7 @@ import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { WeeklyHub } from "./components/weekly/WeeklyHub";
 import { Editor } from "./components/Editor";
+import { FocusTimer } from "./components/focus/FocusTimer";
 import { Modal } from "./components/Modal";
 
 export default function App() {
@@ -77,19 +78,9 @@ export default function App() {
         {section === "home" && (
           <Dashboard
             projects={projects}
+            onOpenFile={openPath}
             onNavigate={(s) => setSection(s)}
-            onStartProjectWizard={() => {
-              setSection("projects");
-              setProjectsWizard(true);
-            }}
-            onStartStandup={() => {
-              setSection("daily");
-              setDailyWizard(true);
-            }}
-            onStartWeekly={() => {
-              setSection("weekly");
-              setWeeklyWizard(true);
-            }}
+            onProjectCreated={() => setRefreshKey((k) => k + 1)}
           />
         )}
 

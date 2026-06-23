@@ -1,11 +1,11 @@
 import { Calendar, CalendarDays, FolderPlus, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { api } from "../lib/api";
-import type { FileEntry } from "../types";
+import type { FileEntry, ProjectMeta } from "../types";
 import { Modal } from "./Modal";
 
 interface DashboardProps {
-  projects: FileEntry[];
+  projects: ProjectMeta[];
   onOpenFile: (path: string) => void;
   onNavigate: (section: "daily" | "weekly" | "projects") => void;
   onProjectCreated: () => void;
@@ -175,8 +175,8 @@ export function Dashboard({
                   onClick={() => onOpenFile(`${p.path}/README.md`)}
                   className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-left transition hover:border-brand-600/50 hover:bg-slate-900"
                 >
-                  <p className="font-medium text-white">{p.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">{p.path}</p>
+                  <p className="font-medium text-white">{p.display_name}</p>
+                  <p className="mt-1 text-xs text-slate-500">{p.customer || p.path}</p>
                 </button>
               ))}
             </div>

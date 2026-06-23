@@ -68,13 +68,12 @@ export function WeeklyReviewWizard({ onComplete, onCancel }: WeeklyReviewWizardP
       title="Weekly review"
       subtitle="Reflect on the week and plan what's next."
       steps={STEPS}
-      step={step}
-      onBack={() => setStep((s) => s - 1)}
-      onNext={() => (step === STEPS.length - 1 ? finish() : setStep((s) => s + 1))}
-      onCancel={onCancel}
-      canNext={canProceed && !loading}
-      isLast={step === STEPS.length - 1}
-      finishLabel={loading ? "Saving…" : "Save review"}
+      currentStep={step}
+      onBack={() => (step === 0 ? onCancel() : setStep((s) => s - 1))}
+      onNext={() => setStep((s) => s + 1)}
+      onFinish={finish}
+      canProceed={canProceed && !loading}
+      loading={loading}
     >
       {error && (
         <div className="mb-4 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">

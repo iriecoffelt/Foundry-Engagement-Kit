@@ -7,10 +7,10 @@ import { ProjectPicker } from "../forms/ProjectPicker";
 import { WizardShell } from "../wizard/WizardShell";
 
 const STEPS = [
-  { label: "Project" },
-  { label: "Meeting" },
-  { label: "Content" },
-  { label: "Review" },
+  { id: "project", label: "Project" },
+  { id: "meeting", label: "Meeting" },
+  { id: "content", label: "Content" },
+  { id: "review", label: "Review" },
 ];
 
 const emptyData = (): CustomerSyncData => ({
@@ -91,13 +91,12 @@ export function CustomerSyncWizard({
       title={isEdit ? "Edit customer sync prep" : "Customer sync prep"}
       subtitle="Prepare for your stakeholder meeting — agenda, demo, and decisions."
       steps={STEPS}
-      step={step}
-      onBack={() => setStep((s) => s - 1)}
-      onNext={() => (step === STEPS.length - 1 ? finish() : setStep((s) => s + 1))}
-      onCancel={onCancel}
-      canNext={(step > 0 || !!data.projectSlug) && !loading}
-      isLast={step === STEPS.length - 1}
-      finishLabel={loading ? "Saving…" : isEdit ? "Update prep doc" : "Save prep doc"}
+      currentStep={step}
+      onBack={() => (step === 0 ? onCancel() : setStep((s) => s - 1))}
+      onNext={() => setStep((s) => s + 1)}
+      onFinish={finish}
+      canProceed={(step > 0 || !!data.projectSlug) && !loading}
+      loading={loading}
     >
       {error && (
         <div className="mb-4 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">

@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, ExternalLink, FileText, Network, Upload } from "lucide-react";
-import { useCallback, useEffect, lazy, Suspense, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { FileEntry, ProjectMeta } from "../../types";
 import { ArchitectureEditor } from "../architecture/ArchitectureEditor";
@@ -109,11 +109,7 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
           </div>
         )}
 
-        {tab === "architecture" && (
-          <Suspense fallback={<SectionFallback />}>
-            <ArchitectureEditor projectPath={project.path} />
-          </Suspense>
-        )}
+        {tab === "architecture" && <ArchitectureEditor projectPath={project.path} />}
 
         {tab === "documents" && (
           <div className="flex h-full">

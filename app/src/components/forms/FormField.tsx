@@ -89,11 +89,7 @@ export function SelectInput({
   );
 }
 
-/** Alias for Field — used by older wizard components */
-export const FormField = Field;
-
-/** Alias for Field — used by older wizard components */
-export const FormField = Field;
+export { FormField as Field };
 
 export function FormCard({
   title,

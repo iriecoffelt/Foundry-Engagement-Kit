@@ -1,5 +1,7 @@
 import type {
+  CustomerSyncData,
   EngagementData,
+  OntologyObjectType,
   StandupData,
   WeeklyReviewData,
   ArchitectureGraph,
@@ -258,5 +260,92 @@ ${architectureToMermaid(graph)}
 \`\`\`
 
 _Edit visually in the Architecture tab. This file is auto-updated when you save the diagram._
+`;
+}
+
+export function generateCustomerSyncMd(data: CustomerSyncData): string {
+  const date = data.date || todayISO();
+  return `---
+project: ${data.projectSlug}
+projectDisplay: ${data.projectDisplay}
+date: ${date}
+type: customer-sync
+---
+
+# Customer Sync — ${data.projectDisplay}
+
+**Date:** ${date}
+**Meeting:** ${data.meetingName}
+**Duration:** ${data.duration}
+**Attendees:** ${data.attendees || "—"}
+
+## Objective
+
+${data.objective || "—"}
+
+## Status summary
+
+${data.statusSummary || "—"}
+
+## Demo actions
+
+${data.demoActions || "—"}
+
+## Decisions needed
+
+${data.decisionsNeeded || "—"}
+
+## Risks to surface
+
+${data.risks || "—"}
+`;
+}
+
+export function parseCustomerSyncMd(body: string): CustomerSyncData | null {
+  const fm = body.match(/^---\n([\s\S]*?)\n---/);
+  const meta: Record<string, string> = {};
+  if (fm) {
+    for (const line of fm[1].split("\n")) {
+      const [k, ...rest] = line.split(":");
+      if (k) meta[k.trim()] = rest.join(":").trim();
+    }
+  }
+
+  const section = (title: string) => {
+    const re = new RegExp(`## ${title}\\n\\n([\\s\\S]*?)(?=\\n## |$)`);
+    const m = body.match(re);
+    return m?.[1]?.trim() || "";
+  };
+
+  if (!meta.project && !body.includes("Customer Sync")) return null;
+
+  return {
+    projectSlug: meta.project || "",
+    projectDisplay: meta.projectDisplay || "",
+    date: meta.date,
+    meetingName: body.match(/\*\*Meeting:\*\* (.+)/)?.[1] || "Weekly customer sync",
+    duration: body.match(/\*\*Duration:\*\* (.+)/)?.[1] || "30 min",
+    attendees: body.match(/\*\*Attendees:\*\* (.+)/)?.[1] || "",
+    objective: section("Objective"),
+    statusSummary: section("Status summary"),
+    demoActions: section("Demo actions"),
+    decisionsNeeded: section("Decisions needed"),
+    risks: section("Risks to surface"),
+  };
+}
+
+export function generateOntologySection(objects: OntologyObjectType[]): string {
+  if (!objects.length) return "## Object types\n\n_No object types defined yet._\n";
+  const rows = objects
+    .map(
+      (o) =>
+        `| ${o.name} | ${o.primaryKey} | ${o.description || "—"} | ${o.properties.join(", ") || "—"} |`,
+    )
+    .join("\n");
+  return `## Object types
+
+| Name | Primary key | Description | Properties |
+|------|-------------|-------------|------------|
+${rows}
 `;
 }
