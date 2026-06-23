@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-slate-800;
+  }
+
+  body {
+    @apply antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-950;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-700;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-600;
+  }
+}
+
+@layer components {
+  .prose-kit h1 {
+    @apply mb-4 text-2xl font-semibold text-white;
+  }
+
+  .prose-fde h2 {
+    @apply mb-3 mt-6 text-xl font-semibold text-slate-100;
+  }
+
+  .prose-fde h3 {
+    @apply mb-2 mt-4 text-lg font-medium text-slate-200;
+  }
+
+  .prose-fde p {
+    @apply mb-3 text-slate-300 leading-relaxed;
+  }
+
+  .prose-fde ul {
+    @apply mb-3 list-disc pl-5 text-slate-300;
+  }
+
+  .prose-fde ol {
+    @apply mb-3 list-decimal pl-5 text-slate-300;
+  }
+
+  .prose-fde li {
+    @apply mb-1;
+  }
+
+  .prose-fde table {
+    @apply mb-4 w-full border-collapse text-sm;
+  }
+
+  .prose-fde th {
+    @apply border border-slate-700 bg-slate-900 px-3 py-2 text-left font-medium text-slate-200;
+  }
+
+  .prose-fde td {
+    @apply border border-slate-800 px-3 py-2 text-slate-300;
+  }
+
+  .prose-fde code {
+    @apply rounded bg-slate-900 px-1.5 py-0.5 text-sm text-brand-300;
+  }
+
+  .prose-fde pre {
+    @apply mb-4 overflow-x-auto rounded-lg bg-slate-900 p-4 text-sm text-slate-300;
+  }
+
+  .prose-fde blockquote {
+    @apply border-l-4 border-brand-600 pl-4 italic text-slate-400;
+  }
+
+  .prose-fde hr {
+    @apply my-6 border-slate-800;
+  }
+
+  .prose-fde a {
+    @apply text-brand-400 hover:text-brand-300 underline;
+  }
+
+  .prose-fde input[type="checkbox"] {
+    @apply mr-2;
+  }
+}
