@@ -1,16 +1,28 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api } from "./lib/api";
 import type { OpenFile, ProjectMeta, Section } from "./types";
 import { Dashboard } from "./components/Dashboard";
-import { DailyHub } from "./components/daily/DailyHub";
-import { LibraryHub } from "./components/library/LibraryHub";
-import { ProjectsHub } from "./components/projects/ProjectsHub";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
-import { WeeklyHub } from "./components/weekly/WeeklyHub";
 import { Editor } from "./components/Editor";
-import { FocusTimer } from "./components/focus/FocusTimer";
 import { Modal } from "./components/Modal";
+import { SectionFallback } from "./components/SectionFallback";
+
+const ProjectsHub = lazy(() =>
+  import("./components/projects/ProjectsHub").then((m) => ({ default: m.ProjectsHub })),
+);
+const DailyHub = lazy(() =>
+  import("./components/daily/DailyHub").then((m) => ({ default: m.DailyHub })),
+);
+const WeeklyHub = lazy(() =>
+  import("./components/weekly/WeeklyHub").then((m) => ({ default: m.WeeklyHub })),
+);
+const LibraryHub = lazy(() =>
+  import("./components/library/LibraryHub").then((m) => ({ default: m.LibraryHub })),
+);
+const FocusTimer = lazy(() =>
+  import("./components/focus/FocusTimer").then((m) => ({ default: m.FocusTimer })),
+);
 
 export default function App() {
   const [section, setSection] = useState<Section>("home");
@@ -85,33 +97,45 @@ export default function App() {
         )}
 
         {section === "projects" && (
-          <ProjectsHub
-            startWizard={projectsWizard}
-            onWizardConsumed={() => setProjectsWizard(false)}
-            onRefresh={() => setRefreshKey((k) => k + 1)}
-          />
+          <Suspense fallback={<SectionFallback />}>
+            <ProjectsHub
+              startWizard={projectsWizard}
+              onWizardConsumed={() => setProjectsWizard(false)}
+              onRefresh={() => setRefreshKey((k) => k + 1)}
+            />
+          </Suspense>
         )}
 
         {section === "daily" && (
-          <DailyHub
-            startWizard={dailyWizard}
-            onWizardConsumed={() => setDailyWizard(false)}
-            onRefresh={() => setRefreshKey((k) => k + 1)}
-          />
+          <Suspense fallback={<SectionFallback />}>
+            <DailyHub
+              startWizard={dailyWizard}
+              onWizardConsumed={() => setDailyWizard(false)}
+              onRefresh={() => setRefreshKey((k) => k + 1)}
+            />
+          </Suspense>
         )}
 
         {section === "weekly" && (
-          <WeeklyHub
-            startWizard={weeklyWizard}
-            onWizardConsumed={() => setWeeklyWizard(false)}
-            onRefresh={() => setRefreshKey((k) => k + 1)}
-          />
+          <Suspense fallback={<SectionFallback />}>
+            <WeeklyHub
+              startWizard={weeklyWizard}
+              onWizardConsumed={() => setWeeklyWizard(false)}
+              onRefresh={() => setRefreshKey((k) => k + 1)}
+            />
+          </Suspense>
         )}
 
-        {section === "library" && <LibraryHub />}
+        {section === "library" && (
+          <Suspense fallback={<SectionFallback />}>
+            <LibraryHub />
+          </Suspense>
+        )}
 
         {section === "focus" && (
-          <FocusTimer projects={projects} onExit={() => setSection("home")} />
+          <Suspense fallback={<SectionFallback />}>
+            <FocusTimer projects={projects} onExit={() => setSection("home")} />
+          </Suspense>
         )}
 
         {section === "settings" && (
