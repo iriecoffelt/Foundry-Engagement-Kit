@@ -64,6 +64,10 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Stage workspace seed
+        working-directory: app
+        run: node scripts/stage-workspace-seed.mjs
+
       - name: Prefetch Rust dependencies
         working-directory: app/src-tauri
         shell: bash
@@ -85,11 +89,12 @@ jobs:
           releaseBody: |
             Desktop installers for **macOS** (Apple Silicon + Intel), **Windows**, and **Linux**.
 
-            Download the asset for your platform, install, then point the app at your workspace folder in **Settings** (must contain `daily/`, `weekly/`, `project/`, `reference/`).
+            **First launch:** the app prompts you to choose where your workspace should live and creates all required folders automatically (`daily/`, `weekly/`, `project/`, `reference/`, `project/_template/`).
 
             | Platform | Artifact |
             |----------|----------|
-            | macOS | `.dmg` |
+            | macOS (Apple Silicon) | `*_aarch64.dmg` |
+            | macOS (Intel) | `*_x64.dmg` |
             | Windows | `.msi` or `-setup.exe` |
             | Linux | `.deb`, `.AppImage`, or `.rpm` |
 

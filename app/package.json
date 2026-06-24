@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "predev": "node scripts/stage-workspace-seed.mjs",
+    "prebuild": "node scripts/stage-workspace-seed.mjs",
+    "pretauri": "node scripts/stage-workspace-seed.mjs",
+    "stage:workspace-seed": "node scripts/stage-workspace-seed.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:build": "tauri build && node scripts/post-build-hint.mjs",

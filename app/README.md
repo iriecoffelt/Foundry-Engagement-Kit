@@ -56,8 +56,8 @@ The [Release workflow](../.github/workflows/release.yml) creates a **draft** Git
 
 ## First launch
 
-1. The app auto-detects the workspace when run from within the repo.
-2. Otherwise: **Settings → Change folder** → select the repo root (must contain `daily/`, `weekly/`, `project/`, `reference/`).
+1. On first open, pick where your workspace should live (Documents, a network drive, etc.). The app creates `daily/`, `weekly/`, `project/`, `reference/`, and `project/_template/` automatically.
+2. Otherwise: **Settings → Create new workspace** or **Use existing folder**.
 3. Create projects via **New engagement** — not by copying `project/_template/` manually.
 
 ## Features

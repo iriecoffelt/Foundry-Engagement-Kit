@@ -21,8 +21,8 @@ interface OnboardingChecklistProps {
 const STEPS = [
   {
     key: "workspaceConfigured" as const,
-    label: "Configure workspace folder",
-    hint: "Point the app at your Palantir Templates root",
+    label: "Set up workspace folder",
+    hint: "Choose a location — the app creates all required folders",
     section: "settings" as Section,
   },
   {

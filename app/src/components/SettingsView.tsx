@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen } from "lucide-react";
 import { useState } from "react";
 import { api } from "../lib/api";
+import { pickDirectoryPath } from "../lib/path";
 import { BackupSection } from "./settings/BackupSection";
 import { NotificationSettings } from "./settings/NotificationSettings";
 import { ThemeSelector } from "./settings/ThemeSelector";
@@ -42,20 +43,45 @@ function Section({
 export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: SettingsViewProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [folderName, setFolderName] = useState("Foundry Engagement Kit");
 
-  const pickFolder = async () => {
+  const pickExisting = async () => {
     setError("");
     setSuccess("");
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "Select template workspace folder",
+      title: "Select workspace folder",
     });
     if (!selected) return;
+    const path = pickDirectoryPath(selected);
+    if (!path) return;
     try {
-      await api.setWorkspaceRoot(selected);
-      onWorkspaceChange(selected);
-      setSuccess("Workspace updated successfully.");
+      await api.setWorkspaceRoot(path);
+      onWorkspaceChange(path);
+      setSuccess("Workspace updated.");
+      onRefresh();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const createWorkspace = async () => {
+    setError("");
+    setSuccess("");
+    const parent = await open({
+      directory: true,
+      multiple: false,
+      title: "Choose where to create your workspace",
+    });
+    if (!parent) return;
+    const parentPath = pickDirectoryPath(parent);
+    if (!parentPath) return;
+    try {
+      const root = await api.initializeWorkspace(parentPath, folderName, true);
+      onWorkspaceChange(root);
+      setSuccess("Workspace created.");
+      onRefresh();
     } catch (e) {
       setError(String(e));
     }
@@ -94,33 +120,51 @@ export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: Se
 
         <Section
           title="Workspace folder"
-          description="The root folder for all your engagement data. It must contain daily/, weekly/, project/, and reference/."
+          description="Where your engagement data lives on disk. Create a new workspace or point at an existing one."
         >
           <div className="rounded-lg bg-surface-base px-4 py-3 font-mono text-sm text-fg-body break-all">
-            {workspaceRoot || "Not configured — choose a folder below"}
+            {workspaceRoot || "Not configured"}
           </div>
-          <button
-            onClick={pickFolder}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm text-fg-on-accent hover:bg-brand-500"
-          >
-            <FolderOpen size={16} />
-            Change folder
-          </button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={createWorkspace}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm text-fg-on-accent hover:bg-brand-500"
+            >
+              <FolderOpen size={16} />
+              Create new workspace
+            </button>
+            <button
+              onClick={pickExisting}
+              className="inline-flex items-center gap-2 rounded-lg border border-surface-border bg-surface-elevated px-4 py-2 text-sm text-fg-body hover:bg-surface-raised"
+            >
+              Use existing folder
+            </button>
+          </div>
+          <div className="mt-4">
+            <label className="text-sm text-fg-secondary">Name for new workspaces</label>
+            <input
+              type="text"
+              value={folderName}
+              onChange={(e) => setFolderName(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-surface-border bg-surface-base px-3 py-2 text-sm text-fg-primary"
+            />
+          </div>
           {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
           {success && <p className="mt-3 text-sm text-green-400">{success}</p>}
         </Section>
 
         <Section
           title="First launch"
-          description="Point the app at your Palantir Templates workspace if it does not auto-detect."
+          description="On first open, the app walks you through creating a workspace with all required folders."
         >
           <ol className="list-decimal space-y-2 pl-5 text-sm text-fg-body">
             <li>
-              Click <strong className="text-fg-body">Change folder</strong> above and select
-              the folder that contains <code className="text-brand-300">daily/</code>,{" "}
+              Pick a location (Documents, a network drive, etc.) and the app creates{" "}
+              <code className="text-brand-300">daily/</code>,{" "}
               <code className="text-brand-300">weekly/</code>,{" "}
-              <code className="text-brand-300">project/</code>, and{" "}
-              <code className="text-brand-300">reference/</code>.
+              <code className="text-brand-300">project/</code>,{" "}
+              <code className="text-brand-300">reference/</code>, and{" "}
+              <code className="text-brand-300">project/_template/</code> for you.
             </li>
             <li>
               Use <strong className="text-fg-body">Projects → New engagement</strong> (or Home →

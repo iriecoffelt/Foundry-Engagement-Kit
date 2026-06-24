@@ -67,7 +67,7 @@ export function Sidebar({
   onRefresh,
   onOpenCommandPalette,
 }: SidebarProps) {
-  const shortRoot = workspaceRoot.split("/").slice(-2).join("/");
+  const shortRoot = workspaceRoot.split(/[/\\]/).filter(Boolean).slice(-2).join("/");
 
   return (
     <aside className="app-sidebar">

@@ -8,6 +8,7 @@ use walkdir::WalkDir;
 mod report_export;
 mod workspace_backup;
 mod workspace_search;
+mod workspace_setup;
 
 const CONFIG_FILE: &str = "workspace.json";
 
@@ -57,6 +58,22 @@ fn is_valid_workspace(path: &Path) -> bool {
         && path.join("reference").is_dir()
 }
 
+fn workspace_is_ready(app: &AppHandle) -> bool {
+    if let Some(saved) = load_config(app) {
+        let path = PathBuf::from(&saved);
+        let path = workspace_setup::normalize_existing_dir(&path).unwrap_or(path);
+        if is_valid_workspace(&path) {
+            return true;
+        }
+    }
+    default_workspace_root().is_some()
+}
+
+fn save_workspace_root(app: &AppHandle, root: &Path) -> Result<(), String> {
+    let normalized = workspace_setup::normalize_existing_dir(root).unwrap_or_else(|_| root.to_path_buf());
+    save_config(app, normalized.to_string_lossy().as_ref())
+}
+
 fn default_workspace_root() -> Option<PathBuf> {
     if let Ok(cwd) = std::env::current_dir() {
         let candidates = [cwd.clone(), cwd.join(".."), cwd.join("../..")];
@@ -73,6 +90,7 @@ fn default_workspace_root() -> Option<PathBuf> {
 fn resolve_workspace(app: &AppHandle) -> Result<PathBuf, String> {
     if let Some(saved) = load_config(app) {
         let path = PathBuf::from(&saved);
+        let path = workspace_setup::normalize_existing_dir(&path).unwrap_or(path);
         if is_valid_workspace(&path) {
             return Ok(path);
         }
@@ -146,23 +164,78 @@ fn list_dir_entries(dir: &Path, relative: &str, recursive: bool) -> Result<Vec<F
 }
 
 #[tauri::command]
+fn is_workspace_configured(app: AppHandle) -> bool {
+    workspace_is_ready(&app)
+}
+
+#[tauri::command]
 fn get_workspace_root(app: AppHandle) -> Result<String, String> {
     Ok(resolve_workspace(&app)?.to_string_lossy().to_string())
 }
 
 #[tauri::command]
+fn initialize_workspace(
+    app: AppHandle,
+    parent_path: String,
+    folder_name: String,
+    create_subfolder: bool,
+) -> Result<String, String> {
+    let parent = PathBuf::from(&parent_path);
+    let parent = workspace_setup::normalize_existing_dir(&parent)?;
+
+    let root = if create_subfolder {
+        let name = workspace_setup::validate_workspace_folder_name(&folder_name)?;
+        parent.join(name)
+    } else {
+        parent.clone()
+    };
+
+    if root.exists() {
+        if is_valid_workspace(&root) {
+            workspace_setup::ensure_project_template(&app, &root)?;
+            save_workspace_root(&app, &root)?;
+            return Ok(workspace_setup::normalize_existing_dir(&root)
+                .unwrap_or(root)
+                .to_string_lossy()
+                .to_string());
+        }
+        if !root.is_dir() || !workspace_setup::is_dir_empty(&root) {
+            return Err(format!(
+                "{} already exists and is not empty. Choose a different folder name or location.",
+                root.display()
+            ));
+        }
+    } else {
+        fs::create_dir_all(&root).map_err(|e| format!("Could not create workspace folder: {e}"))?;
+    }
+
+    workspace_setup::scaffold_workspace(&app, &root)?;
+    save_workspace_root(&app, &root)?;
+    Ok(workspace_setup::normalize_existing_dir(&root)
+        .unwrap_or(root)
+        .to_string_lossy()
+        .to_string())
+}
+
+#[tauri::command]
 fn set_workspace_root(app: AppHandle, path: String) -> Result<(), String> {
     let path_buf = PathBuf::from(&path);
-    let canonical = path_buf
-        .canonicalize()
-        .map_err(|_| "Folder does not exist".to_string())?;
-    if !is_valid_workspace(&canonical) {
-        return Err(
-            "Invalid workspace: folder must contain daily/, weekly/, project/, and reference/"
-                .into(),
-        );
+    let canonical = workspace_setup::normalize_existing_dir(&path_buf)?;
+    if is_valid_workspace(&canonical) {
+        workspace_setup::ensure_project_template(&app, &canonical)?;
+        save_workspace_root(&app, &canonical)?;
+        return Ok(());
     }
-    save_config(&app, canonical.to_string_lossy().as_ref())
+    if canonical.is_dir() && workspace_setup::is_dir_empty(&canonical) {
+        workspace_setup::scaffold_workspace(&app, &canonical)?;
+        save_workspace_root(&app, &canonical)?;
+        return Ok(());
+    }
+    Err(
+        "This folder is not a workspace yet. Use “Create workspace” to set up a new folder, \
+         or pick a folder that already contains daily/, weekly/, project/, and reference/."
+            .into(),
+    )
 }
 
 #[tauri::command]
@@ -266,12 +339,9 @@ fn create_project(app: AppHandle, name: String) -> Result<String, String> {
         return Err("Project already exists".into());
     }
 
-    let template = root.join("project/_template");
-    if !template.is_dir() {
-        return Err("Master template not found at project/_template".into());
-    }
+    let template = workspace_setup::ensure_project_template(&app, &root)?;
 
-    copy_dir_recursive(&template, &dest)?;
+    workspace_setup::copy_dir_recursive(&template, &dest)?;
     Ok(relative)
 }
 
@@ -302,7 +372,7 @@ fn clone_project(app: AppHandle, source_path: String, new_name: String) -> Resul
         return Err("A project with that name already exists".into());
     }
 
-    copy_dir_recursive(&src, &dest)?;
+    workspace_setup::copy_dir_recursive(&src, &dest)?;
 
     let engagement_path = format!("{relative}/engagement.json");
     if resolve_path(&app, &engagement_path).is_ok() {
@@ -327,21 +397,6 @@ fn clone_project(app: AppHandle, source_path: String, new_name: String) -> Resul
     }
 
     Ok(relative)
-}
-
-fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
-    fs::create_dir_all(dst).map_err(|e| e.to_string())?;
-    for entry in fs::read_dir(src).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let file_type = entry.file_type().map_err(|e| e.to_string())?;
-        let target = dst.join(entry.file_name());
-        if file_type.is_dir() {
-            copy_dir_recursive(&entry.path(), &target)?;
-        } else {
-            fs::copy(entry.path(), target).map_err(|e| e.to_string())?;
-        }
-    }
-    Ok(())
 }
 
 #[tauri::command]
@@ -661,7 +716,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
+            is_workspace_configured,
             get_workspace_root,
+            initialize_workspace,
             set_workspace_root,
             list_directory,
             read_file,

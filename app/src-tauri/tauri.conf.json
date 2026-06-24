@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "node scripts/stage-workspace-seed.mjs && npm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -27,6 +27,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": {
+      "resources/workspace-seed": "workspace-seed"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

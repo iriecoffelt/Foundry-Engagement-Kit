@@ -35,9 +35,9 @@ npm run tauri:build
 
 ### First launch
 
-1. Open the app. It auto-detects the workspace if run from within this repo.
-2. Otherwise go to **Settings → Change folder** and select this repo root — the folder containing `daily/`, `weekly/`, `project/`, and `reference/`.
-3. Create engagements with **Projects → New engagement** (or **Home → New engagement**). Do not copy `project/_template/` by hand; that leaves `{{placeholders}}` in the overview.
+1. Open the app and choose where your workspace should live — the app creates all required folders automatically.
+2. When run from source inside this repo, the workspace auto-detects.
+3. Create engagements with **Projects → New engagement**. Do not copy `project/_template/` by hand.
 
 ### App highlights
 

@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import type { FileEntry, ProjectMeta } from "../types";
 
 export const api = {
+  isWorkspaceConfigured: () => invoke<boolean>("is_workspace_configured"),
   getWorkspaceRoot: () => invoke<string>("get_workspace_root"),
+  initializeWorkspace: (parentPath: string, folderName: string, createSubfolder: boolean) =>
+    invoke<string>("initialize_workspace", { parentPath, folderName, createSubfolder }),
   setWorkspaceRoot: (path: string) => invoke<void>("set_workspace_root", { path }),
   listDirectory: (relative: string, recursive = false) =>
     invoke<FileEntry[]>("list_directory", { relative, recursive }),
