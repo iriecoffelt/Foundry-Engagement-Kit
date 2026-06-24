@@ -60,12 +60,16 @@ jobs:
             librsvg2-dev \
             patchelf
 
-      - name: cargo check
+      - name: Stage workspace seed
+        working-directory: app
+        run: node scripts/stage-workspace-seed.mjs
+
+      - name: cargo test
         shell: bash
         run: |
           for attempt in 1 2 3; do
-            cargo check && exit 0
-            echo "cargo check attempt $attempt failed, retrying in 15s..."
+            cargo test && exit 0
+            echo "cargo test attempt $attempt failed, retrying in 15s..."
             sleep 15
           done
           exit 1

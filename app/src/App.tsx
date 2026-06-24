@@ -12,6 +12,7 @@ import { SectionFallback } from "./components/SectionFallback";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
+import { WorkspaceSetupModal } from "./components/onboarding/WorkspaceSetupModal";
 
 const ProjectsHub = lazy(() =>
   import("./components/projects/ProjectsHub").then((m) => ({ default: m.ProjectsHub })),
@@ -41,6 +42,7 @@ const CommandPalette = lazy(() =>
 export default function App() {
   const [section, setSection] = useState<Section>("home");
   const [workspaceRoot, setWorkspaceRoot] = useState("");
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -54,6 +56,13 @@ export default function App() {
   const refresh = useCallback(async () => {
     setError("");
     try {
+      const configured = await api.isWorkspaceConfigured();
+      setWorkspaceReady(configured);
+      if (!configured) {
+        setWorkspaceRoot("");
+        setProjects([]);
+        return;
+      }
       const root = await api.getWorkspaceRoot();
       setWorkspaceRoot(root);
       setProjects(await api.listProjectsWithMeta());
@@ -203,17 +212,32 @@ export default function App() {
         )}
       </div>
 
-      <OnboardingChecklist
-        workspaceRoot={workspaceRoot}
-        projects={projects}
-        onNavigate={setSection}
-        onStartStandup={() => {
-          setSection("daily");
-          setDailyAutoStart(true);
-        }}
-        onNewProject={() => {
-          setSection("projects");
-          setProjectsAutoWizard(true);
+      {workspaceReady && (
+        <OnboardingChecklist
+          workspaceRoot={workspaceRoot}
+          projects={projects}
+          onNavigate={setSection}
+          onStartStandup={() => {
+            setSection("daily");
+            setDailyAutoStart(true);
+          }}
+          onNewProject={() => {
+            setSection("projects");
+            setProjectsAutoWizard(true);
+          }}
+        />
+      )}
+
+      {!workspaceReady && (
+        <div className="pointer-events-none fixed inset-0 z-40 bg-surface-base/80 backdrop-blur-sm" />
+      )}
+
+      <WorkspaceSetupModal
+        open={!workspaceReady}
+        onComplete={(root) => {
+          setWorkspaceRoot(root);
+          setWorkspaceReady(true);
+          bump();
         }}
       />
 
