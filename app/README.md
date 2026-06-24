@@ -38,10 +38,10 @@ Artifacts appear under `src-tauri/target/release/bundle/`:
 **macOS only** — build and open the DMG in Finder:
 
 ```bash
-npm run tauri:install:mac
+npm run tauri:install
 ```
 
-If the installer window closes immediately, eject any mounted copy and run `npm run tauri:install:mac` again.
+(`tauri:install:mac` is the same on macOS.) If the installer window closes immediately, eject any mounted copy and run `npm run tauri:install` again.
 
 ## GitHub Releases (all platforms)
 
@@ -92,7 +92,8 @@ Share the workspace via Git, sync folder, or backup zip (Settings → Backup & r
 |--------|-------------|
 | `npm run tauri dev` | Run app in development mode |
 | `npm run tauri:build` | Production build for current OS + path hint |
-| `npm run tauri:install:mac` | Build + open DMG (macOS only) |
+| `npm run tauri:install` | Build + open DMG (macOS; alias for `tauri:install:mac`) |
+| `npm run tauri:install:mac` | Same as above |
 
 ## CI
 

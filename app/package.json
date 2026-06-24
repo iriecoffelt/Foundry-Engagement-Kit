@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:build": "tauri build && node scripts/post-build-hint.mjs",
+    "tauri:install": "node scripts/tauri-install.mjs",
     "tauri:install:mac": "npm run tauri:build && bash scripts/open-installer.sh"
   },
   "dependencies": {

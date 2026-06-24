@@ -198,7 +198,7 @@ export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: Se
               <code className="text-brand-300">bundle/macos/*.app</code>,{" "}
               <code className="text-brand-300">bundle/dmg/*.dmg</code>
               <span className="mt-1 block text-xs text-fg-muted">
-                Open DMG after build: <code className="text-brand-300">npm run tauri:install:mac</code>
+                Open DMG after build: <code className="text-brand-300">npm run tauri:install</code>
               </span>
             </li>
             <li>

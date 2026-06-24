@@ -27,7 +27,7 @@ npm run tauri:build
 
 | Platform | Output (under `app/src-tauri/target/release/bundle/`) |
 |----------|------------------------------------------------------|
-| macOS | `.app`, `.dmg` — or `npm run tauri:install:mac` to open the DMG |
+| macOS | `.app`, `.dmg` — or `npm run tauri:install` to build and open the DMG |
 | Windows | `.msi`, NSIS `-setup.exe` |
 | Linux | `.deb`, `.AppImage`, `.rpm` |
 
