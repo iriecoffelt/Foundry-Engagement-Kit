@@ -545,8 +545,11 @@ fn open_path_with_system(app: AppHandle, relative: String) -> Result<(), String>
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
     let trimmed = url.trim();
-    if !trimmed.starts_with("http://") && !trimmed.starts_with("https://") {
-        return Err("URL must start with http:// or https://".into());
+    let allowed = trimmed.starts_with("http://")
+        || trimmed.starts_with("https://")
+        || trimmed.starts_with("x-apple.systempreferences:");
+    if !allowed {
+        return Err("URL scheme not allowed".into());
     }
     open::that(trimmed).map_err(|e| e.to_string())
 }
@@ -656,6 +659,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             get_workspace_root,
             set_workspace_root,
