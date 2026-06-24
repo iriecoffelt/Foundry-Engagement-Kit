@@ -7,16 +7,10 @@ import {
   generateScopingMd,
   slugify,
 } from "../../lib/markdown";
-import type { EngagementData, EngagementStatus, Stakeholder, SuccessMetric } from "../../types";
+import type { EngagementData, EngagementStatus, SuccessMetric } from "../../types";
+import { emptyStakeholder } from "../../lib/stakeholders";
 import { Field, FormCard, SelectInput, TextArea, TextInput } from "../forms/FormField";
 import { WizardShell } from "../wizard/WizardShell";
-
-const emptyStakeholder = (): Stakeholder => ({
-  name: "",
-  role: "",
-  influence: "Medium",
-  notes: "",
-});
 
 const emptyMetric = (): SuccessMetric => ({
   metric: "",

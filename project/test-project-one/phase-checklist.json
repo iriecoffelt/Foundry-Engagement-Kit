@@ -1,0 +1,121 @@
+{
+  "phases": {
+    "build": [
+      {
+        "done": false,
+        "id": "b1",
+        "label": "Core pipelines running in dev"
+      },
+      {
+        "done": false,
+        "id": "b2",
+        "label": "Ontology backing wired"
+      },
+      {
+        "done": false,
+        "id": "b3",
+        "label": "Workshop app in UAT"
+      },
+      {
+        "done": false,
+        "id": "b4",
+        "label": "UAT scenarios pass"
+      }
+    ],
+    "deploy": [
+      {
+        "done": false,
+        "id": "dp1",
+        "label": "Go-live checklist complete"
+      },
+      {
+        "done": false,
+        "id": "dp2",
+        "label": "Runbook reviewed with customer"
+      },
+      {
+        "done": false,
+        "id": "dp3",
+        "label": "Production smoke tests pass"
+      }
+    ],
+    "design": [
+      {
+        "done": false,
+        "id": "de1",
+        "label": "Ontology design reviewed"
+      },
+      {
+        "done": false,
+        "id": "de2",
+        "label": "Pipeline design documented"
+      },
+      {
+        "done": false,
+        "id": "de3",
+        "label": "Workshop spec approved"
+      },
+      {
+        "done": false,
+        "id": "de4",
+        "label": "Architecture diagram saved"
+      }
+    ],
+    "discovery": [
+      {
+        "done": false,
+        "id": "d1",
+        "label": "Problem statement agreed with sponsor"
+      },
+      {
+        "done": false,
+        "id": "d2",
+        "label": "End-user interview completed"
+      },
+      {
+        "done": false,
+        "id": "d3",
+        "label": "Data source inventory started"
+      },
+      {
+        "done": false,
+        "id": "d4",
+        "label": "Constraints documented"
+      }
+    ],
+    "handoff": [
+      {
+        "done": false,
+        "id": "h1",
+        "label": "Knowledge transfer sessions done"
+      },
+      {
+        "done": false,
+        "id": "h2",
+        "label": "Customer owner identified"
+      },
+      {
+        "done": false,
+        "id": "h3",
+        "label": "Handoff sign-off obtained"
+      }
+    ],
+    "scoping": [
+      {
+        "done": false,
+        "id": "s1",
+        "label": "Scope document signed"
+      },
+      {
+        "done": false,
+        "id": "s2",
+        "label": "Success metrics defined"
+      },
+      {
+        "done": false,
+        "id": "s3",
+        "label": "Milestone plan agreed"
+      }
+    ]
+  }
+}

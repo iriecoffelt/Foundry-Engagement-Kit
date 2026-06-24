@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Calendar,
   CalendarDays,
   FolderKanban,
@@ -25,6 +26,7 @@ type NavItem = { id: Section; label: string; icon: LucideIcon };
 
 const workNav: NavItem[] = [
   { id: "home", label: "Home", icon: Home },
+  { id: "portfolio", label: "Portfolio", icon: BarChart3 },
   { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "daily", label: "Daily", icon: Calendar },
   { id: "weekly", label: "Weekly", icon: CalendarDays },
@@ -32,6 +34,7 @@ const workNav: NavItem[] = [
 
 const toolsNav: NavItem[] = [
   { id: "library", label: "Library", icon: Library },
+  { id: "search", label: "Search", icon: Search },
   { id: "focus", label: "Focus", icon: Timer },
 ];
 

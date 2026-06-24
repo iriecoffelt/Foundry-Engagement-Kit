@@ -1,11 +1,12 @@
 import {
   ArrowLeft,
+  BookOpen,
   Copy,
   FileDown,
   FileText,
   Layers,
   Network,
-  Upload,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ProjectMeta } from "../../types";
@@ -17,14 +18,21 @@ import {
 import { PrimaryButton, SecondaryButton } from "../forms/FormField";
 import { StatusBadge } from "../StatusBadge";
 
-export type ProjectTab = "overview" | "ontology" | "architecture" | "documents" | "files";
+export type ProjectTab =
+  | "overview"
+  | "stakeholders"
+  | "ontology"
+  | "architecture"
+  | "documents"
+  | "library";
 
 const TABS: { id: ProjectTab; label: string; icon: LucideIcon }[] = [
   { id: "overview", label: "Overview", icon: FileText },
+  { id: "stakeholders", label: "Stakeholders", icon: Users },
   { id: "ontology", label: "Ontology", icon: Layers },
   { id: "architecture", label: "Architecture", icon: Network },
   { id: "documents", label: "Documents", icon: FileText },
-  { id: "files", label: "Files", icon: Upload },
+  { id: "library", label: "Library", icon: BookOpen },
 ];
 
 function ProgressRing({ progress, status }: { progress: number; status: string }) {

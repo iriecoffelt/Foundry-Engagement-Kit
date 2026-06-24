@@ -27,6 +27,7 @@ export const api = {
   resolveAbsolutePath: (relative: string) =>
     invoke<string>("resolve_absolute_path", { relative }),
   openPath: (relative: string) => invoke<void>("open_path_with_system", { relative }),
+  openUrl: (url: string) => invoke<void>("open_url", { url }),
   setupEngagementProject: (
     slug: string,
     engagementJson: unknown,
@@ -49,4 +50,14 @@ export const api = {
     invoke<void>("write_binary", { relative, bytes }),
   writeBytesAbsolute: (destPath: string, bytes: number[]) =>
     invoke<void>("write_bytes_absolute", { destPath, bytes }),
+  exportWorkspaceArchive: (destPath: string) =>
+    invoke<void>("export_workspace_archive", { destPath }),
+  importWorkspaceArchive: (sourcePath: string) =>
+    invoke<void>("import_workspace_archive", { sourcePath }),
+  searchWorkspace: (query: string, projectFilter?: string, categoryFilter?: string) =>
+    invoke<import("../types").SearchHit[]>("search_workspace", {
+      query,
+      projectFilter: projectFilter || null,
+      categoryFilter: categoryFilter || null,
+    }),
 };

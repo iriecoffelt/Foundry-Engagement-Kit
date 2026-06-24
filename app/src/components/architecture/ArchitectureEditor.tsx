@@ -20,12 +20,19 @@ import {
 import "@xyflow/react/dist/style.css";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { toPng } from "html-to-image";
-import { Database, GitBranch, ImageDown, Layers, Monitor, Server, User } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Database, ExternalLink, GitBranch, ImageDown, Layers, Link2, Monitor, Server, User } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import {
+  loadProjectStackUrl,
+  openFoundryLink,
+  supportsFoundryLink,
+} from "../../lib/foundryLinks";
 import { generateDesignOverviewMermaid } from "../../lib/markdown";
 import type { ArchNodeType, ArchitectureGraph } from "../../types";
 import { SecondaryButton } from "../forms/FormField";
+import { ArchNodeDetailsPanel } from "./ArchNodeDetailsPanel";
+import { ProjectFoundryStackField } from "../projects/ProjectFoundryStackField";
 
 const NODE_TYPES: { type: ArchNodeType; label: string; icon: typeof Server; color: string }[] = [
   { type: "source", label: "Source System", icon: Server, color: "#6366f1" },
@@ -39,12 +46,18 @@ const NODE_TYPES: { type: ArchNodeType; label: string; icon: typeof Server; colo
 const IMAGE_WIDTH = 1920;
 const IMAGE_HEIGHT = 1080;
 
+const FoundryLinkContext = createContext({ stackUrl: "" });
+
 function ArchNode({ id, data, selected }: NodeProps) {
   const { setNodes } = useReactFlow();
+  const { stackUrl } = useContext(FoundryLinkContext);
   const meta = NODE_TYPES.find((n) => n.type === data.nodeType) || NODE_TYPES[0];
   const Icon = meta.icon;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(data.label || meta.label));
+  const foundryLink = String(data.foundryLink || "");
+  const hasLink = foundryLink.trim().length > 0;
+  const linkable = supportsFoundryLink(String(data.nodeType));
 
   const commitLabel = () => {
     const label = draft.trim() || meta.label;
@@ -60,9 +73,18 @@ function ArchNode({ id, data, selected }: NodeProps) {
     setEditing(true);
   };
 
+  const jumpToFoundry = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await openFoundryLink(stackUrl, foundryLink, api.openUrl);
+    } catch (err) {
+      alert(String(err));
+    }
+  };
+
   return (
     <div
-      className={`min-w-[140px] rounded-xl border-2 bg-surface-raised px-3 py-2 shadow-lg ${
+      className={`relative min-w-[140px] rounded-xl border-2 bg-surface-raised px-3 py-2 shadow-lg ${
         selected ? "ring-2 ring-brand-400/60" : ""
       }`}
       style={{ borderColor: meta.color }}
@@ -72,6 +94,16 @@ function ArchNode({ id, data, selected }: NodeProps) {
       }}
     >
       <Handle type="target" position={Position.Left} className="!bg-surface-subtle" />
+      {linkable && hasLink && (
+        <button
+          type="button"
+          onClick={jumpToFoundry}
+          title="Open in Foundry"
+          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-surface-border bg-brand-600 text-fg-on-accent shadow hover:bg-brand-500"
+        >
+          <ExternalLink size={12} />
+        </button>
+      )}
       {editing ? (
         <input
           autoFocus
@@ -89,9 +121,17 @@ function ArchNode({ id, data, selected }: NodeProps) {
           className="w-full rounded border border-surface-border-strong bg-surface-base px-2 py-1 text-sm text-fg-primary outline-none focus:border-brand-500"
         />
       ) : (
-        <div className="flex items-center gap-2">
-          <Icon size={16} style={{ color: meta.color }} />
-          <span className="text-sm font-medium text-fg-primary">{data.label as string}</span>
+        <div>
+          <div className="flex items-center gap-2">
+            <Icon size={16} style={{ color: meta.color }} />
+            <span className="text-sm font-medium text-fg-primary">{data.label as string}</span>
+          </div>
+          {linkable && hasLink && (
+            <p className="mt-1 flex items-center gap-1 truncate text-[10px] text-brand-400">
+              <Link2 size={10} className="shrink-0" />
+              <span className="truncate">{foundryLink}</span>
+            </p>
+          )}
         </div>
       )}
       <Handle type="source" position={Position.Right} className="!bg-surface-subtle" />
@@ -106,7 +146,11 @@ function toFlowNodes(graph: ArchitectureGraph): Node[] {
     id: n.id,
     type: "arch",
     position: n.position,
-    data: { label: n.data.label, nodeType: n.type },
+    data: {
+      label: n.data.label,
+      nodeType: n.type,
+      foundryLink: n.data.foundryLink || "",
+    },
   }));
 }
 
@@ -123,12 +167,19 @@ function toFlowEdges(graph: ArchitectureGraph) {
 
 function fromFlow(nodes: Node[], edges: Edge[]): ArchitectureGraph {
   return {
-    nodes: nodes.map((n) => ({
-      id: n.id,
-      type: (n.data.nodeType as ArchNodeType) || "dataset",
-      position: n.position,
-      data: { label: String(n.data.label || "Node") },
-    })),
+    nodes: nodes.map((n) => {
+      const data: ArchitectureGraph["nodes"][0]["data"] = {
+        label: String(n.data.label || "Node"),
+      };
+      const link = String(n.data.foundryLink || "").trim();
+      if (link) data.foundryLink = link;
+      return {
+        id: n.id,
+        type: (n.data.nodeType as ArchNodeType) || "dataset",
+        position: n.position,
+        data,
+      };
+    }),
     edges: edges.map((e) => ({
       id: e.id,
       source: e.source,
@@ -170,9 +221,15 @@ function ArchitectureEditorInner({ projectPath }: ArchitectureEditorProps) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [stackUrl, setStackUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    loadProjectStackUrl(projectPath).then(setStackUrl);
+  }, [projectPath]);
 
   useEffect(() => {
     api
@@ -191,6 +248,27 @@ function ArchitectureEditorInner({ projectPath }: ArchitectureEditorProps) {
     (connection: Connection) =>
       setEdges((eds) => addEdge({ ...connection, animated: true, style: { stroke: "#64748b" } }, eds)),
     [setEdges],
+  );
+
+  const onSelectionChange = useCallback(
+    ({ nodes: selected }: { nodes: Node[] }) => {
+      setSelectedNode(selected.length === 1 ? selected[0] : null);
+    },
+    [],
+  );
+
+  const updateNodeLink = useCallback(
+    (nodeId: string, foundryLink: string) => {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, foundryLink } } : n)),
+      );
+      setSelectedNode((current) =>
+        current?.id === nodeId
+          ? { ...current, data: { ...current.data, foundryLink } }
+          : current,
+      );
+    },
+    [setNodes],
   );
 
   const addNode = (type: ArchNodeType) => {
@@ -295,7 +373,16 @@ function ArchitectureEditorInner({ projectPath }: ArchitectureEditorProps) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <FoundryLinkContext.Provider value={{ stackUrl }}>
+      <div className="flex h-full flex-col">
+      <div className="flex flex-wrap items-end gap-3 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
+        <ProjectFoundryStackField
+          projectPath={projectPath}
+          value={stackUrl}
+          onChange={setStackUrl}
+          compact
+        />
+      </div>
       <div className="flex flex-wrap items-center gap-2 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
         <span className="mr-2 text-sm text-fg-secondary">Add:</span>
         {NODE_TYPES.map((n) => (
@@ -331,28 +418,38 @@ function ArchitectureEditorInner({ projectPath }: ArchitectureEditorProps) {
           {message}
         </div>
       )}
-      <div className="min-h-0 flex-1">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          fitView
-          className="bg-surface-base"
-        >
-          <Background color="#334155" gap={20} />
-          <Controls className="!bg-surface-raised !border-surface-border-strong" />
-          <MiniMap className="!bg-surface-raised" />
-        </ReactFlow>
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onSelectionChange={onSelectionChange}
+            nodeTypes={nodeTypes}
+            fitView
+            className="bg-surface-base"
+          >
+            <Background color="#334155" gap={20} />
+            <Controls className="!bg-surface-raised !border-surface-border-strong" />
+            <MiniMap className="!bg-surface-raised" />
+          </ReactFlow>
+        </div>
+        <ArchNodeDetailsPanel
+          node={selectedNode}
+          stackUrl={stackUrl}
+          onUpdateLink={updateNodeLink}
+          onClose={() => setSelectedNode(null)}
+        />
       </div>
       <p className="border-t border-surface-border px-4 py-2 text-xs text-fg-muted">
-        Drag nodes to arrange. Double-click a node to rename. Click Save diagram to persist changes.
-        PNG export for slides; Mermaid via{" "}
-        <code className="text-brand-400">02-design/design-overview.md</code>
+        Drag nodes to arrange. Double-click to rename. Select a node to add a Foundry deep link (RID
+        or URL) — click the link badge to open in your browser. Save diagram to persist to{" "}
+        <code className="text-brand-400">architecture.json</code>.
       </p>
-    </div>
+      </div>
+    </FoundryLinkContext.Provider>
   );
 }
 

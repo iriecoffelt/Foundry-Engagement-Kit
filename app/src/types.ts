@@ -7,12 +7,22 @@ export interface FileEntry {
 
 export type Section =
   | "home"
+  | "portfolio"
   | "projects"
   | "daily"
   | "weekly"
   | "library"
+  | "search"
   | "focus"
   | "settings";
+
+export interface SearchHit {
+  path: string;
+  name: string;
+  snippet: string;
+  category: string;
+  project: string | null;
+}
 
 export interface OpenFile {
   path: string;
@@ -38,9 +48,11 @@ export type EngagementStatus =
   | "handoff";
 
 export interface Stakeholder {
+  id?: string;
   name: string;
   role: string;
   influence: string;
+  interest?: string;
   notes: string;
 }
 
@@ -62,6 +74,7 @@ export interface EngagementData {
   pain: string;
   toBe: string;
   outOfScope: string;
+  foundryStackUrl?: string;
   stakeholders: Stakeholder[];
   successMetrics: SuccessMetric[];
 }
@@ -103,7 +116,7 @@ export interface ArchitectureGraph {
     id: string;
     type: ArchNodeType;
     position: { x: number; y: number };
-    data: { label: string; notes?: string };
+    data: { label: string; notes?: string; foundryLink?: string };
   }[];
   edges: { id: string; source: string; target: string; label?: string }[];
 }

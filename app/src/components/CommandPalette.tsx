@@ -42,10 +42,12 @@ export function CommandPalette({
 
   const actions: CommandAction[] = [
     { id: "home", label: "Go to Home", section: "home", action: () => onNavigate("home") },
+    { id: "portfolio", label: "Go to Portfolio", section: "portfolio", action: () => onNavigate("portfolio") },
     { id: "projects", label: "Go to Projects", section: "projects", action: () => onNavigate("projects") },
     { id: "daily", label: "Go to Daily", section: "daily", action: () => onNavigate("daily") },
     { id: "weekly", label: "Go to Weekly", section: "weekly", action: () => onNavigate("weekly") },
     { id: "library", label: "Go to Library", section: "library", action: () => onNavigate("library") },
+    { id: "search", label: "Go to Search", section: "search", keywords: "find files", action: () => onNavigate("search") },
     { id: "settings", label: "Go to Settings", section: "settings", action: () => onNavigate("settings") },
     { id: "standup", label: "Start today's standup", keywords: "daily", action: onStartStandup },
     { id: "weekly-w", label: "Start weekly review", action: onStartWeekly },

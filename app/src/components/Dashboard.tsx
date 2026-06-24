@@ -1,13 +1,14 @@
 import { Calendar, CalendarDays, FolderKanban, Sparkles, Users } from "lucide-react";
-import type { ProjectMeta } from "../types";
+import type { ProjectMeta, Section } from "../types";
 import { CadenceAlerts } from "./CadenceAlerts";
+import { InsightsPanel } from "./insights/InsightsPanel";
 import { PrimaryButton } from "./forms/FormField";
 import { RecentActivity } from "./RecentActivity";
 import { StatusBadge } from "./StatusBadge";
 
 interface DashboardProps {
   projects: ProjectMeta[];
-  onNavigate: (section: "daily" | "weekly" | "projects") => void;
+  onNavigate: (section: Section) => void;
   onStartStandup: () => void;
   onStartWeekly: () => void;
   onStartCustomerSync: () => void;
@@ -111,6 +112,8 @@ export function Dashboard({
             </div>
           )}
         </div>
+
+        <InsightsPanel projects={projects} onOpenPath={onOpenRecent} />
 
         <RecentActivity onOpen={onOpenRecent} />
       </div>

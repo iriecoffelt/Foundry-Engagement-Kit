@@ -2,11 +2,14 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen } from "lucide-react";
 import { useState } from "react";
 import { api } from "../lib/api";
+import { BackupSection } from "./settings/BackupSection";
+import { NotificationSettings } from "./settings/NotificationSettings";
 import { ThemeSelector } from "./settings/ThemeSelector";
 
 interface SettingsViewProps {
   workspaceRoot: string;
   onWorkspaceChange: (root: string) => void;
+  onRefresh: () => void;
 }
 
 function CodeBlock({ children }: { children: string }) {
@@ -35,7 +38,7 @@ function Section({
   );
 }
 
-export function SettingsView({ workspaceRoot, onWorkspaceChange }: SettingsViewProps) {
+export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: SettingsViewProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -72,6 +75,20 @@ export function SettingsView({ workspaceRoot, onWorkspaceChange }: SettingsViewP
           description="Dark or light mode plus accent color for the full app shell — sidebar, cards, editors, and buttons."
         >
           <ThemeSelector />
+        </Section>
+
+        <Section
+          title="Notifications"
+          description="Desktop reminders when standups or weekly reviews are overdue."
+        >
+          <NotificationSettings />
+        </Section>
+
+        <Section
+          title="Backup & restore"
+          description="Export or import your entire workspace as a ZIP archive."
+        >
+          <BackupSection onRefresh={onRefresh} />
         </Section>
 
         <Section

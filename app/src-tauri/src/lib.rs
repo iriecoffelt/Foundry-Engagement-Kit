@@ -6,6 +6,8 @@ use tauri::{AppHandle, Manager};
 use walkdir::WalkDir;
 
 mod report_export;
+mod workspace_backup;
+mod workspace_search;
 
 const CONFIG_FILE: &str = "workspace.json";
 
@@ -541,6 +543,15 @@ fn open_path_with_system(app: AppHandle, relative: String) -> Result<(), String>
 }
 
 #[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    let trimmed = url.trim();
+    if !trimmed.starts_with("http://") && !trimmed.starts_with("https://") {
+        return Err("URL must start with http:// or https://".into());
+    }
+    open::that(trimmed).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn export_project_report(
     app: AppHandle,
     project_path: String,
@@ -608,6 +619,38 @@ fn write_binary(app: AppHandle, relative: String, bytes: Vec<u8>) -> Result<(), 
     fs::write(full, bytes).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn export_workspace_archive(app: AppHandle, dest_path: String) -> Result<(), String> {
+    let root = resolve_workspace(&app)?;
+    let dest = workspace_backup::resolve_backup_dest(&dest_path);
+    workspace_backup::export_workspace(&root, &dest)
+}
+
+#[tauri::command]
+fn import_workspace_archive(app: AppHandle, source_path: String) -> Result<(), String> {
+    let root = resolve_workspace(&app)?;
+    let source = PathBuf::from(&source_path);
+    workspace_backup::import_workspace(&root, &source)
+}
+
+#[tauri::command]
+fn search_workspace(
+    app: AppHandle,
+    query: String,
+    project_filter: Option<String>,
+    category_filter: Option<String>,
+) -> Result<Vec<workspace_search::SearchHit>, String> {
+    let root = resolve_workspace(&app)?;
+    let pf = project_filter.filter(|s| !s.is_empty() && s != "all");
+    let cf = category_filter.filter(|s| !s.is_empty() && s != "all");
+    workspace_search::search_workspace(
+        &root,
+        &query,
+        pf.as_deref(),
+        cf.as_deref(),
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -632,11 +675,15 @@ pub fn run() {
             list_projects_with_meta,
             resolve_absolute_path,
             open_path_with_system,
+            open_url,
             export_project_report,
             write_bytes_absolute,
             write_binary,
             setup_engagement_project,
             clone_project,
+            export_workspace_archive,
+            import_workspace_archive,
+            search_workspace,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api } from "./lib/api";
+import { getCadenceAlerts } from "./lib/cadence";
+import { startCadenceNotificationPoller } from "./lib/notifications";
 import { trackRecent } from "./lib/recent";
 import type { OpenFile, ProjectMeta, Section } from "./types";
 import { Dashboard } from "./components/Dashboard";
@@ -9,6 +11,7 @@ import { Modal } from "./components/Modal";
 import { SectionFallback } from "./components/SectionFallback";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
+import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
 
 const ProjectsHub = lazy(() =>
   import("./components/projects/ProjectsHub").then((m) => ({ default: m.ProjectsHub })),
@@ -21,6 +24,12 @@ const WeeklyHub = lazy(() =>
 );
 const LibraryHub = lazy(() =>
   import("./components/library/LibraryHub").then((m) => ({ default: m.LibraryHub })),
+);
+const PortfolioHub = lazy(() =>
+  import("./components/portfolio/PortfolioHub").then((m) => ({ default: m.PortfolioHub })),
+);
+const SearchHub = lazy(() =>
+  import("./components/search/SearchHub").then((m) => ({ default: m.SearchHub })),
 );
 const FocusTimer = lazy(() =>
   import("./components/focus/FocusTimer").then((m) => ({ default: m.FocusTimer })),
@@ -56,6 +65,11 @@ export default function App() {
   useEffect(() => {
     refresh();
   }, [refresh, refreshKey]);
+
+  useEffect(() => {
+    if (!projects.length) return;
+    return startCadenceNotificationPoller(() => getCadenceAlerts(projects));
+  }, [projects]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -131,6 +145,13 @@ export default function App() {
         )}
 
         <Suspense fallback={<SectionFallback />}>
+          {section === "portfolio" && (
+            <PortfolioHub
+              projects={projects}
+              onOpenProject={() => setSection("projects")}
+            />
+          )}
+
           {section === "projects" && (
             <ProjectsHub
               startWizard={projectsAutoWizard}
@@ -161,6 +182,10 @@ export default function App() {
 
           {section === "library" && <LibraryHub />}
 
+          {section === "search" && (
+            <SearchHub projects={projects} onOpenPath={openPath} />
+          )}
+
           {section === "focus" && (
             <FocusTimer projects={projects} onExit={() => setSection("home")} />
           )}
@@ -173,9 +198,24 @@ export default function App() {
               setWorkspaceRoot(root);
               bump();
             }}
+            onRefresh={bump}
           />
         )}
       </div>
+
+      <OnboardingChecklist
+        workspaceRoot={workspaceRoot}
+        projects={projects}
+        onNavigate={setSection}
+        onStartStandup={() => {
+          setSection("daily");
+          setDailyAutoStart(true);
+        }}
+        onNewProject={() => {
+          setSection("projects");
+          setProjectsAutoWizard(true);
+        }}
+      />
 
       {commandOpen && (
         <Suspense fallback={null}>

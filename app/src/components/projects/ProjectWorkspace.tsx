@@ -1,5 +1,4 @@
-import { open } from "@tauri-apps/plugin-dialog";
-import { ExternalLink, FileText, Upload } from "lucide-react";
+import { FilePlus, FileText } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import {
@@ -20,14 +19,18 @@ import { Editor } from "../Editor";
 import { FileTree } from "../FileTree";
 import { HubEmpty, HubLayout, HubMain, HubSidebar } from "../layout/HubLayout";
 import { MarkdownPreview } from "../MarkdownPreview";
-import { PrimaryButton } from "../forms/FormField";
+import { SecondaryButton } from "../forms/FormField";
 import { SectionFallback } from "../SectionFallback";
 import { ExportReportModal } from "./ExportReportModal";
+import { AdrWizard } from "./AdrWizard";
+import { DocumentTemplatePicker } from "./DocumentTemplatePicker";
 import { HandoffReadiness } from "./HandoffReadiness";
 import { MilestoneTracker } from "./MilestoneTracker";
 import { OntologyQuickAdd } from "./OntologyQuickAdd";
 import { PhaseStepper } from "./PhaseStepper";
+import { StakeholderMap } from "./StakeholderMap";
 import { ProjectWorkspaceHeader, type ProjectTab } from "./ProjectWorkspaceHeader";
+import { ProjectLibrary } from "./ProjectLibrary";
 
 const ArchitectureEditor = lazy(() =>
   import("../architecture/ArchitectureEditor").then((m) => ({
@@ -50,6 +53,7 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
   );
   const [message, setMessage] = useState("");
   const [showExport, setShowExport] = useState(false);
+  const [showAdrWizard, setShowAdrWizard] = useState(false);
   const [phaseProgress, setPhaseProgress] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -98,16 +102,11 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
     refresh();
   }, [refresh]);
 
-  const uploadRef = async () => {
-    const selected = await open({ multiple: false, title: "Upload project reference" });
-    if (!selected || typeof selected !== "string") return;
-    try {
-      const dest = await api.importFile(selected, `${project.path}/references/`);
-      setMessage(`Uploaded ${dest}`);
-      await refresh();
-    } catch (e) {
-      setMessage(String(e));
-    }
+  const openDoc = async (path: string) => {
+    const content = await api.readFile(path);
+    setOpenFile({ path, content, dirty: false });
+    setTab("documents");
+    trackRecent(path, path.split("/").pop() || path, "Documents");
   };
 
   const copySummary = async () => {
@@ -155,6 +154,8 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
           </div>
         )}
 
+        {tab === "stakeholders" && <StakeholderMap project={project} />}
+
         {tab === "ontology" && <OntologyQuickAdd projectPath={project.path} />}
 
         {tab === "architecture" && (
@@ -165,7 +166,20 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
 
         {tab === "documents" && (
           <HubLayout>
-            <HubSidebar title="Documents" subtitle="Project folder tree">
+            <HubSidebar
+              title="Documents"
+              subtitle="Project folder tree"
+              actions={
+                <div className="flex flex-wrap gap-2">
+                  <DocumentTemplatePicker projectPath={project.path} onCreated={openDoc} />
+                  <SecondaryButton onClick={() => setShowAdrWizard(true)}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <FilePlus size={14} /> New ADR
+                    </span>
+                  </SecondaryButton>
+                </div>
+              }
+            >
               <FileTree
                 entries={docTree}
                 selectedPath={openFile?.path}
@@ -206,44 +220,24 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
           </HubLayout>
         )}
 
-        {tab === "files" && (
-          <div className="h-full overflow-y-auto p-6">
-            <div className="mx-auto max-w-3xl">
-              <div className="mb-6 flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-fg-primary">Project references</h3>
-                  <p className="mt-1 text-sm text-fg-secondary">
-                    Upload specs, screenshots, or customer docs
-                  </p>
-                </div>
-                <PrimaryButton onClick={uploadRef}>
-                  <span className="flex items-center gap-1.5">
-                    <Upload size={14} /> Upload file
-                  </span>
-                </PrimaryButton>
-              </div>
-              {uploads.length === 0 ? (
-                <div className="card-kit border-dashed p-12 text-center text-fg-muted">
-                  No files uploaded yet
-                </div>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {uploads.map((u) => (
-                    <button
-                      key={u.path}
-                      onClick={() => api.openPath(u.path)}
-                      className="card-kit-interactive flex items-center justify-between px-4 py-3 text-left"
-                    >
-                      <span className="truncate text-fg-body">{u.name}</span>
-                      <ExternalLink size={16} className="shrink-0 text-fg-muted" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+        {tab === "library" && (
+          <ProjectLibrary
+            projectPath={project.path}
+            onMessage={(msg) => {
+              setMessage(msg);
+              setTimeout(() => setMessage(""), 3000);
+              refresh();
+            }}
+          />
         )}
       </div>
+
+      <AdrWizard
+        open={showAdrWizard}
+        projectPath={project.path}
+        onClose={() => setShowAdrWizard(false)}
+        onCreated={openDoc}
+      />
 
       <ExportReportModal
         open={showExport}

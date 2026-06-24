@@ -5,7 +5,10 @@ import type {
   ArchitectureGraph,
   CustomerSyncData,
   OntologyObjectType,
+  Stakeholder,
+  SuccessMetric,
 } from "../types";
+import { stackUrlFromEngagement } from "./foundryLinks";
 
 export function slugify(name: string): string {
   return name
@@ -41,8 +44,24 @@ export function engagementFromJson(
     pain: String(json.pain || ""),
     toBe: String(json.toBe || ""),
     outOfScope: String(json.outOfScope || ""),
-    stakeholders: [],
-    successMetrics: [],
+    foundryStackUrl: stackUrlFromEngagement(json),
+    stakeholders: Array.isArray(json.stakeholders)
+      ? (json.stakeholders as Stakeholder[]).map((s, i) => ({
+          id: String(s.id || `sh-${i}`),
+          name: String(s.name || ""),
+          role: String(s.role || ""),
+          influence: String(s.influence || "M"),
+          interest: String(s.interest || "M"),
+          notes: String(s.notes || ""),
+        }))
+      : [],
+    successMetrics: Array.isArray(json.successMetrics)
+      ? (json.successMetrics as SuccessMetric[]).map((m) => ({
+          metric: String(m.metric || ""),
+          baseline: String(m.baseline || ""),
+          target: String(m.target || ""),
+        }))
+      : [],
   };
 }
 
@@ -223,6 +242,18 @@ export function engagementToJson(data: EngagementData) {
     pain: data.pain,
     toBe: data.toBe,
     outOfScope: data.outOfScope,
+    ...(data.foundryStackUrl ? { foundryStackUrl: data.foundryStackUrl } : {}),
+    stakeholders: data.stakeholders
+      .filter((s) => s.name.trim() || s.role.trim())
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        role: s.role,
+        influence: s.influence || "M",
+        interest: s.interest || "M",
+        notes: s.notes,
+      })),
+    successMetrics: data.successMetrics.filter((m) => m.metric.trim()),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -257,17 +288,17 @@ export function generateDiscoveryMd(data: EngagementData): string {
     .filter((s) => s.name.trim())
     .map(
       (s) =>
-        `| ${s.name} | ${s.role} | ${s.influence || "—"} | ${s.notes || "—"} |`,
+        `| ${s.name} | ${s.role} | ${s.influence || "M"} | ${s.interest || "M"} | ${s.notes || "—"} |`,
     )
     .join("\n");
 
   return `# Discovery — ${data.displayName}
 
-## Stakeholders
+## Stakeholder map
 
-| Name | Role | Influence | Notes |
-|------|------|-----------|-------|
-${stakeholderRows || "| | | | |"}
+| Name | Role | Influence | Interest | Notes |
+|------|------|-----------|----------|-------|
+${stakeholderRows || "| | | H / M / L | H / M / L | |"}
 
 ## Problem statement
 
