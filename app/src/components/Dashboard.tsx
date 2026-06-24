@@ -5,6 +5,7 @@ import { InsightsPanel } from "./insights/InsightsPanel";
 import { PrimaryButton } from "./forms/FormField";
 import { RecentActivity } from "./RecentActivity";
 import { StatusBadge } from "./StatusBadge";
+import { ShortcutKbd } from "./ShortcutKbd";
 
 interface DashboardProps {
   projects: ProjectMeta[];
@@ -36,7 +37,7 @@ export function Dashboard({
             <h2 className="text-2xl font-bold text-fg-primary">Good to see you</h2>
             <p className="mt-1 text-fg-secondary">
               Guided workflows for your Foundry engagements — press{" "}
-              <kbd className="rounded border border-surface-border-strong px-1.5 text-xs">⌘K</kbd> to jump anywhere.
+              <ShortcutKbd keys="K" /> to jump anywhere.
             </p>
           </div>
         </div>

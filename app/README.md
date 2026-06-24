@@ -1,11 +1,14 @@
 # Foundry Engagement Kit — Desktop App
 
-Native macOS UI for the [Foundry Engagement Kit](../README.md) template workspace.
+Native desktop UI (macOS, Windows, Linux) for the [Foundry Engagement Kit](../README.md) template workspace.
 
 ## Requirements
 
 - Node.js 18+
-- Rust (for Tauri builds) — [install guide](https://v2.tauri.app/start/prerequisites/)
+- Rust — [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS
+  - **macOS** — Xcode command line tools
+  - **Windows** — Microsoft Edge WebView2 (usually pre-installed on Windows 10/11)
+  - **Linux** — `webkit2gtk` and related packages (see Tauri docs)
 
 ## Development
 
@@ -15,28 +18,41 @@ npm install
 npm run tauri dev
 ```
 
-## Build (macOS)
+## Build (local)
 
-**Build only** — produces `.app` and `.dmg` without opening the installer:
-
-```bash
-npm run tauri build
-```
-
-**Build and install** — builds, then opens the DMG in Finder:
+Build an installer for **your current platform**:
 
 ```bash
-npm run tauri:install
+cd app
+npm run tauri:build
 ```
 
-### Output paths
+Artifacts appear under `src-tauri/target/release/bundle/`:
 
-| Artifact | Path |
-|----------|------|
-| Application | `src-tauri/target/release/bundle/macos/Foundry Engagement Kit.app` |
-| DMG installer | `src-tauri/target/release/bundle/dmg/Foundry Engagement Kit_0.1.0_aarch64.dmg` |
+| Platform | Installers |
+|----------|------------|
+| **macOS** | `bundle/macos/*.app`, `bundle/dmg/*.dmg` |
+| **Windows** | `bundle/msi/*.msi`, `bundle/nsis/*-setup.exe` |
+| **Linux** | `bundle/deb/*.deb`, `bundle/appimage/*.AppImage`, `bundle/rpm/*.rpm` |
 
-If the installer window closes immediately, eject any mounted copy of the DMG and run `npm run tauri:install` again.
+**macOS only** — build and open the DMG in Finder:
+
+```bash
+npm run tauri:install:mac
+```
+
+If the installer window closes immediately, eject any mounted copy and run `npm run tauri:install:mac` again.
+
+## GitHub Releases (all platforms)
+
+CI builds macOS (Apple Silicon + Intel), Windows, and Linux installers when you push a version tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The [Release workflow](../.github/workflows/release.yml) creates a **draft** GitHub Release with attached installers. Publish the draft when ready.
 
 ## First launch
 
@@ -46,17 +62,19 @@ If the installer window closes immediately, eject any mounted copy of the DMG an
 
 ## Features
 
-- **Home** — standup, weekly review, customer sync; cadence alerts; recent activity
-- **Projects** — engagement overview, phase stepper, milestones, handoff readiness, ontology quick-add, architecture diagram (with PNG export), clone project, PDF/DOCX report export
+- **Home** — standup, weekly review, customer sync; cadence alerts; insights; recent activity
+- **Portfolio** — cross-engagement health and phase counts
+- **Projects** — engagement workspace, stakeholders, phase stepper, milestones, handoff readiness, ontology, architecture (with Foundry deep links), documents, library
 - **Daily / Weekly** — guided wizards; double-click standup entries to edit after saving
 - **Library** — editable reference guides and file uploads
+- **Search** — full-text search across the workspace
 - **Focus** — Pomodoro timer with full-screen and floating modes
-- **Command palette** — `⌘K` to jump anywhere or start wizards
-- **Save** — `⌘S` while editing any document
+- **Command palette** — `Ctrl+K` / `⌘K` to jump anywhere or start wizards
+- **Save** — `Ctrl+S` / `⌘S` while editing any document
 
 ## Data layout
 
-All data is plain files on disk under the workspace root you select in Settings:
+All data is plain files on disk under the workspace root you select in Settings — the same layout on every OS:
 
 ```
 daily/{project}/       — standups
@@ -66,10 +84,17 @@ reference/             — shared guides (editable in Library)
 reference/uploads/     — uploaded reference files
 ```
 
+Share the workspace via Git, sync folder, or backup zip (Settings → Backup & restore).
+
 ## Scripts
 
 | Script | Description |
 |--------|-------------|
 | `npm run tauri dev` | Run app in development mode |
-| `npm run tauri build` | Production build |
-| `npm run tauri:install` | Build + open DMG installer |
+| `npm run tauri:build` | Production build for current OS + path hint |
+| `npm run tauri:install:mac` | Build + open DMG (macOS only) |
+
+## CI
+
+- **Pull requests** — frontend TypeScript build + `cargo check` on Ubuntu, Windows, and macOS
+- **Tags `v*`** — full Tauri bundle for all platforms uploaded to GitHub Releases

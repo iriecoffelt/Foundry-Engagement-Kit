@@ -6,7 +6,7 @@ Everything lives as plain markdown and JSON on disk — no cloud sync, no databa
 
 ## Desktop app
 
-A native macOS UI in [`app/`](app/) — guided wizards, visual architecture editor, editable reference guides, focus timer, and **project report export (PDF / Word)**.
+A native desktop app in [`app/`](app/) (macOS, Windows, Linux) — guided wizards, visual architecture editor, editable reference guides, focus timer, and **project report export (PDF / Word)**.
 
 ### Install & run
 
@@ -18,23 +18,20 @@ npm install
 npm run tauri dev
 ```
 
-**Build a standalone app:**
+**Build a standalone installer** (for your OS):
 
 ```bash
 cd app
-npm run tauri build
+npm run tauri:build
 ```
 
-Output: `app/src-tauri/target/release/bundle/macos/Foundry Engagement Kit.app`
+| Platform | Output (under `app/src-tauri/target/release/bundle/`) |
+|----------|------------------------------------------------------|
+| macOS | `.app`, `.dmg` — or `npm run tauri:install:mac` to open the DMG |
+| Windows | `.msi`, NSIS `-setup.exe` |
+| Linux | `.deb`, `.AppImage`, `.rpm` |
 
-**Build and open the DMG installer:**
-
-```bash
-cd app
-npm run tauri:install
-```
-
-Output: `app/src-tauri/target/release/bundle/dmg/Foundry Engagement Kit_0.1.0_aarch64.dmg`
+**Download pre-built installers** from [GitHub Releases](https://github.com/iriecoffelt/Foundry-Engagement-Kit/releases) (push a `v*` tag to build all platforms — see [`app/README.md`](app/README.md#github-releases-all-platforms)).
 
 ### First launch
 
@@ -53,7 +50,7 @@ Output: `app/src-tauri/target/release/bundle/dmg/Foundry Engagement Kit_0.1.0_aa
 | **Focus** | Pomodoro-style timer (full-screen or floating pill) |
 | **Settings** | Workspace folder, shortcuts, build instructions |
 
-**Keyboard shortcuts:** `⌘K` command palette · `⌘S` save while editing
+**Keyboard shortcuts:** `Ctrl+K` / `⌘K` command palette · `Ctrl+S` / `⌘S` save while editing
 
 See [`app/README.md`](app/README.md) for more detail on development and build.
 

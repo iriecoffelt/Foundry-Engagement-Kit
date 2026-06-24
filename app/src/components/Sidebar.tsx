@@ -13,6 +13,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { Section } from "../types";
 import { AppBrand } from "./AppBrand";
+import { ShortcutKbd } from "./ShortcutKbd";
 
 interface SidebarProps {
   section: Section;
@@ -126,9 +127,7 @@ export function Sidebar({
             <Search size={18} />
             Quick search
           </span>
-          <kbd className="rounded border border-surface-border-strong bg-surface-base px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
-            ⌘K
-          </kbd>
+          <ShortcutKbd keys="K" />
         </button>
         <button
           onClick={() => onSectionChange("settings")}

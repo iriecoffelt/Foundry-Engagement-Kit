@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { BackupSection } from "./settings/BackupSection";
 import { NotificationSettings } from "./settings/NotificationSettings";
 import { ThemeSelector } from "./settings/ThemeSelector";
+import { ShortcutKbd } from "./ShortcutKbd";
 
 interface SettingsViewProps {
   workspaceRoot: string;
@@ -158,42 +159,63 @@ export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: Se
           <p className="mt-4 text-sm text-fg-secondary">Keyboard shortcuts</p>
           <ul className="mt-2 space-y-1 text-sm text-fg-body">
             <li>
-              <kbd className="rounded border border-surface-border-strong px-1.5 py-0.5 text-xs">⌘K</kbd> —
-              command palette (jump anywhere, start wizards)
+              <ShortcutKbd keys="K" /> — command palette (jump anywhere, start wizards)
             </li>
             <li>
-              <kbd className="rounded border border-surface-border-strong px-1.5 py-0.5 text-xs">⌘S</kbd> —
-              save while editing a document
+              <ShortcutKbd keys="S" /> — save while editing a document
             </li>
           </ul>
         </Section>
 
         <Section
           title="Development"
-          description="Run from source while working on the app. Run these from the app/ directory."
+          description="Run from source on macOS, Windows, or Linux. Commands run from the app/ directory."
         >
           <CodeBlock>{`cd app\nnpm install\nnpm run tauri dev`}</CodeBlock>
+          <p className="mt-3 text-xs text-fg-muted">
+            Prerequisites: Node.js 18+, Rust, and{" "}
+            <a
+              href="https://v2.tauri.app/start/prerequisites/"
+              className="text-brand-400 hover:underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Tauri system dependencies
+            </a>{" "}
+            for your OS (WebView2 on Windows, webkit2gtk on Linux).
+          </p>
         </Section>
 
         <Section
-          title="Build & install (macOS)"
-          description="Create a standalone .app and drag-to-Applications installer."
+          title="Build installers"
+          description="Production build for your current platform. Output under src-tauri/target/release/bundle/."
         >
-          <p className="text-sm text-fg-body">Build only (no installer window):</p>
-          <CodeBlock>{`cd app\nnpm run tauri build`}</CodeBlock>
-          <p className="mt-4 text-sm text-fg-body">Build and open the DMG installer:</p>
-          <CodeBlock>{`cd app\nnpm run tauri:install`}</CodeBlock>
-          <p className="mt-4 text-sm text-fg-secondary">Output locations</p>
-          <ul className="mt-2 space-y-1 font-mono text-xs text-fg-muted">
-            <li>app/src-tauri/target/release/bundle/macos/Foundry Engagement Kit.app</li>
+          <CodeBlock>{`cd app\nnpm run tauri:build`}</CodeBlock>
+          <p className="mt-4 text-sm text-fg-secondary">Artifacts by platform</p>
+          <ul className="mt-2 space-y-2 text-sm text-fg-body">
             <li>
-              app/src-tauri/target/release/bundle/dmg/Foundry Engagement Kit_0.1.0_aarch64.dmg
+              <strong className="text-fg-body">macOS</strong> —{" "}
+              <code className="text-brand-300">bundle/macos/*.app</code>,{" "}
+              <code className="text-brand-300">bundle/dmg/*.dmg</code>
+              <span className="mt-1 block text-xs text-fg-muted">
+                Open DMG after build: <code className="text-brand-300">npm run tauri:install:mac</code>
+              </span>
+            </li>
+            <li>
+              <strong className="text-fg-body">Windows</strong> —{" "}
+              <code className="text-brand-300">bundle/msi/*.msi</code>,{" "}
+              <code className="text-brand-300">bundle/nsis/*-setup.exe</code>
+            </li>
+            <li>
+              <strong className="text-fg-body">Linux</strong> —{" "}
+              <code className="text-brand-300">bundle/deb/*.deb</code>,{" "}
+              <code className="text-brand-300">bundle/appimage/*.AppImage</code>,{" "}
+              <code className="text-brand-300">bundle/rpm/*.rpm</code>
             </li>
           </ul>
           <p className="mt-4 text-xs text-fg-muted">
-            If the installer window closes immediately, eject any mounted copy and run{" "}
-            <code className="text-brand-300">npm run tauri:install</code> again, or open the
-            .dmg manually from the path above.
+            GitHub Releases (all platforms): tag <code className="text-brand-300">v0.1.0</code>{" "}
+            or later — CI uploads macOS, Windows, and Linux installers automatically.
           </p>
         </Section>
 

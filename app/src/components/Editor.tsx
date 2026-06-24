@@ -1,6 +1,7 @@
 import { Columns2, Eye, FileText, Pencil, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { shortcut } from "../lib/shortcuts";
 
 type ViewMode = "edit" | "preview" | "split";
 
@@ -120,7 +121,7 @@ export function Editor({
             type="button"
             onClick={onSave}
             disabled={!dirty}
-            title="Save (⌘S)"
+            title={`Save (${shortcut("S")})`}
             className="editor-action editor-action-primary disabled:opacity-40"
           >
             <Save size={15} />
