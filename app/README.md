@@ -4,7 +4,7 @@ Native desktop UI (macOS, Windows, Linux) for the [Foundry Engagement Kit](../RE
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20+ (CI uses 24)
 - Rust — [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS
   - **macOS** — Xcode command line tools
   - **Windows** — Microsoft Edge WebView2 (usually pre-installed on Windows 10/11)
