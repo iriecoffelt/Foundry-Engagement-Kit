@@ -1,9 +1,10 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { BookOpen, ExternalLink, Upload } from "lucide-react";
+import { ArrowLeft, BookOpen, ExternalLink, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { FileEntry } from "../../types";
-import { PrimaryButton } from "../forms/FormField";
+import { Editor } from "../Editor";
+import { PrimaryButton, SecondaryButton } from "../forms/FormField";
 
 interface ProjectLibraryProps {
   projectPath: string;
@@ -13,6 +14,11 @@ interface ProjectLibraryProps {
 export function ProjectLibrary({ projectPath, onMessage }: ProjectLibraryProps) {
   const [uploads, setUploads] = useState<FileEntry[]>([]);
   const [guides, setGuides] = useState<FileEntry[]>([]);
+  const [openGuide, setOpenGuide] = useState<{
+    path: string;
+    content: string;
+    dirty: boolean;
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -46,6 +52,53 @@ export function ProjectLibrary({ projectPath, onMessage }: ProjectLibraryProps) 
     }
   };
 
+  const openGuideFile = async (path: string) => {
+    const content = await api.readFile(path);
+    setOpenGuide({ path, content, dirty: false });
+  };
+
+  if (openGuide) {
+    const guideTitle =
+      openGuide.path
+        .split("/")
+        .pop()
+        ?.replace(".md", "")
+        .replace(/-/g, " ") ?? "Guide";
+
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-800 px-4 py-3">
+          <SecondaryButton onClick={() => setOpenGuide(null)}>
+            <span className="inline-flex items-center gap-1.5">
+              <ArrowLeft size={14} /> Back to library
+            </span>
+          </SecondaryButton>
+          <span className="truncate text-sm font-medium text-fg-primary">{guideTitle}</span>
+        </div>
+        <div className="min-h-0 flex-1">
+          <Editor
+            path={openGuide.path}
+            content={openGuide.content}
+            dirty={openGuide.dirty}
+            defaultView="split"
+            onChange={(content) => setOpenGuide({ ...openGuide, content, dirty: true })}
+            onSave={async () => {
+              await api.writeFile(openGuide.path, openGuide.content);
+              setOpenGuide({ ...openGuide, dirty: false });
+              onMessage("Guide saved");
+            }}
+            onDelete={async () => {
+              if (!confirm(`Delete ${openGuide.path}?`)) return;
+              await api.deletePath(openGuide.path);
+              setOpenGuide(null);
+              refresh();
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto max-w-3xl space-y-8">
@@ -74,6 +127,7 @@ export function ProjectLibrary({ projectPath, onMessage }: ProjectLibraryProps) 
                   key={u.path}
                   onClick={() => api.openPath(u.path)}
                   className="card-kit-interactive flex items-center justify-between px-4 py-3 text-left"
+                  title="Open with default app"
                 >
                   <span className="truncate text-fg-body">{u.name}</span>
                   <ExternalLink size={16} className="shrink-0 text-fg-muted" />
@@ -89,7 +143,7 @@ export function ProjectLibrary({ projectPath, onMessage }: ProjectLibraryProps) 
             <div>
               <h3 className="font-semibold text-fg-primary">Workspace guides</h3>
               <p className="text-sm text-fg-secondary">
-                Shared reference material from reference/
+                Shared reference material from reference/ — view and edit in the app
               </p>
             </div>
           </div>
@@ -100,13 +154,13 @@ export function ProjectLibrary({ projectPath, onMessage }: ProjectLibraryProps) 
               {guides.map((g) => (
                 <button
                   key={g.path}
-                  onClick={() => api.openPath(g.path)}
+                  onClick={() => openGuideFile(g.path)}
                   className="card-kit-interactive flex items-center justify-between px-4 py-3 text-left"
                 >
                   <span className="text-fg-body">
                     {g.name.replace(".md", "").replace(/-/g, " ")}
                   </span>
-                  <ExternalLink size={16} className="shrink-0 text-fg-muted" />
+                  <BookOpen size={16} className="shrink-0 text-fg-muted" />
                 </button>
               ))}
             </div>

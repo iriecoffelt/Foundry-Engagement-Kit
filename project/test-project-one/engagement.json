@@ -1,0 +1,44 @@
+{
+  "stakeholders": [
+    {
+      "id": "sh-import-0",
+      "influence": "H",
+      "interest": "H",
+      "name": "Test Person One",
+      "notes": "",
+      "role": "Executive sponsor"
+    },
+    {
+      "id": "sh-import-1",
+      "influence": "M",
+      "interest": "M",
+      "name": "Domain expert",
+      "notes": "",
+      "role": ""
+    },
+    {
+      "id": "sh-import-2",
+      "influence": "M",
+      "interest": "M",
+      "name": "IT / data owner",
+      "notes": "",
+      "role": ""
+    },
+    {
+      "id": "sh-import-3",
+      "influence": "M",
+      "interest": "M",
+      "name": "End user rep",
+      "notes": "",
+      "role": ""
+    },
+    {
+      "id": "sh-1782273960072",
+      "influence": "M",
+      "interest": "H",
+      "name": "Test Person Two",
+      "notes": "",
+      "role": "Security Manager"
+    }
+  ]
+}

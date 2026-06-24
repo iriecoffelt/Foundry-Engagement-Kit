@@ -10,11 +10,11 @@
 
 | Name | Role | Influence | Interest | Notes |
 |------|------|-----------|----------|-------|
-| | Executive sponsor | H / M / L | H / M / L | |
-| | Domain expert | | | |
-| | IT / data owner | | | |
-| | End user rep | | | |
-
+| Test Person One | Executive sponsor | H | H | — |
+| Domain expert | — | M | M | — |
+| IT / data owner | — | M | M | — |
+| End user rep | — | M | M | — |
+| Test Person Two | Security Manager | M | H | — |
 ## User personas
 
 ### Persona 1: {{NAME}}
