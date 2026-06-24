@@ -70,6 +70,7 @@ export function WorkspaceSetupModal({ open: isOpen, onComplete }: WorkspaceSetup
       open={isOpen}
       title="Set up your workspace"
       onClose={() => {}}
+      closeOnEscape={false}
       wide
       hideClose
       footer={

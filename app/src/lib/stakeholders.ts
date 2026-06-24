@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { engagementFromJson } from "./markdown";
+import { mergeStakeholdersIntoUsers, seedUsersFromEngagement } from "./projectUsers";
 import type { Stakeholder } from "../types";
 
 export const INFLUENCE_LEVELS = ["H", "M", "L"] as const;
@@ -9,7 +10,7 @@ export function emptyStakeholder(): Stakeholder {
   return {
     id: `sh-${Date.now()}`,
     name: "",
-    role: "",
+    role: "Stakeholder",
     influence: "M",
     interest: "M",
     notes: "",
@@ -205,9 +206,20 @@ export async function saveStakeholders(
 
   try {
     const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    await api.writeJson(`${projectPath}/engagement.json`, { ...eng, stakeholders: cleaned });
+    const existingUsers = Array.isArray(eng.projectUsers)
+      ? (eng.projectUsers as import("../types").ProjectUser[])
+      : seedUsersFromEngagement(eng);
+    const projectUsers = mergeStakeholdersIntoUsers(existingUsers, cleaned);
+    await api.writeJson(`${projectPath}/engagement.json`, {
+      ...eng,
+      stakeholders: cleaned,
+      projectUsers,
+    });
   } catch {
-    await api.writeJson(`${projectPath}/engagement.json`, { stakeholders: cleaned });
+    await api.writeJson(`${projectPath}/engagement.json`, {
+      stakeholders: cleaned,
+      projectUsers: mergeStakeholdersIntoUsers([], cleaned),
+    });
   }
 
   await syncDiscoveryStakeholders(projectPath, cleaned);

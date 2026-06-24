@@ -1,5 +1,8 @@
 import { todayISO } from "./markdown";
 
+export const ADR_STATUSES = ["Proposed", "Accepted", "Deprecated", "Superseded"] as const;
+export type AdrStatus = (typeof ADR_STATUSES)[number];
+
 export interface AdrData {
   number: number;
   title: string;

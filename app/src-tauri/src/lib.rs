@@ -5,6 +5,7 @@ use std::path::{Component, Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use walkdir::WalkDir;
 
+mod handoff_pack;
 mod report_export;
 mod workspace_backup;
 mod workspace_search;
@@ -610,6 +611,17 @@ fn open_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn export_handoff_pack(
+    app: AppHandle,
+    project_path: String,
+    dest_path: String,
+) -> Result<(), String> {
+    let root = resolve_workspace(&app)?;
+    let dest = PathBuf::from(&dest_path);
+    handoff_pack::export_handoff_pack(&root, &project_path, &dest)
+}
+
+#[tauri::command]
 fn export_project_report(
     app: AppHandle,
     project_path: String,
@@ -738,6 +750,7 @@ pub fn run() {
             open_path_with_system,
             open_url,
             export_project_report,
+            export_handoff_pack,
             write_bytes_absolute,
             write_binary,
             setup_engagement_project,

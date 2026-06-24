@@ -9,7 +9,12 @@ import {
   quadrantLabel,
   saveStakeholders,
 } from "../../lib/stakeholders";
-import type { ProjectMeta, Stakeholder } from "../../types";
+import {
+  loadActionItems,
+  newActionId,
+  saveActionItems,
+} from "../../lib/actionItems";
+import type { ActionItem, ProjectMeta, Stakeholder } from "../../types";
 import {
   Field,
   FormCard,
@@ -19,6 +24,8 @@ import {
   TextArea,
   TextInput,
 } from "../forms/FormField";
+import { RoleSelect } from "../RoleSelect";
+import { UserPicker } from "./UserPicker";
 
 interface StakeholderMapProps {
   project: ProjectMeta;
@@ -46,9 +53,12 @@ function LevelSelect({
 
 export function StakeholderMap({ project }: StakeholderMapProps) {
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [newActionTitle, setNewActionTitle] = useState("");
+  const [newActionAssignee, setNewActionAssignee] = useState("");
 
   const load = useCallback(async () => {
     const list = await loadStakeholders(project.path, {
@@ -59,6 +69,7 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
     });
     setStakeholders(list.length ? list : []);
     setSelectedId((current) => current ?? list[0]?.id ?? null);
+    setActionItems(await loadActionItems(project.path));
   }, [project]);
 
   useEffect(() => {
@@ -100,6 +111,49 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
     const updated = stakeholders.filter((s) => s.id !== selected.id);
     setSelectedId(updated[0]?.id ?? null);
     persist(updated);
+  };
+
+  const persistActions = async (items: ActionItem[]) => {
+    setActionItems(items);
+    setSaving(true);
+    try {
+      await saveActionItems(project.path, items);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addAction = () => {
+    const title = newActionTitle.trim();
+    if (!title) return;
+    persistActions([
+      ...actionItems,
+      {
+        id: newActionId(),
+        title,
+        assignee: newActionAssignee.trim() || selected?.name || "",
+        stakeholderId: selected?.id,
+        status: "open",
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    setNewActionTitle("");
+    setNewActionAssignee("");
+  };
+
+  const toggleAction = (id: string) => {
+    persistActions(
+      actionItems.map((a) =>
+        a.id === id
+          ? {
+              ...a,
+              status: a.status === "open" ? "done" : "open",
+              completedAt:
+                a.status === "open" ? new Date().toISOString() : undefined,
+            }
+          : a,
+      ),
+    );
   };
 
   const named = stakeholders.filter((s) => s.name.trim() || s.role.trim());
@@ -198,10 +252,9 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
                   <TextInput value={selected.name} onChange={(v) => updateSelected({ name: v })} />
                 </Field>
                 <Field label="Role">
-                  <TextInput
-                    value={selected.role}
+                  <RoleSelect
+                    value={selected.role || ""}
                     onChange={(v) => updateSelected({ role: v })}
-                    placeholder="Executive sponsor, domain expert…"
                   />
                 </Field>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -259,6 +312,65 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
                 </ul>
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="card-kit p-5">
+          <h4 className="font-medium text-fg-primary">Stakeholder action items</h4>
+          <p className="mt-1 text-sm text-fg-secondary">
+            Follow-ups owed by you or the customer — surfaces on Today view when due.
+          </p>
+          <div className="mt-4 space-y-2">
+            {actionItems.length === 0 && (
+              <p className="text-sm text-fg-muted">No action items yet.</p>
+            )}
+            {actionItems.map((a) => (
+              <div key={a.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-elevated/60">
+                <input
+                  type="checkbox"
+                  checked={a.status === "done"}
+                  onChange={() => toggleAction(a.id)}
+                  className="rounded"
+                />
+                <span
+                  className={`flex-1 text-sm ${
+                    a.status === "done" ? "text-fg-muted line-through" : "text-fg-body"
+                  }`}
+                >
+                  {a.title}
+                  {a.assignee ? (
+                    <span className="text-fg-muted"> — {a.assignee}</span>
+                  ) : null}
+                  {a.dueDate ? (
+                    <span className="text-fg-muted"> (due {a.dueDate})</span>
+                  ) : null}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <div className="min-w-[12rem] flex-1">
+              <TextInput
+                value={newActionTitle}
+                onChange={setNewActionTitle}
+                placeholder={
+                  selected?.name
+                    ? `Action for ${selected.name}…`
+                    : "New action item…"
+                }
+              />
+            </div>
+            <div className="w-44">
+              <UserPicker
+                projectPath={project.path}
+                value={newActionAssignee || selected?.name || ""}
+                onChange={setNewActionAssignee}
+                placeholder="Assignee"
+              />
+            </div>
+            <PrimaryButton onClick={addAction} disabled={!newActionTitle.trim()}>
+              Add action
+            </PrimaryButton>
           </div>
         </div>
 

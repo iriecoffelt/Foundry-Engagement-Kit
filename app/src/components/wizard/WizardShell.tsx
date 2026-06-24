@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEscapeKey } from "../../lib/useEscapeKey";
 
 interface WizardShellProps {
   title: string;
@@ -28,6 +29,8 @@ export function WizardShell({
   finishLabel = "Finish",
   children,
 }: WizardShellProps) {
+  useEscapeKey(onCancel);
+
   return (
     <div className="flex h-full flex-col bg-surface-base">
       <div className="border-b border-surface-border bg-surface-raised/60 px-8 py-6">

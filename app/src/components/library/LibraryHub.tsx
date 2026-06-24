@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { BookOpen, Library, Upload } from "lucide-react";
+import { BookOpen, Library, Tags, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { FileEntry } from "../../types";
@@ -12,6 +12,22 @@ import {
   HubSection,
   HubSidebar,
 } from "../layout/HubLayout";
+import { ArchitectureNodeTypesEditor } from "./ArchitectureNodeTypesEditor";
+import { DeliveryTypesEditor } from "./DeliveryTypesEditor";
+import { OntologyElementTypesEditor } from "./OntologyElementTypesEditor";
+import { FoundryAreasEditor } from "./FoundryAreasEditor";
+import { OrganizationsEditor } from "./OrganizationsEditor";
+import { RolesEditor } from "./RolesEditor";
+
+type LibraryPanel =
+  | "none"
+  | "roles"
+  | "foundry-areas"
+  | "organizations"
+  | "delivery-types"
+  | "architecture-node-types"
+  | "ontology-element-types"
+  | "guide";
 
 export function LibraryHub() {
   const [guides, setGuides] = useState<FileEntry[]>([]);
@@ -22,6 +38,7 @@ export function LibraryHub() {
     dirty: boolean;
   } | null>(null);
   const [status, setStatus] = useState("");
+  const [panel, setPanel] = useState<LibraryPanel>("none");
 
   const refresh = useCallback(async () => {
     const ref = await api.listDirectory("reference", false);
@@ -40,6 +57,7 @@ export function LibraryHub() {
   }, [refresh]);
 
   const openGuide = async (path: string) => {
+    setPanel("guide");
     const content = await api.readFile(path);
     setOpenFile({ path, content, dirty: false });
   };
@@ -59,7 +77,64 @@ export function LibraryHub() {
 
   return (
     <HubLayout>
-      <HubSidebar title="Library" subtitle="Guides and reference uploads">
+      <HubSidebar title="Library" subtitle="Guides, reference lists, and uploads">
+        <HubSection label="Reference lists" icon={Tags}>
+          <HubItem
+            selected={panel === "roles"}
+            onClick={() => {
+              setPanel("roles");
+              setOpenFile(null);
+            }}
+          >
+            Engagement roles
+          </HubItem>
+          <HubItem
+            selected={panel === "foundry-areas"}
+            onClick={() => {
+              setPanel("foundry-areas");
+              setOpenFile(null);
+            }}
+          >
+            Foundry areas
+          </HubItem>
+          <HubItem
+            selected={panel === "organizations"}
+            onClick={() => {
+              setPanel("organizations");
+              setOpenFile(null);
+            }}
+          >
+            Organizations
+          </HubItem>
+          <HubItem
+            selected={panel === "delivery-types"}
+            onClick={() => {
+              setPanel("delivery-types");
+              setOpenFile(null);
+            }}
+          >
+            Delivery types
+          </HubItem>
+          <HubItem
+            selected={panel === "architecture-node-types"}
+            onClick={() => {
+              setPanel("architecture-node-types");
+              setOpenFile(null);
+            }}
+          >
+            Architecture node types
+          </HubItem>
+          <HubItem
+            selected={panel === "ontology-element-types"}
+            onClick={() => {
+              setPanel("ontology-element-types");
+              setOpenFile(null);
+            }}
+          >
+            Ontology element types
+          </HubItem>
+        </HubSection>
+
         <HubSection
           label="Guides"
           icon={BookOpen}
@@ -105,7 +180,49 @@ export function LibraryHub() {
       </HubSidebar>
 
       <HubMain>
-        {openFile ? (
+        {panel === "roles" ? (
+          <RolesEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : panel === "foundry-areas" ? (
+          <FoundryAreasEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : panel === "organizations" ? (
+          <OrganizationsEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : panel === "delivery-types" ? (
+          <DeliveryTypesEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : panel === "architecture-node-types" ? (
+          <ArchitectureNodeTypesEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : panel === "ontology-element-types" ? (
+          <OntologyElementTypesEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : openFile ? (
           <div className="flex h-full min-h-0 flex-col">
             <Editor
               path={openFile.path}
@@ -128,8 +245,8 @@ export function LibraryHub() {
         ) : (
           <HubEmpty
             icon={Library}
-            title="Select a guide to view or edit"
-            description="Reference guides live in reference/*.md and are editable here."
+            title="Select a guide or reference list"
+            description="Edit reference guides, manage shared lists, or upload files."
           />
         )}
       </HubMain>

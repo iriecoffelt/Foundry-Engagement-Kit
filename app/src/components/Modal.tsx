@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useEscapeKey } from "../lib/useEscapeKey";
 
 interface ModalProps {
   open: boolean;
@@ -9,9 +10,22 @@ interface ModalProps {
   footer?: ReactNode;
   wide?: boolean;
   hideClose?: boolean;
+  /** When false, Escape does not close (e.g. required first-run setup). Default true. */
+  closeOnEscape?: boolean;
 }
 
-export function Modal({ open, title, onClose, children, footer, wide, hideClose }: ModalProps) {
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  wide,
+  hideClose,
+  closeOnEscape = true,
+}: ModalProps) {
+  useEscapeKey(onClose, open && closeOnEscape);
+
   if (!open) return null;
 
   return (
@@ -25,8 +39,10 @@ export function Modal({ open, title, onClose, children, footer, wide, hideClose 
           <h2 className="text-lg font-semibold text-fg-primary">{title}</h2>
           {!hideClose && (
             <button
+              type="button"
               onClick={onClose}
               className="rounded-lg p-1 text-fg-secondary transition hover:bg-surface-elevated hover:text-fg-primary"
+              aria-label="Close"
             >
               <X size={18} />
             </button>

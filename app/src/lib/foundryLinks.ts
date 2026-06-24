@@ -1,8 +1,19 @@
 import { api } from "./api";
 
-export type FoundryLinkableNodeType = "dataset" | "objectType" | "workshop" | "pipeline";
+export type FoundryLinkableNodeType =
+  | "dataset"
+  | "objectType"
+  | "workshop"
+  | "pipeline"
+  | "function";
 
-const LINKABLE: FoundryLinkableNodeType[] = ["dataset", "objectType", "workshop", "pipeline"];
+const LINKABLE: FoundryLinkableNodeType[] = [
+  "dataset",
+  "objectType",
+  "workshop",
+  "pipeline",
+  "function",
+];
 
 export function supportsFoundryLink(nodeType: string): nodeType is FoundryLinkableNodeType {
   return LINKABLE.includes(nodeType as FoundryLinkableNodeType);
@@ -53,6 +64,7 @@ const LINK_HINTS: Record<FoundryLinkableNodeType, string> = {
   objectType: "Object type RID or ontology URL",
   workshop: "Workshop app RID or URL",
   pipeline: "Pipeline RID or URL",
+  function: "Function or code repository RID or URL",
 };
 
 export function foundryLinkPlaceholder(nodeType: FoundryLinkableNodeType): string {

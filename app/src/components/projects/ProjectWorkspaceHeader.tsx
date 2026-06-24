@@ -1,12 +1,19 @@
 import {
   ArrowLeft,
   BookOpen,
+  CalendarDays,
+  ClipboardList,
   Copy,
   FileDown,
   FileText,
+  Gavel,
+  Handshake,
+  Kanban,
   Layers,
   Network,
-  Users,
+  ShieldAlert,
+  TestTube2,
+  UserCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ProjectMeta } from "../../types";
@@ -20,20 +27,34 @@ import { StatusBadge } from "../StatusBadge";
 
 export type ProjectTab =
   | "overview"
+  | "delivery"
+  | "register"
+  | "uat"
+  | "decisions"
   | "stakeholders"
   | "ontology"
   | "architecture"
   | "documents"
-  | "library";
+  | "library"
+  | "users";
 
 const TABS: { id: ProjectTab; label: string; icon: LucideIcon }[] = [
   { id: "overview", label: "Overview", icon: FileText },
-  { id: "stakeholders", label: "Stakeholders", icon: Users },
+  { id: "delivery", label: "Delivery", icon: Kanban },
+  { id: "register", label: "Register", icon: ShieldAlert },
+  { id: "uat", label: "UAT", icon: TestTube2 },
+  { id: "decisions", label: "Decisions", icon: Gavel },
+  { id: "stakeholders", label: "Stakeholders", icon: Handshake },
   { id: "ontology", label: "Ontology", icon: Layers },
   { id: "architecture", label: "Architecture", icon: Network },
-  { id: "documents", label: "Documents", icon: FileText },
+  { id: "documents", label: "Documents", icon: ClipboardList },
   { id: "library", label: "Library", icon: BookOpen },
+  { id: "users", label: "Users", icon: UserCircle },
 ];
+
+export const PROJECT_TAB_LABELS = Object.fromEntries(
+  TABS.map((t) => [t.id, t.label]),
+) as Record<ProjectTab, string>;
 
 function ProgressRing({ progress, status }: { progress: number; status: string }) {
   const size = 44;
@@ -78,10 +99,13 @@ interface ProjectWorkspaceHeaderProps {
   tab: ProjectTab;
   phaseProgress: number;
   message: string;
+  backLabel?: string;
   onBack: () => void;
   onTabChange: (tab: ProjectTab) => void;
   onCopySummary: () => void;
+  onCopyWeeklyRollup: () => void;
   onExport: () => void;
+  onJiraExport: () => void;
 }
 
 export function ProjectWorkspaceHeader({
@@ -89,10 +113,13 @@ export function ProjectWorkspaceHeader({
   tab,
   phaseProgress,
   message,
+  backLabel,
   onBack,
   onTabChange,
   onCopySummary,
+  onCopyWeeklyRollup,
   onExport,
+  onJiraExport,
 }: ProjectWorkspaceHeaderProps) {
   const phase = normalizeStatus(project.status);
 
@@ -104,7 +131,7 @@ export function ProjectWorkspaceHeader({
           className="mb-3 flex items-center gap-1.5 text-sm text-fg-muted transition hover:text-fg-primary"
         >
           <ArrowLeft size={15} />
-          All projects
+          {backLabel ? `Back to ${backLabel}` : "Back"}
         </button>
 
         <div className="flex items-start gap-4">
@@ -129,6 +156,14 @@ export function ProjectWorkspaceHeader({
             </div>
           </div>
           <div className="hidden shrink-0 gap-2 sm:flex">
+            <SecondaryButton onClick={onJiraExport}>
+              <span className="inline-flex items-center gap-2">Jira export</span>
+            </SecondaryButton>
+            <SecondaryButton onClick={onCopyWeeklyRollup}>
+              <span className="inline-flex items-center gap-2">
+                <CalendarDays size={14} /> Weekly rollup
+              </span>
+            </SecondaryButton>
             <SecondaryButton onClick={onCopySummary}>
               <span className="inline-flex items-center gap-2">
                 <Copy size={14} /> Copy summary

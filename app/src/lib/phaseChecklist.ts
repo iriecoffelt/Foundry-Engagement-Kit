@@ -4,10 +4,19 @@ export interface PhaseCheckItem {
   id: string;
   label: string;
   done: boolean;
+  /** Excluded from progress when true (e.g. pipelines not in scope). */
+  na?: boolean;
 }
 
 export interface PhaseChecklist {
   phases: Record<EngagementStatus, PhaseCheckItem[]>;
+}
+
+export interface PhaseProgress {
+  overall: number;
+  done: number;
+  total: number;
+  byPhase: Record<EngagementStatus, number>;
 }
 
 export const PHASE_ORDER: EngagementStatus[] = [
@@ -66,27 +75,60 @@ export const DEFAULT_CHECKLIST: PhaseChecklist = {
   },
 };
 
+function normalizeItem(item: Partial<PhaseCheckItem>): PhaseCheckItem {
+  return {
+    id: item.id || `c-${Date.now().toString(36)}`,
+    label: item.label?.trim() || "Untitled task",
+    done: Boolean(item.done),
+    na: Boolean(item.na),
+  };
+}
+
+/** Saved checklist is source of truth; fill missing phases from defaults. */
+export function mergeChecklist(saved: Partial<PhaseChecklist> | null | undefined): PhaseChecklist {
+  if (!saved?.phases) return structuredClone(DEFAULT_CHECKLIST);
+
+  const merged: PhaseChecklist = { phases: {} as Record<EngagementStatus, PhaseCheckItem[]> };
+  for (const phase of PHASE_ORDER) {
+    const savedItems = saved.phases[phase];
+    merged.phases[phase] = savedItems?.length
+      ? savedItems.map((item) => normalizeItem(item))
+      : structuredClone(DEFAULT_CHECKLIST.phases[phase]);
+  }
+  return merged;
+}
+
+export function applicableItems(items: PhaseCheckItem[]): PhaseCheckItem[] {
+  return items.filter((item) => !item.na);
+}
+
+export function newChecklistItemId(): string {
+  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 export function checklistPath(projectPath: string) {
   return `${projectPath}/phase-checklist.json`;
 }
 
-export function computePhaseProgress(checklist: PhaseChecklist): {
-  overall: number;
-  byPhase: Record<EngagementStatus, number>;
-} {
+export function computePhaseProgress(checklist: PhaseChecklist): PhaseProgress {
   const byPhase = {} as Record<EngagementStatus, number>;
   let total = 0;
   let done = 0;
 
   for (const phase of PHASE_ORDER) {
-    const items = checklist.phases[phase] || [];
+    const items = applicableItems(checklist.phases[phase] || []);
     const phaseDone = items.filter((i) => i.done).length;
     byPhase[phase] = items.length ? Math.round((phaseDone / items.length) * 100) : 0;
     total += items.length;
     done += phaseDone;
   }
 
-  return { overall: total ? Math.round((done / total) * 100) : 0, byPhase };
+  return {
+    overall: total ? Math.round((done / total) * 100) : 0,
+    done,
+    total,
+    byPhase,
+  };
 }
 
 export function computeHandoffReadiness(
@@ -96,12 +138,15 @@ export function computeHandoffReadiness(
   uploadCount: number,
 ): { score: number; items: { label: string; ok: boolean }[] } {
   const progress = computePhaseProgress(checklist);
-  const handoffItems = checklist.phases.handoff.filter((i) => i.done).length;
-  const handoffTotal = checklist.phases.handoff.length;
+  const handoffApplicable = applicableItems(checklist.phases.handoff);
+  const handoffDone = handoffApplicable.filter((i) => i.done).length;
 
   const items = [
     { label: "Overall phase checklist ≥ 70%", ok: progress.overall >= 70 },
-    { label: "Handoff checklist complete", ok: handoffItems === handoffTotal && handoffTotal > 0 },
+    {
+      label: "Handoff checklist complete",
+      ok: handoffApplicable.length > 0 && handoffDone === handoffApplicable.length,
+    },
     { label: "Runbook exists", ok: hasRunbook },
     { label: "Handoff doc exists", ok: hasHandoffDoc },
     { label: "Reference files uploaded", ok: uploadCount > 0 },
