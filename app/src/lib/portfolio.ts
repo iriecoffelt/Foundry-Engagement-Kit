@@ -4,6 +4,7 @@ import {
   checklistPath,
   computeHandoffReadiness,
   computePhaseProgress,
+  mergeChecklist,
   PHASE_LABELS,
   type PhaseChecklist,
 } from "./phaseChecklist";
@@ -35,7 +36,9 @@ export async function loadPortfolioSummary(
   for (const project of projects) {
     let checklist: PhaseChecklist = DEFAULT_CHECKLIST;
     try {
-      checklist = await api.readJson<PhaseChecklist>(checklistPath(project.path));
+      checklist = mergeChecklist(
+        await api.readJson<PhaseChecklist>(checklistPath(project.path)),
+      );
     } catch {
       /* default */
     }

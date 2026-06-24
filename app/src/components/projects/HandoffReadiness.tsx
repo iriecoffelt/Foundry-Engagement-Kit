@@ -5,15 +5,21 @@ import {
   DEFAULT_CHECKLIST,
   checklistPath,
   computeHandoffReadiness,
+  mergeChecklist,
   type PhaseChecklist,
 } from "../../lib/phaseChecklist";
 
 interface HandoffReadinessProps {
   projectPath: string;
   uploadCount: number;
+  checklistVersion?: number;
 }
 
-export function HandoffReadiness({ projectPath, uploadCount }: HandoffReadinessProps) {
+export function HandoffReadiness({
+  projectPath,
+  uploadCount,
+  checklistVersion = 0,
+}: HandoffReadinessProps) {
   const [readiness, setReadiness] = useState<{
     score: number;
     items: { label: string; ok: boolean }[];
@@ -23,7 +29,9 @@ export function HandoffReadiness({ projectPath, uploadCount }: HandoffReadinessP
     (async () => {
       let checklist: PhaseChecklist = DEFAULT_CHECKLIST;
       try {
-        checklist = await api.readJson<PhaseChecklist>(checklistPath(projectPath));
+        checklist = mergeChecklist(
+          await api.readJson<PhaseChecklist>(checklistPath(projectPath)),
+        );
       } catch {
         /* default */
       }
@@ -39,7 +47,7 @@ export function HandoffReadiness({ projectPath, uploadCount }: HandoffReadinessP
 
       setReadiness(computeHandoffReadiness(checklist, hasRunbook, hasHandoff, uploadCount));
     })();
-  }, [projectPath, uploadCount]);
+  }, [projectPath, uploadCount, checklistVersion]);
 
   if (!readiness) return null;
 

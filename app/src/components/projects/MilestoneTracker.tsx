@@ -63,7 +63,10 @@ export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
   return (
     <div className="rounded-xl border border-surface-border bg-surface-raised/50 p-5">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-fg-primary">Milestones</h3>
+        <div>
+          <h3 className="font-semibold text-fg-primary">Milestones</h3>
+          <p className="mt-0.5 text-xs text-fg-muted">Dates and delivery gates — separate from checklist %</p>
+        </div>
         <button onClick={addCustom} className="text-xs text-brand-400 hover:text-brand-300">
           <Plus size={14} className="inline" /> Add
         </button>

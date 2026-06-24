@@ -5,6 +5,7 @@ import {
   DEFAULT_CHECKLIST,
   checklistPath,
   computePhaseProgress,
+  mergeChecklist,
 } from "../../lib/phaseChecklist";
 import { copyToClipboard, generateCustomerSummary } from "../../lib/customerSummary";
 import { trackRecent } from "../../lib/recent";
@@ -45,6 +46,7 @@ interface ProjectWorkspaceProps {
 
 export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
   const [tab, setTab] = useState<ProjectTab>("overview");
+  const [projectMeta, setProjectMeta] = useState(project);
   const [overview, setOverview] = useState("");
   const [uploads, setUploads] = useState<FileEntry[]>([]);
   const [docTree, setDocTree] = useState<FileEntry[]>([]);
@@ -55,48 +57,69 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
   const [showExport, setShowExport] = useState(false);
   const [showAdrWizard, setShowAdrWizard] = useState(false);
   const [phaseProgress, setPhaseProgress] = useState(0);
+  const [checklistVersion, setChecklistVersion] = useState(0);
+
+  useEffect(() => {
+    setProjectMeta(project);
+  }, [project]);
+
+  const bumpChecklist = useCallback(() => {
+    setChecklistVersion((v) => v + 1);
+  }, []);
 
   const refresh = useCallback(async () => {
     let overviewContent = "";
     try {
-      const readme = await api.readFile(`${project.path}/README.md`);
+      const readme = await api.readFile(`${projectMeta.path}/README.md`);
       if (!isUnfilledTemplate(readme)) {
         overviewContent = readme;
       } else {
         try {
-          const eng = await api.readJson<Record<string, unknown>>(`${project.path}/engagement.json`);
+          const eng = await api.readJson<Record<string, unknown>>(
+            `${projectMeta.path}/engagement.json`,
+          );
           const data = engagementFromJson(eng, {
-            displayName: project.display_name,
-            customer: project.customer,
-            status: project.status,
-            targetGoLive: project.target_go_live,
+            displayName: projectMeta.display_name,
+            customer: projectMeta.customer,
+            status: projectMeta.status,
+            targetGoLive: projectMeta.target_go_live,
           });
-          overviewContent = generateProjectReadme(project.slug, data);
+          overviewContent = generateProjectReadme(projectMeta.slug, data);
         } catch {
-          overviewContent = unfilledTemplateNotice(project.display_name);
+          overviewContent = unfilledTemplateNotice(projectMeta.display_name);
         }
       }
       setOverview(overviewContent);
-      trackRecent(`${project.path}/README.md`, project.display_name, "Overview");
+      trackRecent(`${projectMeta.path}/README.md`, projectMeta.display_name, "Overview");
     } catch {
-      setOverview(unfilledTemplateNotice(project.display_name));
+      setOverview(unfilledTemplateNotice(projectMeta.display_name));
     }
-    const tree = await api.listDirectory(project.path, true);
+    const tree = await api.listDirectory(projectMeta.path, true);
     setDocTree(tree);
     try {
-      await api.createDirectory(`${project.path}/references`);
-      const refs = await api.listDirectory(`${project.path}/references`, false);
+      await api.createDirectory(`${projectMeta.path}/references`);
+      const refs = await api.listDirectory(`${projectMeta.path}/references`, false);
       setUploads(refs.filter((e) => !e.is_dir));
     } catch {
       setUploads([]);
     }
     try {
-      const cl = await api.readJson<typeof DEFAULT_CHECKLIST>(checklistPath(project.path));
+      const cl = mergeChecklist(
+        await api.readJson<typeof DEFAULT_CHECKLIST>(checklistPath(projectMeta.path)),
+      );
       setPhaseProgress(computePhaseProgress(cl).overall);
     } catch {
       setPhaseProgress(0);
     }
-  }, [project.path, project.display_name, project.customer, project.status, project.target_go_live]);
+  }, [
+    projectMeta.path,
+    projectMeta.display_name,
+    projectMeta.customer,
+    projectMeta.status,
+    projectMeta.target_go_live,
+    projectMeta.slug,
+    checklistVersion,
+  ]);
 
   useEffect(() => {
     refresh();
@@ -111,12 +134,14 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
 
   const copySummary = async () => {
     try {
-      const eng = await api.readJson<Record<string, unknown>>(`${project.path}/engagement.json`);
-      const text = generateCustomerSummary(project, eng, phaseProgress);
+      const eng = await api.readJson<Record<string, unknown>>(
+        `${projectMeta.path}/engagement.json`,
+      );
+      const text = generateCustomerSummary(projectMeta, eng, phaseProgress);
       const ok = await copyToClipboard(text);
       setMessage(ok ? "Customer summary copied to clipboard" : "Could not copy — check permissions");
     } catch {
-      const text = generateCustomerSummary(project, null, phaseProgress);
+      const text = generateCustomerSummary(projectMeta, null, phaseProgress);
       await copyToClipboard(text);
       setMessage("Customer summary copied to clipboard");
     }
@@ -126,7 +151,7 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
   return (
     <div className="flex h-full flex-col">
       <ProjectWorkspaceHeader
-        project={project}
+        project={projectMeta}
         tab={tab}
         phaseProgress={phaseProgress}
         message={message}
@@ -140,9 +165,23 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
         {tab === "overview" && (
           <div className="h-full overflow-y-auto p-6">
             <div className="mx-auto max-w-3xl space-y-6">
-              <PhaseStepper projectPath={project.path} currentStatus={project.status} />
-              <MilestoneTracker projectPath={project.path} />
-              <HandoffReadiness projectPath={project.path} uploadCount={uploads.length} />
+              <PhaseStepper
+                projectPath={projectMeta.path}
+                currentStatus={projectMeta.status}
+                onProgressChange={(overall) => {
+                  setPhaseProgress(overall);
+                  bumpChecklist();
+                }}
+                onStatusChange={(status) => {
+                  setProjectMeta((prev) => ({ ...prev, status }));
+                }}
+              />
+              <MilestoneTracker projectPath={projectMeta.path} />
+              <HandoffReadiness
+                projectPath={projectMeta.path}
+                uploadCount={uploads.length}
+                checklistVersion={checklistVersion}
+              />
               {overview ? (
                 <div className="card-kit p-4">
                   <MarkdownPreview content={overview} />
@@ -154,13 +193,13 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
           </div>
         )}
 
-        {tab === "stakeholders" && <StakeholderMap project={project} />}
+        {tab === "stakeholders" && <StakeholderMap project={projectMeta} />}
 
-        {tab === "ontology" && <OntologyQuickAdd projectPath={project.path} />}
+        {tab === "ontology" && <OntologyQuickAdd projectPath={projectMeta.path} />}
 
         {tab === "architecture" && (
           <Suspense fallback={<SectionFallback />}>
-            <ArchitectureEditor projectPath={project.path} />
+            <ArchitectureEditor projectPath={projectMeta.path} />
           </Suspense>
         )}
 
@@ -171,7 +210,7 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
               subtitle="Project folder tree"
               actions={
                 <div className="flex flex-wrap gap-2">
-                  <DocumentTemplatePicker projectPath={project.path} onCreated={openDoc} />
+                  <DocumentTemplatePicker projectPath={projectMeta.path} onCreated={openDoc} />
                   <SecondaryButton onClick={() => setShowAdrWizard(true)}>
                     <span className="inline-flex items-center gap-1.5">
                       <FilePlus size={14} /> New ADR
@@ -222,7 +261,7 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
 
         {tab === "library" && (
           <ProjectLibrary
-            projectPath={project.path}
+            projectPath={projectMeta.path}
             onMessage={(msg) => {
               setMessage(msg);
               setTimeout(() => setMessage(""), 3000);
@@ -234,15 +273,15 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
 
       <AdrWizard
         open={showAdrWizard}
-        projectPath={project.path}
+        projectPath={projectMeta.path}
         onClose={() => setShowAdrWizard(false)}
         onCreated={openDoc}
       />
 
       <ExportReportModal
         open={showExport}
-        projectPath={project.path}
-        projectName={project.display_name}
+        projectPath={projectMeta.path}
+        projectName={projectMeta.display_name}
         onClose={() => setShowExport(false)}
       />
     </div>

@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { api } from "../../lib/api";
 import {
+  DEFAULT_CHECKLIST,
+  checklistPath,
+} from "../../lib/phaseChecklist";
+import {
   engagementToJson,
   generateDiscoveryMd,
   generateProjectReadme,
@@ -65,6 +69,7 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
         generateDiscoveryMd(data),
         generateScopingMd(data),
       );
+      await api.writeJson(checklistPath(path), structuredClone(DEFAULT_CHECKLIST));
       onComplete(path);
     } catch (e) {
       setError(String(e));
