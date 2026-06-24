@@ -1,5 +1,6 @@
 import { FilePlus, FileText } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { pushNavHistory } from "../../lib/appNavigation";
 import { api } from "../../lib/api";
 import {
   DEFAULT_CHECKLIST,
@@ -8,6 +9,7 @@ import {
   mergeChecklist,
 } from "../../lib/phaseChecklist";
 import { copyToClipboard, generateCustomerSummary } from "../../lib/customerSummary";
+import { buildWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
 import type { FileEntry, ProjectMeta } from "../../types";
 import {
@@ -31,11 +33,12 @@ import { ExportReportModal } from "./ExportReportModal";
 import { AdrWizard } from "./AdrWizard";
 import { DocumentTemplatePicker } from "./DocumentTemplatePicker";
 import { HandoffReadiness } from "./HandoffReadiness";
+import { EngagementTimeline } from "./EngagementTimeline";
 import { MilestoneTracker } from "./MilestoneTracker";
 import { OntologyQuickAdd } from "./OntologyQuickAdd";
 import { PhaseStepper } from "./PhaseStepper";
 import { StakeholderMap } from "./StakeholderMap";
-import { ProjectWorkspaceHeader, type ProjectTab } from "./ProjectWorkspaceHeader";
+import { ProjectWorkspaceHeader, PROJECT_TAB_LABELS, type ProjectTab } from "./ProjectWorkspaceHeader";
 import { ProjectLibrary } from "./ProjectLibrary";
 import { ProjectUsersView } from "./ProjectUsersView";
 
@@ -53,6 +56,8 @@ interface ProjectWorkspaceProps {
 
 export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspaceProps) {
   const [tab, setTab] = useState<ProjectTab>(initialTab ?? "overview");
+  const tabHistoryRef = useRef<ProjectTab[]>([]);
+  const [tabBackLabel, setTabBackLabel] = useState<string | undefined>();
   const [projectMeta, setProjectMeta] = useState(project);
   const [overview, setOverview] = useState("");
   const [uploads, setUploads] = useState<FileEntry[]>([]);
@@ -66,14 +71,52 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
   const [showAdrWizard, setShowAdrWizard] = useState(false);
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [checklistVersion, setChecklistVersion] = useState(0);
+  const [deliveryCardId, setDeliveryCardId] = useState<string | null>(null);
 
   useEffect(() => {
     setProjectMeta(project);
   }, [project]);
 
   useEffect(() => {
+    tabHistoryRef.current = [];
+    setTabBackLabel(undefined);
     if (initialTab) setTab(initialTab);
+    else setTab("overview");
   }, [initialTab, project.path]);
+
+  const changeTab = useCallback((next: ProjectTab) => {
+    setTab((current) => {
+      if (current !== next) {
+        tabHistoryRef.current = pushNavHistory(tabHistoryRef.current, current);
+        setTabBackLabel(PROJECT_TAB_LABELS[current]);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleBack = useCallback(() => {
+    const history = tabHistoryRef.current;
+    if (history.length > 0) {
+      const previous = history[history.length - 1];
+      tabHistoryRef.current = history.slice(0, -1);
+      setTab(previous);
+      setTabBackLabel(tabHistoryRef.current.length ? PROJECT_TAB_LABELS[tabHistoryRef.current[tabHistoryRef.current.length - 1]] : undefined);
+      return;
+    }
+    onBack();
+  }, [onBack]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== "[") return;
+      if (tabHistoryRef.current.length === 0) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      handleBack();
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [handleBack]);
 
   const bumpChecklist = useCallback(() => {
     setChecklistVersion((v) => v + 1);
@@ -140,7 +183,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
   const openDoc = async (path: string) => {
     const content = await api.readFile(path);
     setOpenFile({ path, content, dirty: false });
-    setTab("documents");
+    changeTab("documents");
     trackRecent(path, path.split("/").pop() || path, "Documents");
   };
 
@@ -160,6 +203,17 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
     setTimeout(() => setMessage(""), 3000);
   };
 
+  const copyWeeklyRollup = async () => {
+    try {
+      const text = await buildWeeklyRollup(projectMeta);
+      const ok = await copyToClipboard(text);
+      setMessage(ok ? "Weekly rollup copied to clipboard" : "Could not copy — check permissions");
+    } catch {
+      setMessage("Could not build weekly rollup");
+    }
+    setTimeout(() => setMessage(""), 3000);
+  };
+
   return (
     <div className="flex h-full flex-col">
       <ProjectWorkspaceHeader
@@ -167,9 +221,11 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
         tab={tab}
         phaseProgress={phaseProgress}
         message={message}
-        onBack={onBack}
-        onTabChange={setTab}
+        backLabel={tabBackLabel}
+        onBack={handleBack}
+        onTabChange={changeTab}
         onCopySummary={copySummary}
+        onCopyWeeklyRollup={copyWeeklyRollup}
         onExport={() => setShowExport(true)}
         onJiraExport={() => setShowJira(true)}
       />
@@ -190,8 +246,14 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
                 }}
               />
               <MilestoneTracker projectPath={projectMeta.path} />
+              <EngagementTimeline
+                projectPath={projectMeta.path}
+                projectSlug={projectMeta.slug}
+                onOpenTab={changeTab}
+              />
               <HandoffReadiness
                 projectPath={projectMeta.path}
+                projectName={projectMeta.display_name}
                 uploadCount={uploads.length}
                 checklistVersion={checklistVersion}
               />
@@ -206,7 +268,12 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
           </div>
         )}
 
-        {tab === "delivery" && <DeliveryBoardView projectPath={projectMeta.path} />}
+        {tab === "delivery" && (
+          <DeliveryBoardView
+            projectPath={projectMeta.path}
+            initialSelectedCardId={deliveryCardId}
+          />
+        )}
 
         {tab === "register" && <EngagementRegisterView projectPath={projectMeta.path} />}
 
@@ -222,11 +289,22 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
 
         {tab === "stakeholders" && <StakeholderMap project={projectMeta} />}
 
-        {tab === "ontology" && <OntologyQuickAdd projectPath={projectMeta.path} />}
+        {tab === "ontology" && (
+          <OntologyQuickAdd
+            projectPath={projectMeta.path}
+            onOpenArchitecture={() => changeTab("architecture")}
+          />
+        )}
 
         {tab === "architecture" && (
           <Suspense fallback={<SectionFallback />}>
-            <ArchitectureEditor projectPath={projectMeta.path} />
+            <ArchitectureEditor
+              projectPath={projectMeta.path}
+              onOpenDelivery={(cardId) => {
+                setDeliveryCardId(cardId);
+                changeTab("delivery");
+              }}
+            />
           </Suspense>
         )}
 

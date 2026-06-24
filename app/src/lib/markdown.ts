@@ -4,11 +4,16 @@ import type {
   WeeklyReviewData,
   ArchitectureGraph,
   CustomerSyncData,
+  OntologyElement,
   OntologyObjectType,
   ProjectUser,
   Stakeholder,
   SuccessMetric,
 } from "../types";
+import type { ArchitectureNodeTypeDefinition, ResolvedArchNodeType } from "./architectureNodeTypes";
+import type { OntologyElementTypeDefinition } from "./ontologyTypes";
+import { ontologyElementTypeLabel } from "./ontologyTypes";
+import { DELIVERY_COLOR_HEX } from "./deliveryTypes";
 import { stackUrlFromEngagement } from "./foundryLinks";
 import { buildProjectUsersFromWizard } from "./projectUsers";
 
@@ -478,31 +483,62 @@ ${data.openQuestions || "—"}
 `;
 }
 
-export function architectureToMermaid(graph: ArchitectureGraph): string {
+export function architectureToMermaid(
+  graph: ArchitectureGraph,
+  archTypes?: ResolvedArchNodeType[] | ArchitectureNodeTypeDefinition[],
+): string {
+  const typeColor = new Map(
+    (archTypes ?? []).map((t) => [t.id, DELIVERY_COLOR_HEX[t.color] ?? "#94a3b8"]),
+  );
   const lines = ["flowchart LR"];
+  const classNames = new Set<string>();
+
   for (const node of graph.nodes) {
-    const shape =
-      node.type === "source"
-        ? `[${node.data.label}]`
-        : node.type === "user"
-          ? `((${node.data.label}))`
-          : `[${node.data.label}]`;
+    const safeLabel = node.data.label.replace(/"/g, "'");
+    let shape: string;
+    if (node.type === "source") {
+      shape = `[/${safeLabel}/]`;
+    } else if (node.type === "user") {
+      shape = `((${safeLabel}))`;
+    } else if (node.type === "dataset") {
+      shape = `[(${safeLabel})]`;
+    } else {
+      shape = `[${safeLabel}]`;
+    }
     lines.push(`  ${node.id}${shape}`);
+    const className = `arch_${node.type.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    if (typeColor.has(node.type)) {
+      classNames.add(className);
+      lines.push(`  class ${node.id} ${className}`);
+    }
   }
+
   for (const edge of graph.edges) {
     const label = edge.label ? `|${edge.label}|` : "";
     lines.push(`  ${edge.source} -->${label} ${edge.target}`);
   }
+
+  for (const typeId of new Set(graph.nodes.map((n) => n.type))) {
+    const className = `arch_${typeId.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    const fill = typeColor.get(typeId);
+    if (fill && classNames.has(className)) {
+      lines.push(`  classDef ${className} fill:${fill},color:#fff,stroke:${fill}`);
+    }
+  }
+
   return lines.join("\n");
 }
 
-export function generateDesignOverviewMermaid(graph: ArchitectureGraph): string {
+export function generateDesignOverviewMermaid(
+  graph: ArchitectureGraph,
+  archTypes?: ResolvedArchNodeType[],
+): string {
   return `# Design Overview
 
 ## Architecture diagram
 
 \`\`\`mermaid
-${architectureToMermaid(graph)}
+${architectureToMermaid(graph, archTypes)}
 \`\`\`
 
 _Edit visually in the Architecture tab. This file is auto-updated when you save the diagram._
@@ -547,19 +583,60 @@ ${data.risks || "—"}
 `;
 }
 
-export function generateOntologySection(objects: OntologyObjectType[]): string {
-  if (objects.length === 0) return "";
-  const sections = objects.map(
-    (o) => `### ${o.name}
+export function generateOntologySection(
+  elements: OntologyElement[],
+  elementTypes?: OntologyElementTypeDefinition[],
+): string {
+  if (elements.length === 0) return "";
 
-| Attribute | Value |
-|-----------|-------|
-| Primary key | ${o.primaryKey} |
-| Description | ${o.description} |
+  const byKind = new Map<string, OntologyElement[]>();
+  for (const el of elements) {
+    const list = byKind.get(el.kind) ?? [];
+    list.push(el);
+    byKind.set(el.kind, list);
+  }
 
-**Properties:** ${o.properties.join(", ") || "—"}
-`,
-  );
-  return `\n## Object types (quick-add)\n\n${sections.join("\n")}`;
+  const sections: string[] = [];
+  for (const [kind, items] of byKind) {
+    const heading = elementTypes
+      ? ontologyElementTypeLabel(elementTypes, kind)
+      : kind.replace(/([A-Z])/g, " $1").trim();
+    const blocks = items.map((o) => formatOntologyElementMarkdown(o, elementTypes)).join("\n");
+    sections.push(`## ${heading} (quick-add)\n\n${blocks}`);
+  }
+
+  return `\n${sections.join("\n\n")}`;
+}
+
+function formatOntologyElementMarkdown(
+  o: OntologyElement,
+  elementTypes?: OntologyElementTypeDefinition[],
+): string {
+  const typeDef = elementTypes?.find((t) => t.id === o.kind);
+  const lines = [`### ${o.name}`, ""];
+
+  if (o.description) {
+    lines.push(o.description, "");
+  }
+
+  if (typeDef?.showPrimaryKey && o.primaryKey) {
+    lines.push(`- **Primary key:** ${o.primaryKey}`);
+  }
+  if (typeDef?.showLinkEndpoints && (o.linkFrom || o.linkTo)) {
+    lines.push(`- **Link:** ${o.linkFrom || "—"} → ${o.linkTo || "—"}`);
+  }
+  if (typeDef?.showTargetObject && o.targetObject) {
+    lines.push(`- **Target object:** ${o.targetObject}`);
+  }
+  if (typeDef?.showProperties && o.properties.length) {
+    lines.push(`- **Properties:** ${o.properties.join(", ")}`);
+  }
+
+  return lines.join("\n");
+}
+
+/** @deprecated Use generateOntologySection with OntologyElement[] */
+export function generateOntologyObjectSection(objects: OntologyObjectType[]): string {
+  return generateOntologySection(objects);
 }
 

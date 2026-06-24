@@ -1,0 +1,9 @@
+{
+  "types": [
+    { "id": "objectType", "label": "Object type", "color": "emerald" },
+    { "id": "pipeline", "label": "Pipeline", "color": "sky" },
+    { "id": "workshop", "label": "Workshop", "color": "amber" },
+    { "id": "function", "label": "Function", "color": "violet" },
+    { "id": "other", "label": "Other", "color": "slate" }
+  ]
+}

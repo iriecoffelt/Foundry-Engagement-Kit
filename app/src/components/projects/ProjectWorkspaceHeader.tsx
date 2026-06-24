@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   BookOpen,
+  CalendarDays,
   ClipboardList,
   Copy,
   FileDown,
@@ -51,6 +52,10 @@ const TABS: { id: ProjectTab; label: string; icon: LucideIcon }[] = [
   { id: "users", label: "Users", icon: UserCircle },
 ];
 
+export const PROJECT_TAB_LABELS = Object.fromEntries(
+  TABS.map((t) => [t.id, t.label]),
+) as Record<ProjectTab, string>;
+
 function ProgressRing({ progress, status }: { progress: number; status: string }) {
   const size = 44;
   const stroke = 3;
@@ -94,9 +99,11 @@ interface ProjectWorkspaceHeaderProps {
   tab: ProjectTab;
   phaseProgress: number;
   message: string;
+  backLabel?: string;
   onBack: () => void;
   onTabChange: (tab: ProjectTab) => void;
   onCopySummary: () => void;
+  onCopyWeeklyRollup: () => void;
   onExport: () => void;
   onJiraExport: () => void;
 }
@@ -106,9 +113,11 @@ export function ProjectWorkspaceHeader({
   tab,
   phaseProgress,
   message,
+  backLabel,
   onBack,
   onTabChange,
   onCopySummary,
+  onCopyWeeklyRollup,
   onExport,
   onJiraExport,
 }: ProjectWorkspaceHeaderProps) {
@@ -122,7 +131,7 @@ export function ProjectWorkspaceHeader({
           className="mb-3 flex items-center gap-1.5 text-sm text-fg-muted transition hover:text-fg-primary"
         >
           <ArrowLeft size={15} />
-          All projects
+          {backLabel ? `Back to ${backLabel}` : "Back"}
         </button>
 
         <div className="flex items-start gap-4">
@@ -149,6 +158,11 @@ export function ProjectWorkspaceHeader({
           <div className="hidden shrink-0 gap-2 sm:flex">
             <SecondaryButton onClick={onJiraExport}>
               <span className="inline-flex items-center gap-2">Jira export</span>
+            </SecondaryButton>
+            <SecondaryButton onClick={onCopyWeeklyRollup}>
+              <span className="inline-flex items-center gap-2">
+                <CalendarDays size={14} /> Weekly rollup
+              </span>
             </SecondaryButton>
             <SecondaryButton onClick={onCopySummary}>
               <span className="inline-flex items-center gap-2">

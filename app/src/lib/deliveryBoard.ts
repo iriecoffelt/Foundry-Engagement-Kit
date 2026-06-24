@@ -1,11 +1,5 @@
 import { api } from "./api";
-import type {
-  ArchitectureGraph,
-  DeliveryBoard,
-  DeliveryCard,
-  DeliveryComponentType,
-  DeliveryStatus,
-} from "../types";
+import type { DeliveryBoard, DeliveryCard, DeliveryStatus } from "../types";
 
 export const DELIVERY_STATUSES: DeliveryStatus[] = [
   "backlog",
@@ -23,12 +17,12 @@ export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
   done: "Done",
 };
 
-export const DELIVERY_TYPE_LABELS: Record<DeliveryComponentType, string> = {
-  objectType: "Object type",
-  pipeline: "Pipeline",
-  workshop: "Workshop",
-  function: "Function",
-  other: "Other",
+export const DELIVERY_STATUS_BADGE: Record<DeliveryStatus, string> = {
+  backlog: "bg-surface-elevated text-fg-secondary ring-surface-border-strong",
+  in_dev: "bg-sky-500/15 text-sky-300 ring-sky-500/20",
+  in_uat: "bg-amber-500/15 text-amber-300 ring-amber-500/20",
+  blocked: "bg-red-500/15 text-red-300 ring-red-500/20",
+  done: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/20",
 };
 
 export function deliveryBoardPath(projectPath: string) {
@@ -59,43 +53,6 @@ export async function saveDeliveryBoard(
   await api.writeJson(deliveryBoardPath(projectPath), board);
 }
 
-export async function seedFromArchitecture(projectPath: string): Promise<DeliveryBoard> {
-  const board = await loadDeliveryBoard(projectPath);
-  if (board.cards.length > 0) return board;
-
-  let graph: ArchitectureGraph | null = null;
-  try {
-    graph = await api.readJson<ArchitectureGraph>(`${projectPath}/02-design/architecture.json`);
-  } catch {
-    return board;
-  }
-
-  const typeMap: Partial<Record<string, DeliveryComponentType>> = {
-    objectType: "objectType",
-    pipeline: "pipeline",
-    workshop: "workshop",
-  };
-
-  const now = new Date().toISOString();
-  const cards: DeliveryCard[] = (graph.nodes ?? [])
-    .filter((n) => typeMap[n.type])
-    .map((n) => ({
-      id: newDeliveryId(),
-      title: n.data.label || n.type,
-      type: typeMap[n.type]!,
-      status: "backlog",
-      owner: "",
-      resourceId: n.data.foundryLink || "",
-      notes: n.data.notes || "",
-      createdAt: now,
-      updatedAt: now,
-    }));
-
-  const next = { cards };
-  if (cards.length) await saveDeliveryBoard(projectPath, next);
-  return next;
-}
-
 export function boardByStatus(board: DeliveryBoard): Record<DeliveryStatus, DeliveryCard[]> {
   const grouped = Object.fromEntries(
     DELIVERY_STATUSES.map((s) => [s, [] as DeliveryCard[]]),
@@ -107,3 +64,13 @@ export function boardByStatus(board: DeliveryBoard): Record<DeliveryStatus, Deli
   }
   return grouped;
 }
+
+export {
+  seedFromArchitecture,
+  syncFromArchitecture,
+  syncToArchitecture,
+  syncArchitectureAndDelivery,
+  removeArchitectureNodes,
+  removeArchitectureForDeliveryCard,
+  removeDeliveryCardsForArchitectureNodes,
+} from "./architectureSync";

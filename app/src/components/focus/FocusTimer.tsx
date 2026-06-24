@@ -49,7 +49,11 @@ export function FocusTimer({ projects, onExit }: FocusTimerProps) {
   useEffect(() => {
     requestNotificationPermission();
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onExit();
+      if (e.key === "Escape") {
+        if (showSettings) setShowSettings(false);
+        else onExit();
+        return;
+      }
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.key === " " && !showSettings) {

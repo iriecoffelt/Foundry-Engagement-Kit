@@ -3,13 +3,14 @@ import { AlertTriangle, Ban, CalendarClock, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { loadWorkspaceInsights, type WorkspaceInsights } from "../../lib/insights";
 import type { ProjectMeta } from "../../types";
+import type { ProjectTab } from "../projects/ProjectWorkspaceHeader";
 
 interface InsightsPanelProps {
   projects: ProjectMeta[];
-  onOpenPath: (path: string) => void;
+  onOpenProject?: (slug: string, tab?: ProjectTab) => void;
 }
 
-export function InsightsPanel({ projects, onOpenPath }: InsightsPanelProps) {
+export function InsightsPanel({ projects, onOpenProject }: InsightsPanelProps) {
   const [insights, setInsights] = useState<WorkspaceInsights | null>(null);
 
   useEffect(() => {
@@ -37,7 +38,8 @@ export function InsightsPanel({ projects, onOpenPath }: InsightsPanelProps) {
               {insights.blockers.slice(0, 4).map((b, i) => (
                 <li key={i}>
                   <button
-                    onClick={() => onOpenPath(b.path)}
+                    type="button"
+                    onClick={() => onOpenProject?.(b.projectSlug, "register")}
                     className="w-full text-left text-sm hover:text-brand-500"
                   >
                     <span className="font-medium text-fg-body">{b.project}</span>
@@ -58,7 +60,8 @@ export function InsightsPanel({ projects, onOpenPath }: InsightsPanelProps) {
               {insights.risks.slice(0, 4).map((r, i) => (
                 <li key={i}>
                   <button
-                    onClick={() => onOpenPath(r.path)}
+                    type="button"
+                    onClick={() => onOpenProject?.(r.projectSlug, "register")}
                     className="w-full text-left text-sm hover:text-brand-500"
                   >
                     <span className="font-medium text-fg-body">{r.project}</span>
@@ -79,7 +82,8 @@ export function InsightsPanel({ projects, onOpenPath }: InsightsPanelProps) {
               {insights.lastSyncs.map((s, i) => (
                 <li key={i}>
                   <button
-                    onClick={() => onOpenPath(s.path)}
+                    type="button"
+                    onClick={() => onOpenProject?.(s.projectSlug, "documents")}
                     className="w-full text-left text-sm hover:text-brand-500"
                   >
                     <span className="font-medium text-fg-body">{s.project}</span>

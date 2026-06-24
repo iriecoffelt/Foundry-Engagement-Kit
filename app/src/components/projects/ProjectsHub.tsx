@@ -12,20 +12,23 @@ interface ProjectsHubProps {
   onRefresh: () => void;
   startWizard?: boolean;
   onWizardConsumed?: () => void;
-  openProjectRequest?: { slug: string; tab?: string } | null;
-  onOpenConsumed?: () => void;
+  activeProjectSlug?: string;
+  activeProjectTab?: ProjectTab;
+  onOpenProject: (slug: string, tab?: ProjectTab) => void;
+  onBack: () => void;
 }
 
 export function ProjectsHub({
   onRefresh,
   startWizard,
   onWizardConsumed,
-  openProjectRequest,
-  onOpenConsumed,
+  activeProjectSlug,
+  activeProjectTab,
+  onOpenProject,
+  onBack,
 }: ProjectsHubProps) {
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
-  const [selected, setSelected] = useState<ProjectMeta | null>(null);
-  const [initialTab, setInitialTab] = useState<ProjectTab | undefined>();
+  const [activeProject, setActiveProject] = useState<ProjectMeta | null>(null);
   const [showWizard, setShowWizard] = useState(false);
 
   const load = () => api.listProjectsWithMeta().then(setProjects);
@@ -42,14 +45,15 @@ export function ProjectsHub({
   }, [startWizard, onWizardConsumed]);
 
   useEffect(() => {
-    if (!openProjectRequest || !projects.length) return;
-    const p = projects.find((x) => x.slug === openProjectRequest.slug);
-    if (p) {
-      setSelected(p);
-      setInitialTab(openProjectRequest.tab as ProjectTab | undefined);
-      onOpenConsumed?.();
+    if (!activeProjectSlug) {
+      setActiveProject(null);
+      return;
     }
-  }, [openProjectRequest, projects, onOpenConsumed]);
+    api.listProjectsWithMeta().then((list) => {
+      setProjects(list);
+      setActiveProject(list.find((p) => p.slug === activeProjectSlug) ?? null);
+    });
+  }, [activeProjectSlug]);
 
   const cloneProject = async (p: ProjectMeta, e: { stopPropagation: () => void }) => {
     e.stopPropagation();
@@ -71,32 +75,22 @@ export function ProjectsHub({
         onComplete={(path) => {
           setShowWizard(false);
           onRefresh();
-          load().then(() => {
+          api.listProjectsWithMeta().then((list) => {
             const slug = path.replace("project/", "");
-            const created = projects.find((x) => x.slug === slug);
-            if (created) setSelected(created);
-            else {
-              api.listProjectsWithMeta().then((list) => {
-                const p = list.find((x) => x.slug === slug);
-                if (p) setSelected(p);
-              });
-            }
+            const created = list.find((x) => x.slug === slug);
+            if (created) onOpenProject(created.slug);
           });
         }}
       />
     );
   }
 
-  if (selected) {
+  if (activeProject) {
     return (
       <ProjectWorkspace
-        project={selected}
-        initialTab={initialTab}
-        onBack={() => {
-          setSelected(null);
-          setInitialTab(undefined);
-          load();
-        }}
+        project={activeProject}
+        initialTab={activeProjectTab}
+        onBack={onBack}
       />
     );
   }
@@ -136,7 +130,10 @@ export function ProjectsHub({
                 key={p.path}
                 className="card-kit-interactive group relative"
               >
-                <button onClick={() => setSelected(p)} className="w-full p-5 text-left">
+                <button
+                  onClick={() => onOpenProject(p.slug)}
+                  className="w-full p-5 text-left"
+                >
                   <p className="font-semibold text-fg-primary">{p.display_name}</p>
                   <p className="mt-1 text-sm text-fg-secondary">{p.customer || "No customer set"}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">

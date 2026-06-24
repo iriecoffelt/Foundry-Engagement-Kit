@@ -12,11 +12,22 @@ import {
   HubSection,
   HubSidebar,
 } from "../layout/HubLayout";
+import { ArchitectureNodeTypesEditor } from "./ArchitectureNodeTypesEditor";
+import { DeliveryTypesEditor } from "./DeliveryTypesEditor";
+import { OntologyElementTypesEditor } from "./OntologyElementTypesEditor";
 import { FoundryAreasEditor } from "./FoundryAreasEditor";
 import { OrganizationsEditor } from "./OrganizationsEditor";
 import { RolesEditor } from "./RolesEditor";
 
-type LibraryPanel = "none" | "roles" | "foundry-areas" | "organizations" | "guide";
+type LibraryPanel =
+  | "none"
+  | "roles"
+  | "foundry-areas"
+  | "organizations"
+  | "delivery-types"
+  | "architecture-node-types"
+  | "ontology-element-types"
+  | "guide";
 
 export function LibraryHub() {
   const [guides, setGuides] = useState<FileEntry[]>([]);
@@ -95,6 +106,33 @@ export function LibraryHub() {
           >
             Organizations
           </HubItem>
+          <HubItem
+            selected={panel === "delivery-types"}
+            onClick={() => {
+              setPanel("delivery-types");
+              setOpenFile(null);
+            }}
+          >
+            Delivery types
+          </HubItem>
+          <HubItem
+            selected={panel === "architecture-node-types"}
+            onClick={() => {
+              setPanel("architecture-node-types");
+              setOpenFile(null);
+            }}
+          >
+            Architecture node types
+          </HubItem>
+          <HubItem
+            selected={panel === "ontology-element-types"}
+            onClick={() => {
+              setPanel("ontology-element-types");
+              setOpenFile(null);
+            }}
+          >
+            Ontology element types
+          </HubItem>
         </HubSection>
 
         <HubSection
@@ -158,6 +196,27 @@ export function LibraryHub() {
           />
         ) : panel === "organizations" ? (
           <OrganizationsEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : panel === "delivery-types" ? (
+          <DeliveryTypesEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : panel === "architecture-node-types" ? (
+          <ArchitectureNodeTypesEditor
+            onStatus={(msg) => {
+              setStatus(msg);
+              setTimeout(() => setStatus(""), 2500);
+            }}
+          />
+        ) : panel === "ontology-element-types" ? (
+          <OntologyElementTypesEditor
             onStatus={(msg) => {
               setStatus(msg);
               setTimeout(() => setStatus(""), 2500);

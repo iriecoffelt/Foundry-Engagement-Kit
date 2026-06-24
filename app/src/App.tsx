@@ -1,5 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./lib/api";
+import { useAppNavigation } from "./lib/appNavigation";
 import { getCadenceAlerts } from "./lib/cadence";
 import { startCadenceNotificationPoller } from "./lib/notifications";
 import { trackRecent } from "./lib/recent";
@@ -8,11 +9,13 @@ import { Dashboard } from "./components/Dashboard";
 import { Editor } from "./components/Editor";
 import { FocusFloatingPill } from "./components/focus/FocusFloatingPill";
 import { Modal } from "./components/Modal";
+import { NavigationBackBar } from "./components/NavigationBackBar";
 import { SectionFallback } from "./components/SectionFallback";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { OnboardingChecklist } from "./components/onboarding/OnboardingChecklist";
 import { WorkspaceSetupModal } from "./components/onboarding/WorkspaceSetupModal";
+import type { ProjectTab } from "./components/projects/ProjectWorkspaceHeader";
 
 const ProjectsHub = lazy(() =>
   import("./components/projects/ProjectsHub").then((m) => ({ default: m.ProjectsHub })),
@@ -40,7 +43,11 @@ const CommandPalette = lazy(() =>
 );
 
 export default function App() {
-  const [section, setSection] = useState<Section>("home");
+  const { current, canGoBack, previousFrame, navigate, goBack } = useAppNavigation({
+    section: "home",
+  });
+  const section = current.section;
+
   const [workspaceRoot, setWorkspaceRoot] = useState("");
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
@@ -52,10 +59,29 @@ export default function App() {
   const [projectsAutoWizard, setProjectsAutoWizard] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<OpenFile | null>(null);
-  const [openProjectRequest, setOpenProjectRequest] = useState<{
-    slug: string;
-    tab?: string;
-  } | null>(null);
+
+  const projectNames = useMemo(
+    () => Object.fromEntries(projects.map((p) => [p.slug, p.display_name])),
+    [projects],
+  );
+
+  const openProject = useCallback(
+    (slug: string, tab?: string) => {
+      navigate({
+        section: "projects",
+        projectSlug: slug,
+        projectTab: tab,
+      });
+    },
+    [navigate],
+  );
+
+  const goToSection = useCallback(
+    (next: Section) => {
+      navigate({ section: next });
+    },
+    [navigate],
+  );
 
   const refresh = useCallback(async () => {
     setError("");
@@ -89,11 +115,16 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setCommandOpen(true);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "[") {
+        e.preventDefault();
+        if (canGoBack) goBack();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [canGoBack, goBack]);
 
   const openPath = async (path: string) => {
     try {
@@ -112,7 +143,7 @@ export default function App() {
       <Sidebar
         section={section}
         onSectionChange={(s) => {
-          setSection(s);
+          goToSection(s);
           setDailyAutoStart(false);
           setWeeklyAutoStart(false);
           setSyncAutoStart(false);
@@ -123,7 +154,14 @@ export default function App() {
         onOpenCommandPalette={() => setCommandOpen(true)}
       />
 
-      <div className="app-main">
+      <div className="app-main flex min-w-0 flex-1 flex-col">
+        <NavigationBackBar
+          canGoBack={canGoBack && !current.projectSlug}
+          previousFrame={previousFrame}
+          projectNames={projectNames}
+          onBack={goBack}
+        />
+
         {error && (
           <div className="flex items-center justify-between border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-sm text-red-300">
             <span>{error}</span>
@@ -133,106 +171,104 @@ export default function App() {
           </div>
         )}
 
-        {section === "home" && (
-          <Dashboard
-            projects={projects}
-            onNavigate={setSection}
-            onStartStandup={() => {
-              setSection("daily");
-              setDailyAutoStart(true);
-            }}
-            onStartWeekly={() => {
-              setSection("weekly");
-              setWeeklyAutoStart(true);
-            }}
-            onStartCustomerSync={() => {
-              setSection("weekly");
-              setSyncAutoStart(true);
-            }}
-            onNewProject={() => {
-              setSection("projects");
-              setProjectsAutoWizard(true);
-            }}
-            onOpenRecent={openPath}
-            onOpenProject={(slug, tab) => {
-              setOpenProjectRequest({ slug, tab });
-              setSection("projects");
-            }}
-          />
-        )}
-
-        <Suspense fallback={<SectionFallback />}>
-          {section === "portfolio" && (
-            <PortfolioHub
+        <div className="min-h-0 flex-1">
+          {section === "home" && (
+            <Dashboard
               projects={projects}
-              onOpenProject={() => setSection("projects")}
+              onNavigate={goToSection}
+              onStartStandup={() => {
+                navigate({ section: "daily" });
+                setDailyAutoStart(true);
+              }}
+              onStartWeekly={() => {
+                navigate({ section: "weekly" });
+                setWeeklyAutoStart(true);
+              }}
+              onStartCustomerSync={() => {
+                navigate({ section: "weekly" });
+                setSyncAutoStart(true);
+              }}
+              onNewProject={() => {
+                navigate({ section: "projects" });
+                setProjectsAutoWizard(true);
+              }}
+              onOpenRecent={openPath}
+              onOpenProject={openProject}
             />
           )}
 
-          {section === "projects" && (
-            <ProjectsHub
-              startWizard={projectsAutoWizard}
-              onWizardConsumed={() => setProjectsAutoWizard(false)}
-              onRefresh={bump}
-              openProjectRequest={openProjectRequest}
-              onOpenConsumed={() => setOpenProjectRequest(null)}
-            />
-          )}
+          <Suspense fallback={<SectionFallback />}>
+            {section === "portfolio" && (
+              <PortfolioHub projects={projects} onOpenProject={openProject} />
+            )}
 
-          {section === "daily" && (
-            <DailyHub
-              startWizard={dailyAutoStart}
-              onWizardConsumed={() => setDailyAutoStart(false)}
-              onRefresh={bump}
-            />
-          )}
+            {section === "projects" && (
+              <ProjectsHub
+                startWizard={projectsAutoWizard}
+                onWizardConsumed={() => setProjectsAutoWizard(false)}
+                onRefresh={bump}
+                activeProjectSlug={current.projectSlug}
+                activeProjectTab={current.projectTab as ProjectTab | undefined}
+                onOpenProject={(slug, tab) => openProject(slug, tab)}
+                onBack={goBack}
+              />
+            )}
 
-          {section === "weekly" && (
-            <WeeklyHub
-              startWizard={weeklyAutoStart}
-              startSyncWizard={syncAutoStart}
-              onWizardConsumed={() => {
-                setWeeklyAutoStart(false);
-                setSyncAutoStart(false);
+            {section === "daily" && (
+              <DailyHub
+                startWizard={dailyAutoStart}
+                onWizardConsumed={() => setDailyAutoStart(false)}
+                onRefresh={bump}
+              />
+            )}
+
+            {section === "weekly" && (
+              <WeeklyHub
+                startWizard={weeklyAutoStart}
+                startSyncWizard={syncAutoStart}
+                onWizardConsumed={() => {
+                  setWeeklyAutoStart(false);
+                  setSyncAutoStart(false);
+                }}
+                onRefresh={bump}
+              />
+            )}
+
+            {section === "library" && <LibraryHub />}
+
+            {section === "search" && (
+              <SearchHub projects={projects} onOpenPath={openPath} />
+            )}
+
+            {section === "focus" && (
+              <FocusTimer projects={projects} onExit={() => navigate({ section: "home" })} />
+            )}
+          </Suspense>
+
+          {section === "settings" && (
+            <SettingsView
+              workspaceRoot={workspaceRoot}
+              onWorkspaceChange={(root) => {
+                setWorkspaceRoot(root);
+                bump();
               }}
               onRefresh={bump}
             />
           )}
-
-          {section === "library" && <LibraryHub />}
-
-          {section === "search" && (
-            <SearchHub projects={projects} onOpenPath={openPath} />
-          )}
-
-          {section === "focus" && (
-            <FocusTimer projects={projects} onExit={() => setSection("home")} />
-          )}
-        </Suspense>
-
-        {section === "settings" && (
-          <SettingsView
-            workspaceRoot={workspaceRoot}
-            onWorkspaceChange={(root) => {
-              setWorkspaceRoot(root);
-              bump();
-            }}
-            onRefresh={bump}
-          />
-        )}
+        </div>
       </div>
 
       {workspaceReady && (
         <OnboardingChecklist
           workspaceRoot={workspaceRoot}
           projects={projects}
-          onNavigate={setSection}
+          onNavigate={goToSection}
           onStartStandup={() => {
-            setSection("daily");
+            navigate({ section: "daily" });
             setDailyAutoStart(true);
           }}
           onNewProject={() => {
-            setSection("projects");
+            navigate({ section: "projects" });
             setProjectsAutoWizard(true);
           }}
         />
@@ -257,22 +293,22 @@ export default function App() {
             open={commandOpen}
             onClose={() => setCommandOpen(false)}
             projects={projects}
-            onNavigate={setSection}
-            onStartFocus={() => setSection("focus")}
+            onNavigate={goToSection}
+            onStartFocus={() => navigate({ section: "focus" })}
             onStartStandup={() => {
-              setSection("daily");
+              navigate({ section: "daily" });
               setDailyAutoStart(true);
             }}
             onStartWeekly={() => {
-              setSection("weekly");
+              navigate({ section: "weekly" });
               setWeeklyAutoStart(true);
             }}
             onStartCustomerSync={() => {
-              setSection("weekly");
+              navigate({ section: "weekly" });
               setSyncAutoStart(true);
             }}
             onNewProject={() => {
-              setSection("projects");
+              navigate({ section: "projects" });
               setProjectsAutoWizard(true);
             }}
             onOpenFile={openPath}
@@ -281,7 +317,7 @@ export default function App() {
       )}
 
       {section !== "focus" && (
-        <FocusFloatingPill onOpen={() => setSection("focus")} />
+        <FocusFloatingPill onOpen={() => navigate({ section: "focus" })} />
       )}
 
       <Modal

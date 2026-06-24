@@ -29,7 +29,7 @@ export interface PortfolioSummary {
   projects: ProjectPortfolioRow[];
   phaseCounts: Record<string, number>;
   lowHandoff: ProjectPortfolioRow[];
-  overdueMilestones: { project: string; name: string; date: string }[];
+  overdueMilestones: { project: string; projectSlug: string; name: string; date: string }[];
   totalOpenBlockers: number;
 }
 
@@ -38,7 +38,7 @@ export async function loadPortfolioSummary(
 ): Promise<PortfolioSummary> {
   const rows: ProjectPortfolioRow[] = [];
   const phaseCounts: Record<string, number> = {};
-  const overdueMilestones: { project: string; name: string; date: string }[] = [];
+  const overdueMilestones: PortfolioSummary["overdueMilestones"] = [];
   const today = new Date().toISOString().slice(0, 10);
 
   for (const project of projects) {
@@ -92,6 +92,7 @@ export async function loadPortfolioSummary(
           overdue += 1;
           overdueMilestones.push({
             project: project.display_name,
+            projectSlug: project.slug,
             name: m.name,
             date: m.targetDate,
           });

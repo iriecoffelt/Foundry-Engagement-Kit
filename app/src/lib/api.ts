@@ -47,6 +47,8 @@ export const api = {
     }),
   exportProjectReport: (projectPath: string, format: "pdf" | "docx", destPath: string) =>
     invoke<void>("export_project_report", { projectPath, format, destPath }),
+  exportHandoffPack: (projectPath: string, destPath: string) =>
+    invoke<void>("export_handoff_pack", { projectPath, destPath }),
   cloneProject: (sourcePath: string, newName: string) =>
     invoke<string>("clone_project", { sourcePath, newName }),
   writeBinary: (relative: string, bytes: number[]) =>

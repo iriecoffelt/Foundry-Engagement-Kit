@@ -4,21 +4,28 @@ import {
   boardByStatus,
   DELIVERY_STATUSES,
   DELIVERY_STATUS_LABELS,
-  DELIVERY_TYPE_LABELS,
   loadDeliveryBoard,
   newDeliveryId,
   saveDeliveryBoard,
   seedFromArchitecture,
+  syncArchitectureAndDelivery,
+  removeArchitectureForDeliveryCard,
 } from "../../lib/deliveryBoard";
+import {
+  deliveryTypeLabel,
+  deliveryTypeStyles,
+  loadDeliveryTypes,
+  type DeliveryTypeDefinition,
+} from "../../lib/deliveryTypes";
 import { loadRegister, openBlockers } from "../../lib/engagementRegister";
 import { api } from "../../lib/api";
 import type {
   BlockerEntry,
   DeliveryBoard,
   DeliveryCard,
-  DeliveryComponentType,
   DeliveryStatus,
 } from "../../types";
+import { DeliveryTypeSelect } from "../DeliveryTypeSelect";
 import {
   Field,
   SecondaryButton,
@@ -27,9 +34,11 @@ import {
   TextInput,
 } from "../forms/FormField";
 import { UserPicker } from "./UserPicker";
+import { useEscapeKey } from "../../lib/useEscapeKey";
 
 interface DeliveryBoardViewProps {
   projectPath: string;
+  initialSelectedCardId?: string | null;
 }
 
 const DRAG_THRESHOLD_PX = 8;
@@ -49,11 +58,13 @@ type PointerSession = {
   moved: boolean;
 };
 
-export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
+export function DeliveryBoardView({ projectPath, initialSelectedCardId }: DeliveryBoardViewProps) {
   const [board, setBoard] = useState<DeliveryBoard>({ cards: [] });
+  const [deliveryTypes, setDeliveryTypes] = useState<DeliveryTypeDefinition[]>([]);
   const [saving, setSaving] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
   const [newTitle, setNewTitle] = useState("");
-  const [newType, setNewType] = useState<DeliveryComponentType>("pipeline");
+  const [newType, setNewType] = useState("pipeline");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DeliveryStatus | null>(null);
@@ -62,7 +73,11 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
   const draggingIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    const data = await loadDeliveryBoard(projectPath);
+    const [data, types] = await Promise.all([
+      loadDeliveryBoard(projectPath),
+      loadDeliveryTypes(),
+    ]);
+    setDeliveryTypes(types);
     setBoard(data.cards.length ? data : await seedFromArchitecture(projectPath));
     const register = await loadRegister(projectPath);
     setBlockers(openBlockers(register));
@@ -71,6 +86,12 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (initialSelectedCardId && board.cards.some((c) => c.id === initialSelectedCardId)) {
+      setSelectedId(initialSelectedCardId);
+    }
+  }, [initialSelectedCardId, board.cards]);
 
   const persist = useCallback(
     async (next: DeliveryBoard) => {
@@ -190,13 +211,19 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
     setSelectedId(card.id);
   };
 
-  const removeCard = (id: string) => {
+  const removeCard = async (id: string) => {
+    const card = board.cards.find((c) => c.id === id);
+    if (card) {
+      await removeArchitectureForDeliveryCard(projectPath, card);
+    }
     persist({ cards: board.cards.filter((c) => c.id !== id) });
     if (selectedId === id) setSelectedId(null);
   };
 
   const selectedCard = board.cards.find((c) => c.id === selectedId) ?? null;
   const grouped = boardByStatus(board);
+
+  useEscapeKey(() => setSelectedId(null), Boolean(selectedId));
 
   return (
     <div className={`flex h-full min-h-0 ${draggingId ? "select-none" : ""}`}>
@@ -212,12 +239,20 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
             <button
               type="button"
               onClick={async () => {
-                const seeded = await seedFromArchitecture(projectPath);
-                setBoard(seeded);
+                const result = await syncArchitectureAndDelivery(projectPath);
+                setBoard(result.board);
+                const parts: string[] = [];
+                if (result.archAdded) parts.push(`${result.archAdded} added to diagram`);
+                if (result.deliveryAdded) parts.push(`${result.deliveryAdded} added to board`);
+                if (result.deliveryUpdated) parts.push(`${result.deliveryUpdated} board cards updated`);
+                setSyncMessage(
+                  parts.length ? parts.join(", ") : "Already in sync with architecture",
+                );
+                setTimeout(() => setSyncMessage(""), 4000);
               }}
               className="inline-flex items-center gap-1.5 rounded-xl border border-surface-border-strong px-3 py-2 text-sm text-fg-body hover:text-fg-primary"
             >
-              <Layers size={14} /> Seed from architecture
+              <Layers size={14} /> Sync with architecture
             </button>
           </div>
 
@@ -226,21 +261,26 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
               <div
                 key={status}
                 data-delivery-status={status}
-                className={`card-kit flex min-h-[12rem] flex-col p-3 transition ${
-                  dropTarget === status ? "bg-brand-950/20 ring-2 ring-brand-500/60" : ""
+                className={`flex min-h-[12rem] flex-col rounded-2xl border border-surface-border bg-surface-base/40 p-3 transition ${
+                  dropTarget === status
+                    ? "bg-brand-950/25 ring-2 ring-brand-500/50"
+                    : "ring-1 ring-[rgb(var(--ring-subtle)/0.03)]"
                 }`}
               >
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h4 className="text-[11px] font-semibold uppercase tracking-wide text-fg-secondary">
                     {DELIVERY_STATUS_LABELS[status]}
                   </h4>
-                  <span className="text-xs text-fg-faint">{grouped[status].length}</span>
+                  <span className="rounded-full bg-surface-elevated px-2 py-0.5 text-[10px] font-medium tabular-nums text-fg-muted ring-1 ring-surface-border-strong">
+                    {grouped[status].length}
+                  </span>
                 </div>
-                <div className="flex min-h-[8rem] flex-1 flex-col gap-2">
+                <div className="flex min-h-[8rem] flex-1 flex-col gap-2.5">
                   {grouped[status].map((card) => (
                     <DeliveryCardItem
                       key={card.id}
                       card={card}
+                      deliveryTypes={deliveryTypes}
                       selected={selectedId === card.id}
                       dragging={draggingId === card.id}
                       onPointerDown={(e) => onCardPointerDown(card.id, e)}
@@ -248,7 +288,7 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
                     />
                   ))}
                   {grouped[status].length === 0 && (
-                    <p className="flex flex-1 items-center justify-center py-4 text-center text-[10px] text-fg-faint">
+                    <p className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-surface-border-strong/80 py-6 text-center text-[11px] text-fg-faint">
                       Drop here
                     </p>
                   )}
@@ -264,14 +304,7 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
                 <TextInput value={newTitle} onChange={setNewTitle} placeholder="Component name" />
               </div>
               <div className="w-40">
-                <SelectInput
-                  value={newType}
-                  onChange={(v) => setNewType(v as DeliveryComponentType)}
-                  options={Object.entries(DELIVERY_TYPE_LABELS).map(([value, label]) => ({
-                    value,
-                    label,
-                  }))}
-                />
+                <DeliveryTypeSelect value={newType} onChange={setNewType} />
               </div>
               <button
                 type="button"
@@ -284,6 +317,7 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
             </div>
           </div>
 
+          {syncMessage && <p className="mt-2 text-xs text-brand-300">{syncMessage}</p>}
           {saving && <p className="mt-2 text-xs text-fg-muted">Saving…</p>}
         </div>
       </div>
@@ -304,45 +338,63 @@ export function DeliveryBoardView({ projectPath }: DeliveryBoardViewProps) {
 
 function DeliveryCardItem({
   card,
+  deliveryTypes,
   selected,
   dragging,
   onPointerDown,
   onRemove,
 }: {
   card: DeliveryCard;
+  deliveryTypes: DeliveryTypeDefinition[];
   selected: boolean;
   dragging: boolean;
   onPointerDown: (e: React.PointerEvent) => void;
   onRemove: () => void;
 }) {
+  const typeStyle = deliveryTypeStyles(deliveryTypes, card.type);
+
   return (
     <div
       onPointerDown={onPointerDown}
-      className={`group touch-none rounded-lg border p-2.5 ${
+      className={`group touch-none rounded-xl border border-l-[3px] p-3 shadow-sm transition ${
+        typeStyle.accent
+      } ${
         dragging
-          ? "cursor-grabbing border-brand-500/50 bg-surface-base/80 opacity-50 ring-2 ring-brand-500/50"
+          ? "cursor-grabbing border-brand-500/60 bg-surface-input opacity-60 shadow-md ring-2 ring-brand-500/40"
           : selected
-            ? "cursor-grab border-brand-500 bg-brand-950/30 ring-1 ring-brand-500/40"
-            : "cursor-grab border-surface-border-strong bg-surface-base/80 hover:border-brand-500/40"
-      }`}
+            ? "cursor-grab border-brand-500/70 bg-surface-input ring-2 ring-brand-500/35"
+            : "cursor-grab border-surface-border-strong bg-surface-input hover:border-brand-500/45 hover:shadow-md"
+      } ${card.status === "blocked" ? "ring-1 ring-red-500/25" : ""}`}
     >
-      <div className="flex items-start gap-1.5">
-        <GripVertical size={14} className="mt-0.5 shrink-0 text-fg-muted" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-fg-primary">{card.title}</p>
-          <p className="mt-0.5 text-[10px] text-fg-muted">
-            {DELIVERY_TYPE_LABELS[card.type]}
-            {card.owner ? ` · ${card.owner}` : ""}
-          </p>
+      <div className="flex items-start gap-2">
+        <GripVertical
+          size={15}
+          className="mt-0.5 shrink-0 text-fg-faint transition group-hover:text-fg-muted"
+          aria-hidden
+        />
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-sm font-semibold leading-snug text-fg-primary">{card.title}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span
+              className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ${typeStyle.badge}`}
+            >
+              {deliveryTypeLabel(deliveryTypes, card.type)}
+            </span>
+            {card.owner && (
+              <span className="truncate text-[10px] text-fg-secondary">{card.owner}</span>
+            )}
+          </div>
         </div>
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={onRemove}
-          className="shrink-0 rounded p-0.5 text-fg-muted transition hover:text-red-400"
+          className={`shrink-0 rounded-md p-1 text-fg-faint transition hover:bg-red-500/10 hover:text-red-400 ${
+            selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}
           title="Remove card"
         >
-          <X size={12} />
+          <X size={13} />
         </button>
       </div>
     </div>
@@ -394,13 +446,9 @@ function DeliveryCardDetail({
         </Field>
 
         <Field label="Type">
-          <SelectInput
+          <DeliveryTypeSelect
             value={card.type}
-            onChange={(v) => onUpdate({ type: v as DeliveryComponentType })}
-            options={Object.entries(DELIVERY_TYPE_LABELS).map(([value, label]) => ({
-              value,
-              label,
-            }))}
+            onChange={(v) => onUpdate({ type: v })}
           />
         </Field>
 

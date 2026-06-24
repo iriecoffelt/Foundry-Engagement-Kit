@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { loadPortfolioSummary, type PortfolioSummary } from "../../lib/portfolio";
 import { PHASE_LABELS, PHASE_ORDER } from "../../lib/phaseChecklist";
 import type { EngagementStatus, ProjectMeta } from "../../types";
+import type { ProjectTab } from "../projects/ProjectWorkspaceHeader";
 import { StatusBadge } from "../StatusBadge";
 
 interface PortfolioHubProps {
   projects: ProjectMeta[];
-  onOpenProject: () => void;
+  onOpenProject: (slug: string, tab?: ProjectTab) => void;
 }
 
 export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
@@ -62,9 +63,15 @@ export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
             </div>
             <ul className="mt-3 space-y-1 text-sm">
               {summary.overdueMilestones.map((m, i) => (
-                <li key={i} className="text-fg-body">
-                  <span className="font-medium">{m.project}</span> — {m.name}{" "}
-                  <span className="text-fg-muted">(due {m.date})</span>
+                <li key={i}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenProject(m.projectSlug, "overview")}
+                    className="text-left text-fg-body hover:text-brand-400"
+                  >
+                    <span className="font-medium">{m.project}</span> — {m.name}{" "}
+                    <span className="text-fg-muted">(due {m.date})</span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -77,7 +84,25 @@ export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
               <ShieldAlert size={18} />
               <h3 className="font-medium">Open blockers across portfolio</h3>
             </div>
-            <p className="mt-2 text-sm text-fg-body">{summary.totalOpenBlockers} total — check Register tab per project</p>
+            <p className="mt-2 text-sm text-fg-body">
+              {summary.totalOpenBlockers} total — open an engagement Register tab to triage.
+            </p>
+            <ul className="mt-3 space-y-1">
+              {summary.projects
+                .filter((row) => row.openBlockers > 0)
+                .map((row) => (
+                  <li key={row.project.path}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenProject(row.project.slug, "register")}
+                      className="text-sm text-fg-body hover:text-brand-400"
+                    >
+                      {row.project.display_name} — {row.openBlockers} blocker
+                      {row.openBlockers === 1 ? "" : "s"}
+                    </button>
+                  </li>
+                ))}
+            </ul>
           </div>
         )}
 
@@ -89,9 +114,15 @@ export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
             </div>
             <ul className="mt-3 space-y-2">
               {summary.lowHandoff.map((row) => (
-                <li key={row.project.path} className="flex items-center justify-between text-sm">
-                  <span className="text-fg-body">{row.project.display_name}</span>
-                  <span className="font-medium text-red-400">{row.handoffScore}%</span>
+                <li key={row.project.path}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenProject(row.project.slug, "overview")}
+                    className="flex w-full items-center justify-between text-sm hover:text-brand-400"
+                  >
+                    <span className="text-fg-body">{row.project.display_name}</span>
+                    <span className="font-medium text-red-400">{row.handoffScore}%</span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -104,7 +135,7 @@ export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
             {summary.projects.map((row) => (
               <button
                 key={row.project.path}
-                onClick={onOpenProject}
+                onClick={() => onOpenProject(row.project.slug, "overview")}
                 className="card-kit-interactive flex w-full items-center justify-between p-4 text-left"
               >
                 <div>

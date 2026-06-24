@@ -1,0 +1,11 @@
+{
+  "types": [
+    { "id": "source", "label": "Source System", "color": "indigo", "icon": "server", "linkable": false },
+    { "id": "dataset", "label": "Dataset", "color": "blue", "icon": "database", "linkable": true, "deliveryTypeId": "other" },
+    { "id": "pipeline", "label": "Pipeline", "color": "sky", "icon": "gitBranch", "linkable": true, "deliveryTypeId": "pipeline" },
+    { "id": "objectType", "label": "Object Type", "color": "emerald", "icon": "layers", "linkable": true, "deliveryTypeId": "objectType" },
+    { "id": "workshop", "label": "Workshop App", "color": "amber", "icon": "monitor", "linkable": true, "deliveryTypeId": "workshop" },
+    { "id": "function", "label": "Function", "color": "violet", "icon": "code", "linkable": true, "deliveryTypeId": "function" },
+    { "id": "user", "label": "User", "color": "rose", "icon": "user", "linkable": false }
+  ]
+}

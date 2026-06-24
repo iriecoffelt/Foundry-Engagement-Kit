@@ -1,6 +1,8 @@
-import { CalendarDays, Users } from "lucide-react";
+import { CalendarDays, Copy, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { copyToClipboard } from "../../lib/customerSummary";
+import { buildPortfolioWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
 import type { FileEntry, ProjectMeta } from "../../types";
 import { PrimaryButton, SecondaryButton } from "../forms/FormField";
@@ -45,6 +47,15 @@ export function WeeklyHub({
   );
   const [selected, setSelected] = useState<string | null>(null);
   const [content, setContent] = useState("");
+  const [rollupMessage, setRollupMessage] = useState("");
+
+  const copyPortfolioRollup = async () => {
+    if (!projects.length) return;
+    const text = await buildPortfolioWeeklyRollup(projects);
+    const ok = await copyToClipboard(text);
+    setRollupMessage(ok ? "Portfolio weekly rollup copied" : "Could not copy");
+    setTimeout(() => setRollupMessage(""), 2500);
+  };
 
   const load = useCallback(async () => {
     const projs = await api.listProjectsWithMeta();
@@ -138,6 +149,16 @@ export function WeeklyHub({
                 <Users size={16} /> Customer sync
               </span>
             </SecondaryButton>
+            {projects.length > 0 && (
+              <SecondaryButton onClick={copyPortfolioRollup}>
+                <span className="inline-flex w-full items-center justify-center gap-2">
+                  <Copy size={16} /> Portfolio rollup
+                </span>
+              </SecondaryButton>
+            )}
+            {rollupMessage && (
+              <p className="text-center text-xs text-brand-300">{rollupMessage}</p>
+            )}
           </div>
         }
       >

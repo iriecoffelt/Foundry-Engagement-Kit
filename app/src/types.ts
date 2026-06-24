@@ -116,20 +116,22 @@ export interface WeeklyReviewData {
   openQuestions: string;
 }
 
-export type ArchNodeType =
-  | "source"
-  | "dataset"
-  | "pipeline"
-  | "objectType"
-  | "workshop"
-  | "user";
+export type ArchNodeType = string;
 
 export interface ArchitectureGraph {
   nodes: {
     id: string;
     type: ArchNodeType;
     position: { x: number; y: number };
-    data: { label: string; notes?: string; foundryLink?: string };
+    data: {
+      label: string;
+      notes?: string;
+      foundryLink?: string;
+      /** Links to ontology-elements.json entry when added from Ontology tab */
+      ontologyElementId?: string;
+      /** @deprecated Use ontologyElementId */
+      ontologyObjectId?: string;
+    };
   }[];
   edges: { id: string; source: string; target: string; label?: string }[];
 }
@@ -141,13 +143,21 @@ export interface Milestone {
   status: "pending" | "in_progress" | "done";
 }
 
-export interface OntologyObjectType {
+export interface OntologyElement {
   id: string;
+  /** Kind id from Library → reference/ontology-element-types.json */
+  kind: string;
   name: string;
   description: string;
-  primaryKey: string;
+  primaryKey?: string;
   properties: string[];
+  linkFrom?: string;
+  linkTo?: string;
+  targetObject?: string;
 }
+
+/** @deprecated Use OntologyElement */
+export type OntologyObjectType = OntologyElement;
 
 export interface CustomerSyncData {
   projectSlug: string;
@@ -166,22 +176,18 @@ export interface CustomerSyncData {
 
 export type DeliveryStatus = "backlog" | "in_dev" | "in_uat" | "blocked" | "done";
 
-export type DeliveryComponentType =
-  | "objectType"
-  | "pipeline"
-  | "workshop"
-  | "function"
-  | "other";
-
 export interface DeliveryCard {
   id: string;
   title: string;
-  type: DeliveryComponentType;
+  /** Delivery type id from Library → reference/delivery-types.json */
+  type: string;
   status: DeliveryStatus;
   owner: string;
   designRef?: string;
   resourceId?: string;
   notes?: string;
+  /** Stable link to architecture.json node id */
+  architectureNodeId?: string;
   blockerId?: string;
   createdAt: string;
   updatedAt: string;

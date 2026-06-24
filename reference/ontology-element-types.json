@@ -1,0 +1,60 @@
+{
+  "types": [
+    {
+      "id": "objectType",
+      "label": "Object type",
+      "color": "emerald",
+      "showPrimaryKey": true,
+      "showProperties": true,
+      "showLinkEndpoints": false,
+      "showTargetObject": false,
+      "architectureNodeTypeId": "objectType"
+    },
+    {
+      "id": "linkType",
+      "label": "Link type",
+      "color": "cyan",
+      "showPrimaryKey": false,
+      "showProperties": false,
+      "showLinkEndpoints": true,
+      "showTargetObject": false
+    },
+    {
+      "id": "actionType",
+      "label": "Action type",
+      "color": "orange",
+      "showPrimaryKey": false,
+      "showProperties": false,
+      "showLinkEndpoints": false,
+      "showTargetObject": true
+    },
+    {
+      "id": "function",
+      "label": "Function",
+      "color": "violet",
+      "showPrimaryKey": false,
+      "showProperties": false,
+      "showLinkEndpoints": false,
+      "showTargetObject": false,
+      "architectureNodeTypeId": "function"
+    },
+    {
+      "id": "interface",
+      "label": "Interface",
+      "color": "indigo",
+      "showPrimaryKey": false,
+      "showProperties": true,
+      "showLinkEndpoints": false,
+      "showTargetObject": false
+    },
+    {
+      "id": "sharedProperty",
+      "label": "Shared property",
+      "color": "slate",
+      "showPrimaryKey": false,
+      "showProperties": false,
+      "showLinkEndpoints": false,
+      "showTargetObject": false
+    }
+  ]
+}

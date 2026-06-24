@@ -120,7 +120,7 @@ export function Dashboard({
           )}
         </div>
 
-        <InsightsPanel projects={projects} onOpenPath={onOpenRecent} />
+        <InsightsPanel projects={projects} onOpenProject={onOpenProject} />
 
         <RecentActivity onOpen={onOpenRecent} />
       </div>
