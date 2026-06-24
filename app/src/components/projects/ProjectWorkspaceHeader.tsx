@@ -124,7 +124,7 @@ export function ProjectWorkspaceHeader({
   const phase = normalizeStatus(project.status);
 
   return (
-    <header className="shrink-0 border-b border-surface-border/90 bg-surface-raised/55 backdrop-blur-sm">
+    <header className="shrink-0 border-b border-surface-border bg-surface-raised">
       <div className="px-6 pt-4">
         <button
           onClick={onBack}

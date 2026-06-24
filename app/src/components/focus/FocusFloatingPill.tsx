@@ -16,7 +16,7 @@ export function FocusFloatingPill({ onOpen }: FocusFloatingPillProps) {
   return (
     <button
       onClick={onOpen}
-      className={`focus-floating-pill fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full border px-5 py-3 shadow-xl backdrop-blur-md transition hover:scale-105 ${
+      className={`focus-floating-pill fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full border px-5 py-3 shadow-xl transition hover:scale-105 ${
         isBreak
           ? "border-emerald-600/40 bg-emerald-950/80 text-emerald-200"
           : "border-brand-600/40 bg-surface-raised/90 text-brand-200"

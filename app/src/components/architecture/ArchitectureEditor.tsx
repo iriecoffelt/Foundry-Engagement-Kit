@@ -585,6 +585,8 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
               onConnect={onConnect}
               onSelectionChange={onSelectionChange}
               nodeTypes={nodeTypes}
+              zoomOnScroll={false}
+              panOnScroll
               fitView
               className="bg-surface-base"
             >

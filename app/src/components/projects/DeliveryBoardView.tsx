@@ -71,6 +71,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   const [blockers, setBlockers] = useState<BlockerEntry[]>([]);
   const sessionRef = useRef<PointerSession | null>(null);
   const draggingIdRef = useRef<string | null>(null);
+  const suppressClickRef = useRef(false);
 
   const load = useCallback(async () => {
     const [data, types] = await Promise.all([
@@ -138,28 +139,10 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
     [persist],
   );
 
-  useEffect(() => {
-    const onPointerMove = (e: PointerEvent) => {
-      const session = sessionRef.current;
-      if (!session) return;
-
-      const distance = Math.hypot(e.clientX - session.startX, e.clientY - session.startY);
-      if (!session.moved && distance > DRAG_THRESHOLD_PX) {
-        session.moved = true;
-        draggingIdRef.current = session.cardId;
-        setDraggingId(session.cardId);
-      }
-
+  const endPointerSession = useCallback(
+    (e: PointerEvent, session: PointerSession) => {
       if (session.moved) {
-        setDropTarget(columnFromPoint(e.clientX, e.clientY));
-      }
-    };
-
-    const onPointerUp = (e: PointerEvent) => {
-      const session = sessionRef.current;
-      if (!session) return;
-
-      if (session.moved) {
+        suppressClickRef.current = true;
         const status = columnFromPoint(e.clientX, e.clientY);
         if (status && draggingIdRef.current) moveCard(draggingIdRef.current, status);
         setDraggingId(null);
@@ -168,26 +151,76 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
       } else {
         setSelectedId(session.cardId);
       }
-
       sessionRef.current = null;
-    };
+    },
+    [moveCard],
+  );
 
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-    };
-  }, [moveCard]);
+  const startDragSession = (cardId: string, e: React.PointerEvent, captureEl: HTMLElement) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
 
-  const onCardPointerDown = (cardId: string, e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest("button")) return;
-    sessionRef.current = {
+    captureEl.setPointerCapture(e.pointerId);
+    const pointerId = e.pointerId;
+
+    const session: PointerSession = {
       cardId,
       startX: e.clientX,
       startY: e.clientY,
       moved: false,
     };
+    sessionRef.current = session;
+
+    const onPointerMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const active = sessionRef.current;
+      if (!active || active.cardId !== cardId) return;
+
+      const distance = Math.hypot(ev.clientX - active.startX, ev.clientY - active.startY);
+      if (!active.moved && distance > DRAG_THRESHOLD_PX) {
+        active.moved = true;
+        draggingIdRef.current = cardId;
+        setDraggingId(cardId);
+      }
+
+      if (active.moved) {
+        setDropTarget(columnFromPoint(ev.clientX, ev.clientY));
+      }
+    };
+
+    const onPointerUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      captureEl.removeEventListener("pointermove", onPointerMove);
+      captureEl.removeEventListener("pointerup", onPointerUp);
+      captureEl.removeEventListener("pointercancel", onPointerUp);
+      if (captureEl.hasPointerCapture(pointerId)) {
+        captureEl.releasePointerCapture(pointerId);
+      }
+      const active = sessionRef.current;
+      if (active?.cardId === cardId) endPointerSession(ev, active);
+    };
+
+    captureEl.addEventListener("pointermove", onPointerMove);
+    captureEl.addEventListener("pointerup", onPointerUp);
+    captureEl.addEventListener("pointercancel", onPointerUp);
+  };
+
+  const onCardDragPointerDown = (cardId: string, e: React.PointerEvent) => {
+    startDragSession(cardId, e, e.currentTarget as HTMLElement);
+  };
+
+  const onCardBodyPointerDown = (cardId: string, e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    startDragSession(cardId, e, e.currentTarget as HTMLElement);
+  };
+
+  const onCardClick = (cardId: string) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    setSelectedId(cardId);
   };
 
   const addCard = () => {
@@ -227,13 +260,13 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
 
   return (
     <div className={`flex h-full min-h-0 ${draggingId ? "select-none" : ""}`}>
-      <div className="min-w-0 flex-1 overflow-y-auto p-6">
+      <div className="min-w-0 flex-1 overflow-y-auto overscroll-y-contain p-6">
         <div className="mx-auto max-w-6xl">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h3 className="text-lg font-semibold text-fg-primary">Delivery board</h3>
               <p className="mt-1 text-sm text-fg-secondary">
-                Click a card to edit details. Drag between columns to change status.
+                Click a card to edit details. Drag a card (or its grip) between columns to change status.
               </p>
             </div>
             <button
@@ -261,7 +294,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
               <div
                 key={status}
                 data-delivery-status={status}
-                className={`flex min-h-[12rem] flex-col rounded-2xl border border-surface-border bg-surface-base/40 p-3 transition ${
+                className={`flex min-h-[12rem] flex-col rounded-2xl border border-surface-border bg-surface-base/40 p-3 ${
                   dropTarget === status
                     ? "bg-brand-950/25 ring-2 ring-brand-500/50"
                     : "ring-1 ring-[rgb(var(--ring-subtle)/0.03)]"
@@ -283,7 +316,9 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
                       deliveryTypes={deliveryTypes}
                       selected={selectedId === card.id}
                       dragging={draggingId === card.id}
-                      onPointerDown={(e) => onCardPointerDown(card.id, e)}
+                      onClick={() => onCardClick(card.id)}
+                      onBodyPointerDown={(e) => onCardBodyPointerDown(card.id, e)}
+                      onDragHandlePointerDown={(e) => onCardDragPointerDown(card.id, e)}
                       onRemove={() => removeCard(card.id)}
                     />
                   ))}
@@ -341,37 +376,46 @@ function DeliveryCardItem({
   deliveryTypes,
   selected,
   dragging,
-  onPointerDown,
+  onClick,
+  onBodyPointerDown,
+  onDragHandlePointerDown,
   onRemove,
 }: {
   card: DeliveryCard;
   deliveryTypes: DeliveryTypeDefinition[];
   selected: boolean;
   dragging: boolean;
-  onPointerDown: (e: React.PointerEvent) => void;
+  onClick: () => void;
+  onBodyPointerDown: (e: React.PointerEvent) => void;
+  onDragHandlePointerDown: (e: React.PointerEvent) => void;
   onRemove: () => void;
 }) {
   const typeStyle = deliveryTypeStyles(deliveryTypes, card.type);
 
   return (
     <div
-      onPointerDown={onPointerDown}
-      className={`group touch-none rounded-xl border border-l-[3px] p-3 shadow-sm transition ${
+      onPointerDown={onBodyPointerDown}
+      onClick={onClick}
+      className={`group rounded-xl border border-l-[3px] p-3 shadow-sm [touch-action:pan-y] ${
         typeStyle.accent
       } ${
         dragging
-          ? "cursor-grabbing border-brand-500/60 bg-surface-input opacity-60 shadow-md ring-2 ring-brand-500/40"
+          ? "cursor-grabbing touch-none border-brand-500/60 bg-surface-input opacity-60 shadow-md ring-2 ring-brand-500/40"
           : selected
             ? "cursor-grab border-brand-500/70 bg-surface-input ring-2 ring-brand-500/35"
             : "cursor-grab border-surface-border-strong bg-surface-input hover:border-brand-500/45 hover:shadow-md"
       } ${card.status === "blocked" ? "ring-1 ring-red-500/25" : ""}`}
     >
       <div className="flex items-start gap-2">
-        <GripVertical
-          size={15}
-          className="mt-0.5 shrink-0 text-fg-faint transition group-hover:text-fg-muted"
-          aria-hidden
-        />
+        <button
+          type="button"
+          aria-label="Drag to change status"
+          onPointerDown={onDragHandlePointerDown}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-0.5 shrink-0 cursor-grab rounded p-0.5 text-fg-faint transition hover:text-fg-muted active:cursor-grabbing"
+        >
+          <GripVertical size={15} aria-hidden />
+        </button>
         <div className="min-w-0 flex-1 space-y-2">
           <p className="text-sm font-semibold leading-snug text-fg-primary">{card.title}</p>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -388,7 +432,10 @@ function DeliveryCardItem({
         <button
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={onRemove}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
           className={`shrink-0 rounded-md p-1 text-fg-faint transition hover:bg-red-500/10 hover:text-red-400 ${
             selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           }`}
