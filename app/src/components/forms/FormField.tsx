@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 const inputClass =
-  "w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white outline-none transition focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30";
+  "w-full rounded-xl border border-surface-border-strong bg-surface-input px-4 py-2.5 text-sm text-fg-primary outline-none transition focus:border-brand-500 focus:ring-1 focus:ring-brand-500/30";
 
 export function FormField({
   label,
@@ -14,9 +14,9 @@ export function FormField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-slate-200">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-fg-body">{label}</span>
       {children}
-      {hint && <span className="mt-1.5 block text-xs text-slate-500">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-xs text-fg-muted">{hint}</span>}
     </label>
   );
 }
@@ -101,9 +101,9 @@ export function FormCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-      <h3 className="text-lg font-semibold text-white">{title}</h3>
-      {description && <p className="mt-1 text-sm text-slate-400">{description}</p>}
+    <div className="card-kit p-6">
+      <h3 className="text-lg font-semibold text-fg-primary">{title}</h3>
+      {description && <p className="mt-1 text-sm text-fg-secondary">{description}</p>}
       <div className="mt-5 space-y-4">{children}</div>
     </div>
   );
@@ -125,7 +125,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-500 disabled:opacity-40"
+      className="rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-medium text-fg-on-accent transition hover:bg-brand-500 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
     >
       {children}
     </button>
@@ -146,7 +146,7 @@ export function SecondaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl border border-slate-700 px-5 py-2.5 text-sm font-medium text-slate-300 transition hover:border-slate-600 hover:text-white disabled:opacity-40"
+      className="rounded-xl border border-surface-border-strong px-5 py-2.5 text-sm font-medium text-fg-body transition hover:border-surface-border-strong hover:text-fg-primary active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
     >
       {children}
     </button>

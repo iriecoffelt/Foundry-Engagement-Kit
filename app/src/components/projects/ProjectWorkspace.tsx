@@ -1,14 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import {
-  ArrowLeft,
-  Copy,
-  ExternalLink,
-  FileDown,
-  FileText,
-  Layers,
-  Network,
-  Upload,
-} from "lucide-react";
+import { ExternalLink, FileText, Upload } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import {
@@ -25,24 +16,24 @@ import {
   isUnfilledTemplate,
   unfilledTemplateNotice,
 } from "../../lib/markdown";
-import { PrimaryButton } from "../forms/FormField";
 import { Editor } from "../Editor";
 import { FileTree } from "../FileTree";
+import { HubEmpty, HubLayout, HubMain, HubSidebar } from "../layout/HubLayout";
 import { MarkdownPreview } from "../MarkdownPreview";
+import { PrimaryButton } from "../forms/FormField";
 import { SectionFallback } from "../SectionFallback";
 import { ExportReportModal } from "./ExportReportModal";
 import { HandoffReadiness } from "./HandoffReadiness";
 import { MilestoneTracker } from "./MilestoneTracker";
 import { OntologyQuickAdd } from "./OntologyQuickAdd";
 import { PhaseStepper } from "./PhaseStepper";
+import { ProjectWorkspaceHeader, type ProjectTab } from "./ProjectWorkspaceHeader";
 
 const ArchitectureEditor = lazy(() =>
   import("../architecture/ArchitectureEditor").then((m) => ({
     default: m.ArchitectureEditor,
   })),
 );
-
-type ProjectTab = "overview" | "ontology" | "architecture" | "documents" | "files";
 
 interface ProjectWorkspaceProps {
   project: ProjectMeta;
@@ -101,7 +92,7 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
     } catch {
       setPhaseProgress(0);
     }
-  }, [project.path, project.display_name]);
+  }, [project.path, project.display_name, project.customer, project.status, project.target_go_live]);
 
   useEffect(() => {
     refresh();
@@ -133,60 +124,18 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
     setTimeout(() => setMessage(""), 3000);
   };
 
-  const tabs: { id: ProjectTab; label: string; icon: typeof FileText }[] = [
-    { id: "overview", label: "Overview", icon: FileText },
-    { id: "ontology", label: "Ontology", icon: Layers },
-    { id: "architecture", label: "Architecture", icon: Network },
-    { id: "documents", label: "Documents", icon: FileText },
-    { id: "files", label: "Files", icon: Upload },
-  ];
-
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-slate-800 bg-slate-900/40 px-6 py-4">
-        <button
-          onClick={onBack}
-          className="mb-2 flex items-center gap-1 text-sm text-slate-400 hover:text-white"
-        >
-          <ArrowLeft size={16} /> All projects
-        </button>
-        <h2 className="text-xl font-bold text-white">{project.display_name}</h2>
-        <p className="text-sm text-slate-400">
-          {project.customer} · <span className="capitalize">{project.status}</span>
-        </p>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-1">
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${
-                  tab === id
-                    ? "bg-brand-600 text-white"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                }`}
-              >
-                <Icon size={16} />
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={copySummary}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
-            >
-              <Copy size={14} /> Copy summary
-            </button>
-            <PrimaryButton onClick={() => setShowExport(true)}>
-              <span className="inline-flex items-center gap-2">
-                <FileDown size={16} /> Export report
-              </span>
-            </PrimaryButton>
-          </div>
-        </div>
-        {message && <p className="mt-2 text-sm text-brand-300">{message}</p>}
-      </div>
+      <ProjectWorkspaceHeader
+        project={project}
+        tab={tab}
+        phaseProgress={phaseProgress}
+        message={message}
+        onBack={onBack}
+        onTabChange={setTab}
+        onCopySummary={copySummary}
+        onExport={() => setShowExport(true)}
+      />
 
       <div className="min-h-0 flex-1">
         {tab === "overview" && (
@@ -196,11 +145,11 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
               <MilestoneTracker projectPath={project.path} />
               <HandoffReadiness projectPath={project.path} uploadCount={uploads.length} />
               {overview ? (
-                <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-4">
+                <div className="card-kit p-4">
                   <MarkdownPreview content={overview} />
                 </div>
               ) : (
-                <p className="text-slate-500">No overview yet.</p>
+                <p className="text-fg-muted">No overview yet.</p>
               )}
             </div>
           </div>
@@ -215,9 +164,8 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
         )}
 
         {tab === "documents" && (
-          <div className="flex h-full">
-            <div className="w-64 shrink-0 overflow-y-auto border-r border-slate-800 p-2">
-              <p className="px-2 py-1 text-xs font-medium uppercase text-slate-500">Advanced</p>
+          <HubLayout>
+            <HubSidebar title="Documents" subtitle="Project folder tree">
               <FileTree
                 entries={docTree}
                 selectedPath={openFile?.path}
@@ -227,13 +175,14 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
                   trackRecent(path, path.split("/").pop() || path, "Documents");
                 }}
               />
-            </div>
-            <div className="min-w-0 flex-1">
+            </HubSidebar>
+            <HubMain>
               {openFile ? (
                 <Editor
                   path={openFile.path}
                   content={openFile.content}
                   dirty={openFile.dirty}
+                  defaultView="split"
                   onChange={(content) => setOpenFile({ ...openFile, content, dirty: true })}
                   onSave={async () => {
                     await api.writeFile(openFile.path, openFile.content);
@@ -247,45 +196,51 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
                   }}
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-slate-500">
-                  Select a document for raw markdown editing
-                </div>
+                <HubEmpty
+                  icon={FileText}
+                  title="Select a document to edit"
+                  description="Browse the project tree or pick a markdown file to open in split view."
+                />
               )}
-            </div>
-          </div>
+            </HubMain>
+          </HubLayout>
         )}
 
         {tab === "files" && (
-          <div className="p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-white">Project references</h3>
-                <p className="text-sm text-slate-400">Upload specs, screenshots, or customer docs</p>
+          <div className="h-full overflow-y-auto p-6">
+            <div className="mx-auto max-w-3xl">
+              <div className="mb-6 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-fg-primary">Project references</h3>
+                  <p className="mt-1 text-sm text-fg-secondary">
+                    Upload specs, screenshots, or customer docs
+                  </p>
+                </div>
+                <PrimaryButton onClick={uploadRef}>
+                  <span className="flex items-center gap-1.5">
+                    <Upload size={14} /> Upload file
+                  </span>
+                </PrimaryButton>
               </div>
-              <PrimaryButton onClick={uploadRef}>
-                <span className="flex items-center gap-1.5">
-                  <Upload size={14} /> Upload file
-                </span>
-              </PrimaryButton>
+              {uploads.length === 0 ? (
+                <div className="card-kit border-dashed p-12 text-center text-fg-muted">
+                  No files uploaded yet
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {uploads.map((u) => (
+                    <button
+                      key={u.path}
+                      onClick={() => api.openPath(u.path)}
+                      className="card-kit-interactive flex items-center justify-between px-4 py-3 text-left"
+                    >
+                      <span className="truncate text-fg-body">{u.name}</span>
+                      <ExternalLink size={16} className="shrink-0 text-fg-muted" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {uploads.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-700 p-12 text-center text-slate-500">
-                No files uploaded yet
-              </div>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {uploads.map((u) => (
-                  <button
-                    key={u.path}
-                    onClick={() => api.openPath(u.path)}
-                    className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3 text-left hover:border-brand-600/40"
-                  >
-                    <span className="text-slate-200">{u.name}</span>
-                    <ExternalLink size={16} className="text-slate-500" />
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>

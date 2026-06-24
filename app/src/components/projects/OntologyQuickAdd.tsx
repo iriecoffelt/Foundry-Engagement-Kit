@@ -106,16 +106,16 @@ export function OntologyQuickAdd({ projectPath }: OntologyQuickAddProps) {
 
         {objects.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-slate-400">Defined object types</h3>
+            <h3 className="text-sm font-medium text-fg-secondary">Defined object types</h3>
             {objects.map((o) => (
               <div
                 key={o.id}
-                className="flex items-start justify-between rounded-xl border border-slate-800 bg-slate-900/50 p-4"
+                className="flex items-start justify-between rounded-xl border border-surface-border bg-surface-raised/50 p-4"
               >
                 <div>
-                  <p className="font-medium text-white">{o.name}</p>
-                  <p className="mt-1 text-sm text-slate-400">{o.description}</p>
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="font-medium text-fg-primary">{o.name}</p>
+                  <p className="mt-1 text-sm text-fg-secondary">{o.description}</p>
+                  <p className="mt-2 text-xs text-fg-muted">
                     PK: {o.primaryKey} · {o.properties.length} properties
                   </p>
                 </div>

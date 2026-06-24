@@ -53,14 +53,16 @@ function FileTreeNode({
     <li>
       <div
         className={`group flex items-center gap-1 rounded-lg pr-2 transition ${
-          isSelected ? "bg-brand-600/20 text-brand-200" : "text-slate-300 hover:bg-slate-800/80"
+          isSelected
+            ? "file-tree-selected bg-brand-600/20 text-brand-200"
+            : "text-fg-body hover:bg-surface-elevated/80"
         }`}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
       >
         {entry.is_dir ? (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="rounded p-1 hover:bg-slate-700/50"
+            className="rounded p-1 hover:bg-surface-subtle/50"
             aria-label={expanded ? "Collapse folder" : "Expand folder"}
           >
             {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -82,7 +84,7 @@ function FileTreeNode({
           {entry.is_dir ? (
             <Folder size={15} className="shrink-0 text-brand-400" />
           ) : (
-            <FileText size={15} className="shrink-0 text-slate-500" />
+            <FileText size={15} className="shrink-0 text-fg-muted" />
           )}
           <span className="truncate">{entry.name}</span>
         </button>

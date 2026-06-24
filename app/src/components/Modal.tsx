@@ -14,19 +14,19 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
+      <div className="w-full max-w-md rounded-xl border border-surface-border bg-surface-raised shadow-2xl">
+        <div className="flex items-center justify-between border-b border-surface-border px-5 py-4">
+          <h2 className="text-lg font-semibold text-fg-primary">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white"
+            className="rounded-lg p-1 text-fg-secondary transition hover:bg-surface-elevated hover:text-fg-primary"
           >
             <X size={18} />
           </button>
         </div>
         <div className="px-5 py-4">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
+          <div className="flex justify-end gap-2 border-t border-surface-border px-5 py-4">
             {footer}
           </div>
         )}

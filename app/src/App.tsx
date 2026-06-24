@@ -81,7 +81,7 @@ export default function App() {
   const bump = () => setRefreshKey((k) => k + 1);
 
   return (
-    <div className="flex h-screen bg-slate-950">
+    <div className="flex h-screen bg-surface-base">
       <Sidebar
         section={section}
         onSectionChange={(s) => {
@@ -93,9 +93,10 @@ export default function App() {
         }}
         workspaceRoot={workspaceRoot}
         onRefresh={bump}
+        onOpenCommandPalette={() => setCommandOpen(true)}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="app-main">
         {error && (
           <div className="flex items-center justify-between border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-sm text-red-300">
             <span>{error}</span>
@@ -217,7 +218,7 @@ export default function App() {
           previewFile && (
             <button
               onClick={() => setPreviewFile(null)}
-              className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white"
+              className="rounded-lg px-4 py-2 text-sm text-fg-secondary hover:text-fg-primary"
             >
               Close
             </button>
@@ -225,11 +226,12 @@ export default function App() {
         }
       >
         {previewFile && (
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="flex h-[60vh] min-h-0 flex-col overflow-hidden">
             <Editor
               path={previewFile.path}
               content={previewFile.content}
               dirty={previewFile.dirty}
+              defaultView="edit"
               onChange={(content) =>
                 setPreviewFile({ ...previewFile, content, dirty: true })
               }

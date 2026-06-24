@@ -47,21 +47,21 @@ export function HandoffReadiness({ projectPath, uploadCount }: HandoffReadinessP
     readiness.score >= 80 ? "text-green-400" : readiness.score >= 50 ? "text-amber-400" : "text-red-400";
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+    <div className="rounded-xl border border-surface-border bg-surface-raised/50 p-5">
       <div className="flex items-center gap-3">
         <ShieldCheck size={22} className={color} />
         <div>
-          <h3 className="font-semibold text-white">Handoff readiness</h3>
+          <h3 className="font-semibold text-fg-primary">Handoff readiness</h3>
           <p className={`text-2xl font-bold ${color}`}>{readiness.score}%</p>
         </div>
       </div>
       <ul className="mt-4 space-y-2">
         {readiness.items.map((item) => (
           <li key={item.label} className="flex items-center gap-2 text-sm">
-            <span className={item.ok ? "text-green-400" : "text-slate-600"}>
+            <span className={item.ok ? "text-green-400" : "text-fg-faint"}>
               {item.ok ? "✓" : "○"}
             </span>
-            <span className={item.ok ? "text-slate-300" : "text-slate-500"}>{item.label}</span>
+            <span className={item.ok ? "text-fg-body" : "text-fg-muted"}>{item.label}</span>
           </li>
         ))}
       </ul>

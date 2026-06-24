@@ -144,8 +144,8 @@ export function CustomerSyncWizard({ onComplete, onCancel }: CustomerSyncWizardP
 
       {step === 3 && (
         <FormCard title="Ready to save">
-          <p className="text-sm text-slate-300">
-            <strong className="text-white">{data.projectDisplay}</strong> — customer sync for{" "}
+          <p className="text-sm text-fg-body">
+            <strong className="text-fg-primary">{data.projectDisplay}</strong> — customer sync for{" "}
             {todayISO()}
           </p>
         </FormCard>

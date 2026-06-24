@@ -3,6 +3,15 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { FileEntry, ProjectMeta } from "../../types";
 import { PrimaryButton, SecondaryButton } from "../forms/FormField";
+import {
+  HubEmpty,
+  HubItem,
+  HubLayout,
+  HubMain,
+  HubMainTitle,
+  HubSection,
+  HubSidebar,
+} from "../layout/HubLayout";
 import { MarkdownPreview } from "../MarkdownPreview";
 import { StandupWizard } from "../wizards/StandupWizard";
 
@@ -10,6 +19,10 @@ interface DailyHubProps {
   onRefresh: () => void;
   startWizard?: boolean;
   onWizardConsumed?: () => void;
+}
+
+function formatStandupLabel(path: string): string {
+  return path.split("/").pop()?.replace("-standup.md", "").replace(".md", "") ?? path;
 }
 
 export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubProps) {
@@ -96,76 +109,87 @@ export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubP
   }
 
   return (
-    <div className="flex h-full">
-      <div className="w-80 shrink-0 overflow-y-auto border-r border-slate-800 bg-slate-900/40 p-4">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-semibold text-white">Daily</h2>
+    <HubLayout>
+      <HubSidebar
+        title="Daily"
+        subtitle="Standups by project"
+        actions={
           <PrimaryButton onClick={() => setShowWizard(true)}>
-            <span className="flex items-center gap-1.5">
-              <Plus size={14} /> Standup
+            <span className="flex w-full items-center justify-center gap-1.5">
+              <Plus size={14} /> New standup
             </span>
           </PrimaryButton>
-        </div>
-
+        }
+      >
         {groups.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center">
-            <Calendar size={28} className="mx-auto text-slate-600" />
-            <p className="mt-3 text-sm text-slate-400">No standups yet</p>
-            <button
-              onClick={() => setShowWizard(true)}
-              className="mt-2 text-sm text-brand-400 hover:text-brand-300"
-            >
-              Start today's standup
-            </button>
-          </div>
+          <HubEmpty
+            compact
+            icon={Calendar}
+            title="No standups yet"
+            description="Capture blockers and priorities for today."
+            action={
+              <button
+                onClick={() => setShowWizard(true)}
+                className="mt-2 text-sm text-brand-400 hover:text-brand-300"
+              >
+                Start today's standup
+              </button>
+            }
+          />
         ) : (
           groups.map((g) => (
-            <div key={g.project} className="mb-5">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-                {g.project === "_general" ? "General" : g.project}
-              </p>
+            <HubSection
+              key={g.project}
+              label={g.project === "_general" ? "General" : g.project}
+            >
               {g.entries.map((e) => (
-                <button
+                <HubItem
                   key={e.path}
+                  selected={selected === e.path}
                   onClick={() => openEntry(e.path)}
-                  className={`mb-1 flex w-full rounded-lg px-3 py-2 text-left text-sm ${
-                    selected === e.path
-                      ? "bg-brand-600/20 text-brand-200"
-                      : "text-slate-400 hover:bg-slate-800"
-                  }`}
                 >
-                  {e.name.replace("-standup.md", "").replace(".md", "")}
-                </button>
+                  {formatStandupLabel(e.name)}
+                </HubItem>
               ))}
-            </div>
+            </HubSection>
           ))
         )}
-      </div>
+      </HubSidebar>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <HubMain
+        header={
+          selected ? (
+            <HubMainTitle
+              title={formatStandupLabel(selected)}
+              subtitle={selected}
+              actions={
+                <SecondaryButton onClick={startEdit}>
+                  <span className="flex items-center gap-1.5">
+                    <Pencil size={14} /> Edit standup
+                  </span>
+                </SecondaryButton>
+              }
+            />
+          ) : undefined
+        }
+      >
         {selected ? (
-          <>
-            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/40 px-4 py-3">
-              <p className="text-sm text-slate-400">
-                {selected.split("/").pop()?.replace("-standup.md", "")}
-              </p>
-              <SecondaryButton onClick={startEdit}>
-                <span className="flex items-center gap-1.5">
-                  <Pencil size={14} /> Edit standup
-                </span>
-              </SecondaryButton>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <MarkdownPreview content={content} />
-            </div>
-          </>
+          <MarkdownPreview content={content} />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center text-slate-500">
-            <Calendar size={40} className="mb-3 opacity-40" />
-            <p>Start a standup or select an entry</p>
-          </div>
+          <HubEmpty
+            icon={Calendar}
+            title="Start a standup or select an entry"
+            description="Daily notes are saved under daily/{project}/ in your workspace."
+            action={
+              <PrimaryButton onClick={() => setShowWizard(true)}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Plus size={14} /> New standup
+                </span>
+              </PrimaryButton>
+            }
+          />
         )}
-      </div>
-    </div>
+      </HubMain>
+    </HubLayout>
   );
 }

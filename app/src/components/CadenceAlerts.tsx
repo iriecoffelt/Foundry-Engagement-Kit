@@ -19,7 +19,7 @@ export function CadenceAlerts({ projects, onStartStandup, onStartWeekly }: Caden
   if (alerts.length === 0) return null;
 
   return (
-    <div className="mb-8 rounded-xl border border-amber-900/40 bg-amber-950/20 p-4">
+    <div className="card-kit mb-8 border-amber-900/30 bg-amber-950/15 p-4 ring-amber-500/10">
       <div className="flex items-center gap-2 text-amber-300">
         <AlertCircle size={18} />
         <span className="text-sm font-medium">Cadence reminders</span>
@@ -27,7 +27,7 @@ export function CadenceAlerts({ projects, onStartStandup, onStartWeekly }: Caden
       <ul className="mt-3 space-y-2">
         {alerts.slice(0, 4).map((a, i) => (
           <li key={i} className="flex items-center justify-between text-sm">
-            <span className="text-slate-300">{a.message}</span>
+            <span className="text-fg-body">{a.message}</span>
             <button
               onClick={a.type === "standup" ? onStartStandup : onStartWeekly}
               className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300"

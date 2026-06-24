@@ -56,14 +56,14 @@ export function ExportReportModal({
       onClose={onClose}
       footer={
         <>
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-fg-secondary hover:text-fg-primary">
             {success ? "Close" : "Cancel"}
           </button>
           {!success && (
             <button
               onClick={exportReport}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm text-white hover:bg-brand-500 disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm text-fg-on-accent hover:bg-brand-500 disabled:opacity-40"
             >
               <FileDown size={16} />
               {loading ? "Exporting…" : "Export"}
@@ -72,7 +72,7 @@ export function ExportReportModal({
         </>
       }
     >
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-fg-secondary">
         Compile engagement docs, architecture, standups, and reference files into a shareable
         report.
       </p>
@@ -85,7 +85,7 @@ export function ExportReportModal({
             className={`flex-1 rounded-lg border px-4 py-3 text-sm font-medium transition ${
               format === f
                 ? "border-brand-500 bg-brand-600/20 text-brand-200"
-                : "border-slate-700 text-slate-400 hover:border-slate-600"
+                : "border-surface-border-strong text-fg-secondary hover:border-surface-border-strong"
             }`}
           >
             {f === "pdf" ? "PDF" : "Word (.docx)"}
@@ -93,7 +93,7 @@ export function ExportReportModal({
         ))}
       </div>
 
-      <ul className="mt-4 space-y-1 text-xs text-slate-500">
+      <ul className="mt-4 space-y-1 text-xs text-fg-muted">
         <li>• Engagement overview & discovery/scoping docs</li>
         <li>• Design, ontology, pipeline, and workshop specs</li>
         <li>• Architecture diagram summary</li>

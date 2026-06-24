@@ -12,8 +12,8 @@ export function RecentActivity({ onOpen }: RecentActivityProps) {
 
   return (
     <div className="mt-10">
-      <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-white">
-        <Clock size={18} className="text-slate-500" />
+      <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-fg-primary">
+        <Clock size={18} className="text-fg-muted" />
         Recent activity
       </h3>
       <div className="space-y-1">
@@ -21,10 +21,10 @@ export function RecentActivity({ onOpen }: RecentActivityProps) {
           <button
             key={item.path}
             onClick={() => onOpen(item.path)}
-            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-slate-400 hover:bg-slate-900 hover:text-white"
+            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-fg-secondary hover:bg-surface-raised hover:text-fg-primary"
           >
             <span>{item.title}</span>
-            <span className="text-xs text-slate-600">{item.section}</span>
+            <span className="text-xs text-fg-faint">{item.section}</span>
           </button>
         ))}
       </div>

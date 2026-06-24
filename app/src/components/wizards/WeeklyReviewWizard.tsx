@@ -86,7 +86,7 @@ export function WeeklyReviewWizard({ projects, onComplete, onCancel }: WeeklyRev
       {step === 0 && (
         <FormCard title="Which project?">
           {projects.length === 0 ? (
-            <p className="text-slate-400">Create a project first.</p>
+            <p className="text-fg-secondary">Create a project first.</p>
           ) : (
             <>
               <Field label="Engagement">
@@ -151,8 +151,8 @@ export function WeeklyReviewWizard({ projects, onComplete, onCancel }: WeeklyRev
 
       {step === 4 && project && (
         <FormCard title="Ready to save">
-          <p className="text-slate-300">
-            Weekly review for <strong className="text-white">{project.display_name}</strong>
+          <p className="text-fg-body">
+            Weekly review for <strong className="text-fg-primary">{project.display_name}</strong>
           </p>
         </FormCard>
       )}

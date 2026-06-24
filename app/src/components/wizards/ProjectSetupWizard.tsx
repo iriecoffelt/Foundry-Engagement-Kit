@@ -196,7 +196,7 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
       {step === 2 && (
         <FormCard title="Key people" description="Who cares about this engagement?">
           {data.stakeholders.map((s, i) => (
-            <div key={i} className="rounded-lg border border-slate-800 p-4 space-y-3">
+            <div key={i} className="rounded-lg border border-surface-border p-4 space-y-3">
               <Field label="Name">
                 <TextInput
                   value={s.name}
@@ -283,15 +283,15 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
         <FormCard title="Ready to create" description="We'll generate your project folder and starter docs.">
           <dl className="space-y-3 text-sm">
             <div>
-              <dt className="text-slate-500">Project</dt>
-              <dd className="text-white">{data.displayName}</dd>
+              <dt className="text-fg-muted">Project</dt>
+              <dd className="text-fg-primary">{data.displayName}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Customer</dt>
-              <dd className="text-white">{data.customer}</dd>
+              <dt className="text-fg-muted">Customer</dt>
+              <dd className="text-fg-primary">{data.customer}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Folder</dt>
+              <dt className="text-fg-muted">Folder</dt>
               <dd className="font-mono text-brand-300">project/{slugify(data.displayName)}</dd>
             </div>
           </dl>

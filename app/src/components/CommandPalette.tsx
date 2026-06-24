@@ -130,9 +130,9 @@ export function CommandPalette({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-[15vh] backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
-        <div className="flex items-center gap-3 border-b border-slate-800 px-4">
-          <Search size={18} className="text-slate-500" />
+      <div className="w-full max-w-lg rounded-xl border border-surface-border-strong bg-surface-raised shadow-2xl">
+        <div className="flex items-center gap-3 border-b border-surface-border px-4">
+          <Search size={18} className="text-fg-muted" />
           <input
             autoFocus
             value={query}
@@ -141,28 +141,30 @@ export function CommandPalette({
               setSelected(0);
             }}
             placeholder="Search commands, projects, files…"
-            className="flex-1 bg-transparent py-4 text-white outline-none placeholder:text-slate-500"
+            className="flex-1 bg-transparent py-4 text-fg-primary outline-none placeholder:text-fg-muted"
           />
-          <kbd className="rounded border border-slate-700 px-1.5 py-0.5 text-xs text-slate-500">
+          <kbd className="rounded border border-surface-border-strong px-1.5 py-0.5 text-xs text-fg-muted">
             esc
           </kbd>
         </div>
         <ul className="max-h-72 overflow-y-auto py-2">
           {allItems.length === 0 ? (
-            <li className="px-4 py-6 text-center text-sm text-slate-500">No results</li>
+            <li className="px-4 py-6 text-center text-sm text-fg-muted">No results</li>
           ) : (
             allItems.map((item, i) => (
               <li key={item.id}>
                 <button
                   onClick={() => run(i)}
                   className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm ${
-                    i === selected ? "bg-brand-600/20 text-brand-200" : "text-slate-300 hover:bg-slate-800"
+                    i === selected
+                      ? "command-palette-item-active bg-brand-600/20 text-brand-200"
+                      : "text-fg-body hover:bg-surface-elevated"
                   }`}
                 >
                   <Command size={14} className="shrink-0 opacity-50" />
                   <span>{item.label}</span>
                   {item.type === "file" && (
-                    <span className="ml-auto truncate text-xs text-slate-600">{item.path}</span>
+                    <span className="ml-auto truncate text-xs text-fg-faint">{item.path}</span>
                   )}
                 </button>
               </li>

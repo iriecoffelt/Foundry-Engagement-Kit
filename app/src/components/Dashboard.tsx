@@ -3,6 +3,7 @@ import type { ProjectMeta } from "../types";
 import { CadenceAlerts } from "./CadenceAlerts";
 import { PrimaryButton } from "./forms/FormField";
 import { RecentActivity } from "./RecentActivity";
+import { StatusBadge } from "./StatusBadge";
 
 interface DashboardProps {
   projects: ProjectMeta[];
@@ -31,10 +32,10 @@ export function Dashboard({
             <Sparkles size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">Good to see you</h2>
-            <p className="mt-1 text-slate-400">
+            <h2 className="text-2xl font-bold text-fg-primary">Good to see you</h2>
+            <p className="mt-1 text-fg-secondary">
               Guided workflows for your Foundry engagements — press{" "}
-              <kbd className="rounded border border-slate-700 px-1.5 text-xs">⌘K</kbd> to jump anywhere.
+              <kbd className="rounded border border-surface-border-strong px-1.5 text-xs">⌘K</kbd> to jump anywhere.
             </p>
           </div>
         </div>
@@ -78,7 +79,7 @@ export function Dashboard({
 
         <div className="mt-12">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Active engagements</h3>
+            <h3 className="text-lg font-semibold text-fg-primary">Active engagements</h3>
             <button
               onClick={() => onNavigate("projects")}
               className="text-sm text-brand-400 hover:text-brand-300"
@@ -88,8 +89,8 @@ export function Dashboard({
           </div>
 
           {projects.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-700 p-10 text-center">
-              <p className="text-slate-400">You don't have any projects yet.</p>
+            <div className="card-kit border-dashed p-10 text-center">
+              <p className="text-fg-secondary">You don't have any projects yet.</p>
               <PrimaryButton onClick={onNewProject}>
                 <span className="mt-4 inline-block">Set up your first engagement</span>
               </PrimaryButton>
@@ -100,13 +101,11 @@ export function Dashboard({
                 <button
                   key={p.path}
                   onClick={() => onNavigate("projects")}
-                  className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-left transition hover:border-brand-600/40"
+                  className="card-kit-interactive p-4 text-left"
                 >
-                  <p className="font-medium text-white">{p.display_name}</p>
-                  <p className="mt-1 text-sm text-slate-400">{p.customer}</p>
-                  <span className="mt-2 inline-block rounded-full bg-slate-800 px-2 py-0.5 text-xs capitalize text-slate-400">
-                    {p.status}
-                  </span>
+                  <p className="font-medium text-fg-primary">{p.display_name}</p>
+                  <p className="mt-1 text-sm text-fg-secondary">{p.customer}</p>
+                  <StatusBadge status={p.status} className="mt-2" />
                 </button>
               ))}
             </div>
@@ -135,11 +134,11 @@ function ActionCard({
   return (
     <button
       onClick={onClick}
-      className={`rounded-2xl border border-slate-800 bg-gradient-to-br p-5 text-left transition hover:border-brand-600/40 ${accent}`}
+      className={`card-kit-interactive bg-gradient-to-br p-5 text-left ${accent}`}
     >
       <Icon size={22} className="text-brand-400" />
-      <p className="mt-3 font-semibold text-white">{title}</p>
-      <p className="mt-1 text-sm text-slate-400">{description}</p>
+      <p className="mt-3 font-semibold text-fg-primary">{title}</p>
+      <p className="mt-1 text-sm text-fg-secondary">{description}</p>
     </button>
   );
 }

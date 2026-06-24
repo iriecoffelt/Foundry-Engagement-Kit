@@ -22,7 +22,7 @@ export function ProjectPicker({ value, onChange }: ProjectPickerProps) {
 
   if (projects.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
+      <div className="rounded-xl border border-dashed border-surface-border-strong bg-surface-base/50 p-6 text-center text-sm text-fg-secondary">
         No projects yet. Create a project first from the Projects section.
       </div>
     );

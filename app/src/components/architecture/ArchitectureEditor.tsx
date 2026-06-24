@@ -62,7 +62,7 @@ function ArchNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
-      className={`min-w-[140px] rounded-xl border-2 bg-slate-900 px-3 py-2 shadow-lg ${
+      className={`min-w-[140px] rounded-xl border-2 bg-surface-raised px-3 py-2 shadow-lg ${
         selected ? "ring-2 ring-brand-400/60" : ""
       }`}
       style={{ borderColor: meta.color }}
@@ -71,7 +71,7 @@ function ArchNode({ id, data, selected }: NodeProps) {
         startEditing();
       }}
     >
-      <Handle type="target" position={Position.Left} className="!bg-slate-500" />
+      <Handle type="target" position={Position.Left} className="!bg-surface-subtle" />
       {editing ? (
         <input
           autoFocus
@@ -86,15 +86,15 @@ function ArchNode({ id, data, selected }: NodeProps) {
             }
           }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full rounded border border-slate-600 bg-slate-950 px-2 py-1 text-sm text-white outline-none focus:border-brand-500"
+          className="w-full rounded border border-surface-border-strong bg-surface-base px-2 py-1 text-sm text-fg-primary outline-none focus:border-brand-500"
         />
       ) : (
         <div className="flex items-center gap-2">
           <Icon size={16} style={{ color: meta.color }} />
-          <span className="text-sm font-medium text-white">{data.label as string}</span>
+          <span className="text-sm font-medium text-fg-primary">{data.label as string}</span>
         </div>
       )}
-      <Handle type="source" position={Position.Right} className="!bg-slate-500" />
+      <Handle type="source" position={Position.Right} className="!bg-surface-subtle" />
     </div>
   );
 }
@@ -296,14 +296,14 @@ function ArchitectureEditorInner({ projectPath }: ArchitectureEditorProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-900/40 px-4 py-3">
-        <span className="mr-2 text-sm text-slate-400">Add:</span>
+      <div className="flex flex-wrap items-center gap-2 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
+        <span className="mr-2 text-sm text-fg-secondary">Add:</span>
         {NODE_TYPES.map((n) => (
           <button
             key={n.type}
             type="button"
             onClick={() => addNode(n.type)}
-            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:border-slate-600 hover:text-white"
+            className="rounded-lg border border-surface-border-strong px-3 py-1.5 text-xs text-fg-body hover:border-surface-border-strong hover:text-fg-primary"
           >
             {n.label}
           </button>
@@ -327,7 +327,7 @@ function ArchitectureEditorInner({ projectPath }: ArchitectureEditorProps) {
         </div>
       </div>
       {message && (
-        <div className="border-b border-slate-800 bg-slate-900/30 px-4 py-2 text-sm text-brand-300">
+        <div className="border-b border-surface-border bg-surface-raised/30 px-4 py-2 text-sm text-brand-300">
           {message}
         </div>
       )}
@@ -340,14 +340,14 @@ function ArchitectureEditorInner({ projectPath }: ArchitectureEditorProps) {
           onConnect={onConnect}
           nodeTypes={nodeTypes}
           fitView
-          className="bg-slate-950"
+          className="bg-surface-base"
         >
           <Background color="#334155" gap={20} />
-          <Controls className="!bg-slate-900 !border-slate-700" />
-          <MiniMap className="!bg-slate-900" />
+          <Controls className="!bg-surface-raised !border-surface-border-strong" />
+          <MiniMap className="!bg-surface-raised" />
         </ReactFlow>
       </div>
-      <p className="border-t border-slate-800 px-4 py-2 text-xs text-slate-500">
+      <p className="border-t border-surface-border px-4 py-2 text-xs text-fg-muted">
         Drag nodes to arrange. Double-click a node to rename. Click Save diagram to persist changes.
         PNG export for slides; Mermaid via{" "}
         <code className="text-brand-400">02-design/design-overview.md</code>

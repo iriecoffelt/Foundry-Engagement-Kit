@@ -138,7 +138,7 @@ export function StandupWizard({
           }
         >
           {projects.length === 0 ? (
-            <p className="text-slate-400">Create a project first from the Projects tab.</p>
+            <p className="text-fg-secondary">Create a project first from the Projects tab.</p>
           ) : (
             <Field label="Engagement">
               <SelectInput
@@ -208,8 +208,8 @@ export function StandupWizard({
           title="Ready to save"
           description={isEdit ? `Updates ${editPath}` : `Saved to daily/${project.slug}/`}
         >
-          <p className="text-slate-300">
-            <strong className="text-white">{project.display_name}</strong> — standup for{" "}
+          <p className="text-fg-body">
+            <strong className="text-fg-primary">{project.display_name}</strong> — standup for{" "}
             {displayDate}
           </p>
         </FormCard>

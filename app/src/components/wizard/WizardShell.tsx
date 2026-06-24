@@ -29,18 +29,18 @@ export function WizardShell({
   children,
 }: WizardShellProps) {
   return (
-    <div className="flex h-full flex-col bg-slate-950">
-      <div className="border-b border-slate-800 bg-slate-900/60 px-8 py-6">
-        <h2 className="text-2xl font-semibold text-white">{title}</h2>
-        {subtitle && <p className="mt-1 text-slate-400">{subtitle}</p>}
+    <div className="flex h-full flex-col bg-surface-base">
+      <div className="border-b border-surface-border bg-surface-raised/60 px-8 py-6">
+        <h2 className="text-2xl font-semibold text-fg-primary">{title}</h2>
+        {subtitle && <p className="mt-1 text-fg-secondary">{subtitle}</p>}
         <div className="mt-6 flex gap-2">
           {steps.map((s, i) => (
             <div key={s.label} className="flex flex-1 flex-col gap-1">
               <div
-                className={`h-1.5 rounded-full ${i <= step ? "bg-brand-500" : "bg-slate-800"}`}
+                className={`h-1.5 rounded-full ${i <= step ? "bg-brand-500" : "bg-surface-elevated"}`}
               />
               <span
-                className={`text-xs ${i === step ? "text-brand-300" : "text-slate-500"}`}
+                className={`text-xs ${i === step ? "text-brand-300" : "text-fg-muted"}`}
               >
                 {s.label}
               </span>
@@ -53,10 +53,10 @@ export function WizardShell({
         <div className="mx-auto max-w-2xl">{children}</div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-800 bg-slate-900/60 px-8 py-4">
+      <div className="flex items-center justify-between border-t border-surface-border bg-surface-raised/60 px-8 py-4">
         <button
           onClick={onCancel}
-          className="text-sm text-slate-400 hover:text-white"
+          className="text-sm text-fg-secondary hover:text-fg-primary"
         >
           Cancel
         </button>
@@ -64,7 +64,7 @@ export function WizardShell({
           {step > 0 && (
             <button
               onClick={onBack}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+              className="inline-flex items-center gap-1 rounded-lg border border-surface-border-strong px-4 py-2 text-sm text-fg-body hover:bg-surface-elevated"
             >
               <ChevronLeft size={16} />
               Back
@@ -73,7 +73,7 @@ export function WizardShell({
           <button
             onClick={onNext}
             disabled={!canNext}
-            className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-5 py-2 text-sm font-medium text-fg-on-accent hover:bg-brand-500 disabled:opacity-40"
           >
             {isLast ? finishLabel : "Continue"}
             {!isLast && <ChevronRight size={16} />}
