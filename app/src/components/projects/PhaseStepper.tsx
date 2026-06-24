@@ -1,5 +1,5 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/api";
 import { updateEngagementStatus } from "../../lib/engagementMeta";
 import {
@@ -21,6 +21,7 @@ interface PhaseStepperProps {
   currentStatus: string;
   onProgressChange?: (overall: number) => void;
   onStatusChange?: (status: EngagementStatus) => void;
+  onChecklistSaved?: () => void;
 }
 
 export function PhaseStepper({
@@ -28,7 +29,15 @@ export function PhaseStepper({
   currentStatus,
   onProgressChange,
   onStatusChange,
+  onChecklistSaved,
 }: PhaseStepperProps) {
+  const onProgressChangeRef = useRef(onProgressChange);
+  const onStatusChangeRef = useRef(onStatusChange);
+  const onChecklistSavedRef = useRef(onChecklistSaved);
+  onProgressChangeRef.current = onProgressChange;
+  onStatusChangeRef.current = onStatusChange;
+  onChecklistSavedRef.current = onChecklistSaved;
+
   const [checklist, setChecklist] = useState<PhaseChecklist>(DEFAULT_CHECKLIST);
   const [activePhase, setActivePhase] = useState<EngagementStatus>(
     (PHASE_ORDER.includes(currentStatus as EngagementStatus)
@@ -40,12 +49,9 @@ export function PhaseStepper({
   const [editLabel, setEditLabel] = useState("");
   const [newTaskLabel, setNewTaskLabel] = useState("");
 
-  const notifyProgress = useCallback(
-    (data: PhaseChecklist) => {
-      onProgressChange?.(computePhaseProgress(data).overall);
-    },
-    [onProgressChange],
-  );
+  const notifyProgress = useCallback((data: PhaseChecklist) => {
+    onProgressChangeRef.current?.(computePhaseProgress(data).overall);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -82,6 +88,7 @@ export function PhaseStepper({
     setSaving(true);
     try {
       await api.writeJson(checklistPath(projectPath), updated);
+      onChecklistSavedRef.current?.();
     } finally {
       setSaving(false);
     }
@@ -151,7 +158,7 @@ export function PhaseStepper({
     setSaving(true);
     try {
       await updateEngagementStatus(projectPath, status);
-      onStatusChange?.(status);
+      onStatusChangeRef.current?.(status);
     } finally {
       setSaving(false);
     }

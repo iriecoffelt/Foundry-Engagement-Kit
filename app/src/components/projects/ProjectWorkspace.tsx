@@ -11,7 +11,7 @@ import {
 import { copyToClipboard, generateCustomerSummary } from "../../lib/customerSummary";
 import { buildWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
-import type { FileEntry, ProjectMeta } from "../../types";
+import type { EngagementStatus, FileEntry, ProjectMeta } from "../../types";
 import {
   engagementFromJson,
   generateProjectReadme,
@@ -122,6 +122,14 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
     setChecklistVersion((v) => v + 1);
   }, []);
 
+  const handleProgressChange = useCallback((overall: number) => {
+    setPhaseProgress(overall);
+  }, []);
+
+  const handleStatusChange = useCallback((status: EngagementStatus) => {
+    setProjectMeta((prev) => ({ ...prev, status }));
+  }, []);
+
   const refresh = useCallback(async () => {
     let overviewContent = "";
     try {
@@ -158,6 +166,16 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
     } catch {
       setUploads([]);
     }
+  }, [
+    projectMeta.path,
+    projectMeta.display_name,
+    projectMeta.customer,
+    projectMeta.status,
+    projectMeta.target_go_live,
+    projectMeta.slug,
+  ]);
+
+  const refreshPhaseProgress = useCallback(async () => {
     try {
       const cl = mergeChecklist(
         await api.readJson<typeof DEFAULT_CHECKLIST>(checklistPath(projectMeta.path)),
@@ -166,19 +184,16 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
     } catch {
       setPhaseProgress(0);
     }
-  }, [
-    projectMeta.path,
-    projectMeta.display_name,
-    projectMeta.customer,
-    projectMeta.status,
-    projectMeta.target_go_live,
-    projectMeta.slug,
-    checklistVersion,
-  ]);
+  }, [projectMeta.path]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (checklistVersion === 0) return;
+    refreshPhaseProgress();
+  }, [checklistVersion, refreshPhaseProgress]);
 
   const openDoc = async (path: string) => {
     const content = await api.readFile(path);
@@ -232,33 +247,37 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
 
       <div className="min-h-0 flex-1">
         {tab === "overview" && (
-          <div className="h-full overflow-y-auto p-6">
+          <div className="h-full scroll-region p-6">
             <div className="mx-auto max-w-3xl space-y-6">
-              <PhaseStepper
-                projectPath={projectMeta.path}
-                currentStatus={projectMeta.status}
-                onProgressChange={(overall) => {
-                  setPhaseProgress(overall);
-                  bumpChecklist();
-                }}
-                onStatusChange={(status) => {
-                  setProjectMeta((prev) => ({ ...prev, status }));
-                }}
-              />
-              <MilestoneTracker projectPath={projectMeta.path} />
-              <EngagementTimeline
-                projectPath={projectMeta.path}
-                projectSlug={projectMeta.slug}
-                onOpenTab={changeTab}
-              />
-              <HandoffReadiness
-                projectPath={projectMeta.path}
-                projectName={projectMeta.display_name}
-                uploadCount={uploads.length}
-                checklistVersion={checklistVersion}
-              />
+              <div className="overview-section">
+                <PhaseStepper
+                  projectPath={projectMeta.path}
+                  currentStatus={projectMeta.status}
+                  onProgressChange={handleProgressChange}
+                  onStatusChange={handleStatusChange}
+                  onChecklistSaved={bumpChecklist}
+                />
+              </div>
+              <div className="overview-section">
+                <MilestoneTracker projectPath={projectMeta.path} />
+              </div>
+              <div className="overview-section">
+                <EngagementTimeline
+                  projectPath={projectMeta.path}
+                  projectSlug={projectMeta.slug}
+                  onOpenTab={changeTab}
+                />
+              </div>
+              <div className="overview-section">
+                <HandoffReadiness
+                  projectPath={projectMeta.path}
+                  projectName={projectMeta.display_name}
+                  uploadCount={uploads.length}
+                  checklistVersion={checklistVersion}
+                />
+              </div>
               {overview ? (
-                <div className="card-kit p-4">
+                <div className="overview-section card-kit-scroll p-4">
                   <MarkdownPreview content={overview} />
                 </div>
               ) : (

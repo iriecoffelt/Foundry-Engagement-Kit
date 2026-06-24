@@ -127,6 +127,24 @@
     @apply mb-1 text-[10px] font-medium uppercase tracking-wider text-fg-faint;
   }
 
+  .scroll-region {
+    @apply overflow-y-auto overscroll-y-contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .overview-section {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
+
+  .overview-section .card-kit {
+    @apply card-kit-scroll;
+  }
+
+  .card-kit-scroll {
+    @apply rounded-2xl border border-surface-border bg-surface-raised;
+  }
+
   .card-kit {
     @apply rounded-2xl border border-surface-border bg-surface-raised shadow-card ring-1 ring-[rgb(var(--ring-subtle)/0.04)];
   }
@@ -188,11 +206,11 @@
   }
 
   .hub-main-header {
-    @apply flex shrink-0 items-center justify-between gap-3 border-b border-surface-border bg-surface-raised/60 px-5 py-3 backdrop-blur-sm;
+    @apply flex shrink-0 items-center justify-between gap-3 border-b border-surface-border bg-surface-raised px-5 py-3;
   }
 
   .hub-main-body {
-    @apply min-h-0 flex-1 overflow-y-auto;
+    @apply min-h-0 flex-1 overflow-y-auto overscroll-y-contain;
   }
 
   .hub-empty {
@@ -229,7 +247,7 @@
   }
 
   .editor-toolbar {
-    @apply flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-surface-border bg-surface-raised/80 px-4 py-2.5 backdrop-blur-sm;
+    @apply flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-surface-border bg-surface-raised px-4 py-2.5;
   }
 
   .editor-view-toggle {

@@ -1,6 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useSyncExternalStore, useState } from "react";
 import { api } from "./lib/api";
 import { useAppNavigation } from "./lib/appNavigation";
+import {
+  getAppSection,
+  openFocusSession,
+  setAppSection,
+  setOpenFocusHandler,
+  subscribeAppSection,
+} from "./lib/appSectionStore";
 import { getCadenceAlerts } from "./lib/cadence";
 import { startCadenceNotificationPoller } from "./lib/notifications";
 import { trackRecent } from "./lib/recent";
@@ -8,6 +15,7 @@ import type { OpenFile, ProjectMeta, Section } from "./types";
 import { Dashboard } from "./components/Dashboard";
 import { Editor } from "./components/Editor";
 import { FocusFloatingPill } from "./components/focus/FocusFloatingPill";
+import { useFocusTimerContext } from "./context/FocusTimerContext";
 import { Modal } from "./components/Modal";
 import { NavigationBackBar } from "./components/NavigationBackBar";
 import { SectionFallback } from "./components/SectionFallback";
@@ -43,10 +51,34 @@ const CommandPalette = lazy(() =>
 );
 
 export default function App() {
+  return (
+    <>
+      <AppMain />
+      <FocusFloatingPillGate />
+    </>
+  );
+}
+
+function FocusFloatingPillGate() {
+  const section = useSyncExternalStore(subscribeAppSection, getAppSection);
+  const { isActive } = useFocusTimerContext();
+  if (section === "focus" || !isActive) return null;
+  return <FocusFloatingPill onOpen={openFocusSession} />;
+}
+
+const AppMain = memo(function AppMain() {
   const { current, canGoBack, previousFrame, navigate, goBack } = useAppNavigation({
     section: "home",
   });
   const section = current.section;
+
+  useEffect(() => {
+    setAppSection(section);
+  }, [section]);
+
+  useEffect(() => {
+    setOpenFocusHandler(() => navigate({ section: "focus" }));
+  }, [navigate]);
 
   const [workspaceRoot, setWorkspaceRoot] = useState("");
   const [workspaceReady, setWorkspaceReady] = useState(false);
@@ -316,10 +348,6 @@ export default function App() {
         </Suspense>
       )}
 
-      {section !== "focus" && (
-        <FocusFloatingPill onOpen={() => navigate({ section: "focus" })} />
-      )}
-
       <Modal
         open={!!previewFile}
         title={previewFile?.path.split("/").pop() ?? "Document"}
@@ -361,4 +389,4 @@ export default function App() {
       </Modal>
     </div>
   );
-}
+});

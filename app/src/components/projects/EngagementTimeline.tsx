@@ -34,10 +34,32 @@ export function EngagementTimeline({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    loadEngagementTimeline(projectPath, projectSlug)
-      .then(setEvents)
-      .finally(() => setLoading(false));
+
+    const run = () => {
+      loadEngagementTimeline(projectPath, projectSlug)
+        .then((data) => {
+          if (!cancelled) setEvents(data);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    };
+
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(run, { timeout: 1200 });
+      return () => {
+        cancelled = true;
+        cancelIdleCallback(id);
+      };
+    }
+
+    const id = window.setTimeout(run, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
   }, [projectPath, projectSlug]);
 
   return (
