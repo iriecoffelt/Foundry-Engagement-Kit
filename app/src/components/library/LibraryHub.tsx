@@ -1,124 +1,130 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { ExternalLink, FileText, Upload } from "lucide-react";
+import { BookOpen, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import type { FileEntry } from "../../types";
-import { PrimaryButton } from "../forms/FormField";
-import { MarkdownPreview } from "../MarkdownPreview";
+import { Editor } from "../Editor";
 
 export function LibraryHub() {
   const [guides, setGuides] = useState<FileEntry[]>([]);
   const [uploads, setUploads] = useState<FileEntry[]>([]);
-  const [selectedGuide, setSelectedGuide] = useState<string | null>(null);
-  const [guideContent, setGuideContent] = useState("");
-  const [message, setMessage] = useState("");
+  const [openFile, setOpenFile] = useState<{
+    path: string;
+    content: string;
+    dirty: boolean;
+  } | null>(null);
+  const [status, setStatus] = useState("");
 
   const refresh = useCallback(async () => {
-    const refEntries = await api.listDirectory("reference", false);
-    setGuides(refEntries.filter((e) => !e.is_dir && e.name.endsWith(".md")));
-
+    const ref = await api.listDirectory("reference", false);
+    setGuides(ref.filter((f) => f.name.endsWith(".md")));
     try {
       await api.createDirectory("reference/uploads");
+      const up = await api.listDirectory("reference/uploads", false);
+      setUploads(up.filter((f) => !f.is_dir));
     } catch {
-      /* exists */
+      setUploads([]);
     }
-    const uploadEntries = await api.listDirectory("reference/uploads", false);
-    setUploads(uploadEntries.filter((e) => !e.is_dir));
   }, []);
 
   useEffect(() => {
-    refresh().catch(() => {});
+    refresh();
   }, [refresh]);
 
   const openGuide = async (path: string) => {
     const content = await api.readFile(path);
-    setSelectedGuide(path);
-    setGuideContent(content);
+    setOpenFile({ path, content, dirty: false });
   };
 
-  const uploadFile = async () => {
-    const selected = await open({
-      multiple: false,
-      title: "Choose a reference file to upload",
-    });
-    if (!selected || typeof selected !== "string") return;
+  const upload = async () => {
+    const selected = await open({ multiple: false });
+    if (!selected) return;
     try {
-      const dest = await api.importFile(selected, "reference/uploads/");
-      setMessage(`Uploaded ${dest}`);
-      await refresh();
+      await api.createDirectory("reference/uploads");
+      await api.importFile(selected, "reference/uploads/");
+      setStatus("File uploaded");
+      refresh();
     } catch (e) {
-      setMessage(String(e));
-    }
-  };
-
-  const openUploaded = async (path: string) => {
-    try {
-      await api.openPath(path);
-    } catch (e) {
-      setMessage(String(e));
+      setStatus(String(e));
     }
   };
 
   return (
-    <div className="flex h-full">
-      <div className="w-80 shrink-0 overflow-y-auto border-r border-slate-800 bg-slate-900/40 p-4">
-        <div className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-white">Reference guides</h3>
-          </div>
-          <div className="space-y-1">
+    <div className="flex h-full min-h-0">
+      <div className="w-80 shrink-0 overflow-y-auto border-r border-slate-800 p-4">
+        <h2 className="text-lg font-semibold text-white">Library</h2>
+        <p className="mt-1 text-sm text-slate-500">Guides and reference uploads</p>
+
+        <div className="mt-6">
+          <h3 className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <BookOpen size={14} />
+            Guides
+          </h3>
+          <div className="mt-2 space-y-1">
             {guides.map((g) => (
               <button
                 key={g.path}
                 onClick={() => openGuide(g.path)}
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${
-                  selectedGuide === g.path
+                className={`block w-full rounded-lg px-3 py-2 text-left text-sm ${
+                  openFile?.path === g.path
                     ? "bg-brand-600/20 text-brand-200"
-                    : "text-slate-400 hover:bg-slate-800"
+                    : "text-slate-400 hover:bg-slate-900 hover:text-white"
                 }`}
               >
-                <FileText size={15} />
-                {g.name.replace(".md", "")}
+                {g.name.replace(".md", "").replace(/-/g, " ")}
               </button>
             ))}
           </div>
         </div>
 
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-white">Uploaded files</h3>
-            <PrimaryButton onClick={uploadFile}>
-              <span className="flex items-center gap-1.5">
-                <Upload size={14} /> Upload
-              </span>
-            </PrimaryButton>
+        <div className="mt-8">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Uploads
+            </h3>
+            <button
+              onClick={upload}
+              className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300"
+            >
+              <Upload size={14} />
+              Upload
+            </button>
           </div>
-          {message && <p className="mb-2 text-xs text-brand-300">{message}</p>}
-          {uploads.length === 0 ? (
-            <p className="text-sm text-slate-500">No uploads yet. Add PDFs, images, or docs.</p>
-          ) : (
-            <div className="space-y-1">
-              {uploads.map((u) => (
-                <button
-                  key={u.path}
-                  onClick={() => openUploaded(u.path)}
-                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-slate-400 hover:bg-slate-800"
-                >
-                  <span className="truncate">{u.name}</span>
-                  <ExternalLink size={14} />
-                </button>
-              ))}
-            </div>
-          )}
+          {status && <p className="mt-1 text-xs text-slate-500">{status}</p>}
+          <div className="mt-2 space-y-1">
+            {uploads.map((u) => (
+              <button
+                key={u.path}
+                onClick={() => api.openPath(u.path)}
+                className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 hover:bg-slate-900 hover:text-white"
+              >
+                {u.name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        {selectedGuide ? (
-          <MarkdownPreview content={guideContent} />
+      <div className="min-w-0 flex-1">
+        {openFile ? (
+          <Editor
+            path={openFile.path}
+            content={openFile.content}
+            dirty={openFile.dirty}
+            onChange={(content) => setOpenFile({ ...openFile, content, dirty: true })}
+            onSave={async () => {
+              await api.writeFile(openFile.path, openFile.content);
+              setOpenFile({ ...openFile, dirty: false });
+            }}
+            onDelete={async () => {
+              if (!confirm(`Delete ${openFile.path}?`)) return;
+              await api.deletePath(openFile.path);
+              setOpenFile(null);
+              refresh();
+            }}
+          />
         ) : (
           <div className="flex h-full items-center justify-center text-slate-500">
-            Select a guide or upload a reference file
+            Select a guide to view or edit
           </div>
         )}
       </div>

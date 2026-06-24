@@ -1,60 +1,101 @@
-import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../../lib/api";
-import { generateStandupMd, todayISO } from "../../lib/markdown";
-import type { StandupData } from "../../types";
-import { FormCard, FormField, SelectInput, TextArea, TextInput } from "../forms/FormField";
-import { ProjectPicker } from "../forms/ProjectPicker";
+import { generateStandupMd, parseStandupMd, todayISO } from "../../lib/markdown";
+import type { ProjectMeta, StandupData } from "../../types";
+import { Field, FormCard, SelectInput, TextArea, TextInput } from "../forms/FormField";
 import { WizardShell } from "../wizard/WizardShell";
 
-const STEPS = [
-  { id: "project", label: "Project" },
-  { id: "yesterday", label: "Yesterday" },
-  { id: "today", label: "Today" },
-  { id: "blockers", label: "Blockers" },
-  { id: "review", label: "Review" },
-];
-
-const SURFACES = [
-  { value: "", label: "—" },
-  { value: "Ontology", label: "Ontology" },
-  { value: "Pipeline", label: "Pipeline" },
-  { value: "Workshop", label: "Workshop" },
-  { value: "Other", label: "Other" },
-];
-
 interface StandupWizardProps {
+  projects: ProjectMeta[];
+  editPath?: string;
+  initialMarkdown?: string;
   onComplete: (path: string) => void;
   onCancel: () => void;
 }
 
-export function StandupWizard({ onComplete, onCancel }: StandupWizardProps) {
+function initFromMarkdown(
+  initialMarkdown: string | undefined,
+  projects: ProjectMeta[],
+) {
+  const parsed = initialMarkdown ? parseStandupMd(initialMarkdown) : null;
+  return {
+    projectSlug: parsed?.projectSlug ?? projects[0]?.slug ?? "",
+    milestone: parsed?.milestone ?? "",
+    yesterday: parsed?.yesterday.join("\n") ?? "",
+    todayTask: parsed?.today[0]?.task ?? "",
+    todaySurface: parsed?.today[0]?.surface ?? "Workshop",
+    blocker: parsed?.blockers[0]?.blocker ?? "",
+    meetings: parsed?.meetings ?? "",
+    notes: parsed?.notes ?? "",
+    standupDate: parsed?.date,
+  };
+}
+
+export function StandupWizard({
+  projects,
+  editPath,
+  initialMarkdown,
+  onComplete,
+  onCancel,
+}: StandupWizardProps) {
+  const initial = useMemo(
+    () => initFromMarkdown(initialMarkdown, projects),
+    [initialMarkdown, projects],
+  );
+  const isEdit = Boolean(editPath);
+
   const [step, setStep] = useState(0);
+  const [projectSlug, setProjectSlug] = useState(initial.projectSlug);
+  const [milestone, setMilestone] = useState(initial.milestone);
+  const [yesterday, setYesterday] = useState(initial.yesterday);
+  const [todayTask, setTodayTask] = useState(initial.todayTask);
+  const [todaySurface, setTodaySurface] = useState(initial.todaySurface);
+  const [blocker, setBlocker] = useState(initial.blocker);
+  const [meetings, setMeetings] = useState(initial.meetings);
+  const [notes, setNotes] = useState(initial.notes);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [data, setData] = useState<StandupData>({
-    projectSlug: "",
-    projectDisplay: "",
-    milestone: "",
-    yesterday: [""],
-    today: [{ task: "", surface: "", priority: "P1" }],
-    blockers: [{ blocker: "", owner: "", escalate: false }],
-    meetings: "",
-    notes: "",
-  });
 
-  const canProceed = step !== 0 || data.projectSlug.length > 0;
+  const project = projects.find((p) => p.slug === projectSlug);
+  const steps = [
+    { label: "Project" },
+    { label: "Yesterday" },
+    { label: "Today" },
+    { label: "Blockers" },
+    { label: "Done" },
+  ];
 
   const finish = async () => {
+    if (!project) return;
     setLoading(true);
     setError("");
     try {
-      const date = todayISO();
-      const dir = `daily/${data.projectSlug}`;
-      const path = `${dir}/${date}-standup.md`;
-      await api.createDirectory(dir);
-      await api.writeFile(path, generateStandupMd(data));
-      onComplete(path);
+      const data: StandupData = {
+        projectSlug: project.slug,
+        projectDisplay: project.display_name,
+        date: initial.standupDate || todayISO(),
+        milestone,
+        yesterday: yesterday.split("\n").filter(Boolean),
+        today: todayTask
+          ? [{ task: todayTask, surface: todaySurface, priority: "P0" }]
+          : [],
+        blockers: blocker ? [{ blocker, owner: "", escalate: false }] : [],
+        meetings,
+        notes,
+      };
+      const markdown = generateStandupMd(data);
+
+      if (editPath) {
+        await api.writeFile(editPath, markdown);
+        onComplete(editPath);
+      } else {
+        const date = todayISO();
+        const dir = `daily/${project.slug}`;
+        await api.createDirectory(dir);
+        const path = `${dir}/${date}-standup.md`;
+        await api.writeFile(path, markdown);
+        onComplete(path);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -62,203 +103,115 @@ export function StandupWizard({ onComplete, onCancel }: StandupWizardProps) {
     }
   };
 
+  const displayDate = initial.standupDate || todayISO();
+
   return (
     <WizardShell
-      title="Daily standup"
-      subtitle="A quick check-in tied to your engagement."
-      steps={STEPS}
-      currentStep={step}
-      onBack={() => (step === 0 ? onCancel() : setStep((s) => s - 1))}
-      onNext={() => setStep((s) => s + 1)}
-      onFinish={finish}
-      canProceed={canProceed}
-      loading={loading}
+      title={isEdit ? "Edit standup" : "Daily standup"}
+      subtitle={
+        isEdit
+          ? "Update your standup — changes save to the same file."
+          : "Quick check-in tied to your engagement."
+      }
+      steps={steps}
+      step={step}
+      onBack={() => setStep((s) => s - 1)}
+      onNext={() => (step === steps.length - 1 ? finish() : setStep((s) => s + 1))}
+      onCancel={onCancel}
+      canNext={step > 0 || !!projectSlug}
+      isLast={step === steps.length - 1}
+      finishLabel={loading ? "Saving…" : isEdit ? "Update standup" : "Save standup"}
     >
       {error && (
-        <div className="mb-4 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+        <div className="mb-4 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
           {error}
         </div>
       )}
 
       {step === 0 && (
-        <FormCard title="Which project?" description="Standups are saved under that project's daily folder.">
-          <ProjectPicker
-            value={data.projectSlug}
-            onChange={(slug, display) =>
-              setData({ ...data, projectSlug: slug, projectDisplay: display })
-            }
-          />
-          <FormField label="Current milestone (optional)">
-            <TextInput
-              value={data.milestone}
-              onChange={(v) => setData({ ...data, milestone: v })}
-              placeholder="e.g. M2 — Alpha"
-            />
-          </FormField>
+        <FormCard
+          title="Which project?"
+          description={
+            isEdit
+              ? "Project is fixed for this entry."
+              : "Standups are saved under that project."
+          }
+        >
+          {projects.length === 0 ? (
+            <p className="text-slate-400">Create a project first from the Projects tab.</p>
+          ) : (
+            <Field label="Engagement">
+              <SelectInput
+                value={projectSlug}
+                onChange={setProjectSlug}
+                options={projects.map((p) => ({
+                  value: p.slug,
+                  label: `${p.display_name}${p.customer ? ` — ${p.customer}` : ""}`,
+                }))}
+              />
+            </Field>
+          )}
+          <Field label="Current milestone (optional)">
+            <TextInput value={milestone} onChange={setMilestone} placeholder="M2 — Alpha" />
+          </Field>
         </FormCard>
       )}
 
       {step === 1 && (
-        <FormCard title="What did you accomplish yesterday?">
-          {data.yesterday.map((y, i) => (
-            <div key={i} className="flex gap-2">
-              <TextInput
-                value={y}
-                onChange={(v) => {
-                  const yesterday = [...data.yesterday];
-                  yesterday[i] = v;
-                  setData({ ...data, yesterday });
-                }}
-                placeholder="Completed…"
-              />
-              {data.yesterday.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setData({ ...data, yesterday: data.yesterday.filter((_, j) => j !== i) })
-                  }
-                  className="text-slate-500 hover:text-red-400"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => setData({ ...data, yesterday: [...data.yesterday, ""] })}
-            className="flex items-center gap-1 text-sm text-brand-400"
-          >
-            <Plus size={14} /> Add item
-          </button>
+        <FormCard title="Yesterday" description="What did you get done? One item per line.">
+          <TextArea
+            value={yesterday}
+            onChange={setYesterday}
+            placeholder="Shipped ontology backing for Orders&#10;Reviewed pipeline schedule with customer"
+            rows={6}
+          />
         </FormCard>
       )}
 
       {step === 2 && (
-        <FormCard title="What's on deck today?">
-          {data.today.map((t, i) => (
-            <div key={i} className="grid gap-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3 sm:grid-cols-4">
-              <SelectInput
-                value={t.priority}
-                onChange={(v) => {
-                  const today = [...data.today];
-                  today[i] = { ...t, priority: v };
-                  setData({ ...data, today });
-                }}
-                options={[
-                  { value: "P0", label: "P0" },
-                  { value: "P1", label: "P1" },
-                  { value: "P2", label: "P2" },
-                ]}
-              />
-              <TextInput
-                value={t.task}
-                onChange={(v) => {
-                  const today = [...data.today];
-                  today[i] = { ...t, task: v };
-                  setData({ ...data, today });
-                }}
-                placeholder="Task"
-              />
-              <SelectInput
-                value={t.surface}
-                onChange={(v) => {
-                  const today = [...data.today];
-                  today[i] = { ...t, surface: v };
-                  setData({ ...data, today });
-                }}
-                options={SURFACES}
-              />
-              <button
-                type="button"
-                onClick={() => setData({ ...data, today: data.today.filter((_, j) => j !== i) })}
-                className="text-slate-500 hover:text-red-400"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() =>
-              setData({
-                ...data,
-                today: [...data.today, { task: "", surface: "", priority: "P1" }],
-              })
-            }
-            className="flex items-center gap-1 text-sm text-brand-400"
-          >
-            <Plus size={14} /> Add task
-          </button>
+        <FormCard title="Today's focus">
+          <Field label="Top priority">
+            <TextInput value={todayTask} onChange={setTodayTask} />
+          </Field>
+          <Field label="Foundry area">
+            <SelectInput
+              value={todaySurface}
+              onChange={setTodaySurface}
+              options={[
+                { value: "Ontology", label: "Ontology" },
+                { value: "Pipeline", label: "Pipeline" },
+                { value: "Workshop", label: "Workshop" },
+                { value: "Customer sync", label: "Customer sync" },
+                { value: "Other", label: "Other" },
+              ]}
+            />
+          </Field>
+          <Field label="Meetings today">
+            <TextArea value={meetings} onChange={setMeetings} rows={2} />
+          </Field>
         </FormCard>
       )}
 
       {step === 3 && (
-        <FormCard title="Blockers & meetings">
-          {data.blockers.map((b, i) => (
-            <div key={i} className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/50 p-3">
-              <TextInput
-                value={b.blocker}
-                onChange={(v) => {
-                  const blockers = [...data.blockers];
-                  blockers[i] = { ...b, blocker: v };
-                  setData({ ...data, blockers });
-                }}
-                placeholder="Blocker"
-              />
-              <div className="flex gap-2">
-                <TextInput
-                  value={b.owner}
-                  onChange={(v) => {
-                    const blockers = [...data.blockers];
-                    blockers[i] = { ...b, owner: v };
-                    setData({ ...data, blockers });
-                  }}
-                  placeholder="Owner"
-                />
-                <label className="flex items-center gap-2 text-sm text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={b.escalate}
-                    onChange={(e) => {
-                      const blockers = [...data.blockers];
-                      blockers[i] = { ...b, escalate: e.target.checked };
-                      setData({ ...data, blockers });
-                    }}
-                  />
-                  Escalate
-                </label>
-              </div>
-            </div>
-          ))}
-          <FormField label="Customer meetings today">
-            <TextArea
-              value={data.meetings}
-              onChange={(v) => setData({ ...data, meetings: v })}
-              placeholder="None, or list meetings…"
-              rows={2}
-            />
-          </FormField>
-          <FormField label="Notes for tomorrow">
-            <TextArea value={data.notes} onChange={(v) => setData({ ...data, notes: v })} rows={2} />
-          </FormField>
+        <FormCard title="Blockers & notes">
+          <Field label="Anything blocking you?">
+            <TextArea value={blocker} onChange={setBlocker} rows={3} />
+          </Field>
+          <Field label="Notes for tomorrow">
+            <TextArea value={notes} onChange={setNotes} rows={2} />
+          </Field>
         </FormCard>
       )}
 
-      {step === 4 && (
-        <FormCard title="Review your standup">
-          <p className="text-sm text-slate-400">
-            Saving to{" "}
-            <span className="text-brand-400">
-              daily/{data.projectSlug}/{todayISO()}-standup.md
-            </span>
+      {step === 4 && project && (
+        <FormCard
+          title="Ready to save"
+          description={isEdit ? `Updates ${editPath}` : `Saved to daily/${project.slug}/`}
+        >
+          <p className="text-slate-300">
+            <strong className="text-white">{project.display_name}</strong> — standup for{" "}
+            {displayDate}
           </p>
-          <p className="mt-2 text-white">{data.projectDisplay}</p>
-          <ul className="mt-3 list-disc pl-5 text-sm text-slate-300">
-            {data.yesterday.filter(Boolean).map((y, i) => (
-              <li key={i}>{y}</li>
-            ))}
-          </ul>
         </FormCard>
       )}
     </WizardShell>

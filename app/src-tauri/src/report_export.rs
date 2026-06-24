@@ -10,8 +10,7 @@ struct ReportSection {
     body: String,
 }
 
-#[derive(Debug)]
-struct ProjectReport {
+pub(crate) struct ProjectReport {
     title: String,
     customer: String,
     status: String,

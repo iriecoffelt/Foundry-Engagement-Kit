@@ -43,4 +43,10 @@ export const api = {
     }),
   exportProjectReport: (projectPath: string, format: "pdf" | "docx", destPath: string) =>
     invoke<void>("export_project_report", { projectPath, format, destPath }),
+  cloneProject: (sourcePath: string, newName: string) =>
+    invoke<string>("clone_project", { sourcePath, newName }),
+  writeBinary: (relative: string, bytes: number[]) =>
+    invoke<void>("write_binary", { relative, bytes }),
+  writeBytesAbsolute: (destPath: string, bytes: number[]) =>
+    invoke<void>("write_bytes_absolute", { destPath, bytes }),
 };

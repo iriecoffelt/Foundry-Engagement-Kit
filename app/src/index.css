@@ -30,7 +30,7 @@
 }
 
 @layer components {
-  .prose-kit h1 {
+  .prose-fde h1 {
     @apply mb-4 text-2xl font-semibold text-white;
   }
 
@@ -92,5 +92,84 @@
 
   .prose-fde input[type="checkbox"] {
     @apply mr-2;
+  }
+
+  .focus-timer-screen {
+    @apply fixed inset-0 z-50 flex flex-col overflow-hidden;
+    background: linear-gradient(135deg, #0f172a 0%, #020617 40%, #0c1929 100%);
+    background-size: 200% 200%;
+    animation: focus-gradient-shift 12s ease infinite;
+  }
+
+  .focus-timer-screen.focus-timer-break {
+    background: linear-gradient(135deg, #0f172a 0%, #052e1a 50%, #0f172a 100%);
+    background-size: 200% 200%;
+  }
+
+  .focus-timer-orb {
+    @apply pointer-events-none absolute rounded-full blur-3xl;
+    animation: focus-breathe 6s ease-in-out infinite;
+  }
+
+  .focus-timer-orb-1 {
+    @apply h-96 w-96;
+    top: 10%;
+    left: 15%;
+    background: radial-gradient(circle, rgba(26, 130, 245, 0.15) 0%, transparent 70%);
+  }
+
+  .focus-timer-break .focus-timer-orb-1 {
+    background: radial-gradient(circle, rgba(34, 197, 94, 0.12) 0%, transparent 70%);
+  }
+
+  .focus-floating-pill {
+    animation: focus-pill-enter 0.3s ease-out;
+  }
+
+  .focus-pill-pulse {
+    animation: focus-pill-pulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes focus-gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes focus-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes focus-pill-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes focus-pill-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }

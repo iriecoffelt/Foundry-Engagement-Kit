@@ -1,11 +1,15 @@
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
   MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  getNodesBounds,
+  getViewportForBounds,
   Handle,
   Position,
   type Connection,
@@ -14,7 +18,9 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Database, GitBranch, Layers, Monitor, Server, User } from "lucide-react";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { toPng } from "html-to-image";
+import { Database, GitBranch, ImageDown, Layers, Monitor, Server, User } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { generateDesignOverviewMermaid } from "../../lib/markdown";
@@ -30,19 +36,64 @@ const NODE_TYPES: { type: ArchNodeType; label: string; icon: typeof Server; colo
   { type: "user", label: "User", icon: User, color: "#ec4899" },
 ];
 
-function ArchNode({ data }: NodeProps) {
+const IMAGE_WIDTH = 1920;
+const IMAGE_HEIGHT = 1080;
+
+function ArchNode({ id, data, selected }: NodeProps) {
+  const { setNodes } = useReactFlow();
   const meta = NODE_TYPES.find((n) => n.type === data.nodeType) || NODE_TYPES[0];
   const Icon = meta.icon;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(data.label || meta.label));
+
+  const commitLabel = () => {
+    const label = draft.trim() || meta.label;
+    setNodes((nds) =>
+      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, label } } : n)),
+    );
+    setDraft(label);
+    setEditing(false);
+  };
+
+  const startEditing = () => {
+    setDraft(String(data.label || meta.label));
+    setEditing(true);
+  };
+
   return (
     <div
-      className="min-w-[140px] rounded-xl border-2 bg-slate-900 px-3 py-2 shadow-lg"
+      className={`min-w-[140px] rounded-xl border-2 bg-slate-900 px-3 py-2 shadow-lg ${
+        selected ? "ring-2 ring-brand-400/60" : ""
+      }`}
       style={{ borderColor: meta.color }}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        startEditing();
+      }}
     >
       <Handle type="target" position={Position.Left} className="!bg-slate-500" />
-      <div className="flex items-center gap-2">
-        <Icon size={16} style={{ color: meta.color }} />
-        <span className="text-sm font-medium text-white">{data.label as string}</span>
-      </div>
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitLabel}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitLabel();
+            if (e.key === "Escape") {
+              setDraft(String(data.label || meta.label));
+              setEditing(false);
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full rounded border border-slate-600 bg-slate-950 px-2 py-1 text-sm text-white outline-none focus:border-brand-500"
+        />
+      ) : (
+        <div className="flex items-center gap-2">
+          <Icon size={16} style={{ color: meta.color }} />
+          <span className="text-sm font-medium text-white">{data.label as string}</span>
+        </div>
+      )}
       <Handle type="source" position={Position.Right} className="!bg-slate-500" />
     </div>
   );
@@ -87,6 +138,12 @@ function fromFlow(nodes: Node[], edges: Edge[]): ArchitectureGraph {
   };
 }
 
+function dataUrlToBytes(dataUrl: string): number[] {
+  const base64 = dataUrl.split(",")[1];
+  const binary = atob(base64);
+  return Array.from(binary, (char) => char.charCodeAt(0));
+}
+
 const defaultGraph: ArchitectureGraph = {
   nodes: [
     { id: "src1", type: "source", position: { x: 0, y: 80 }, data: { label: "Source System" } },
@@ -105,12 +162,16 @@ interface ArchitectureEditorProps {
   projectPath: string;
 }
 
-export function ArchitectureEditor({ projectPath }: ArchitectureEditorProps) {
+function ArchitectureEditorInner({ projectPath }: ArchitectureEditorProps) {
   const jsonPath = `${projectPath}/02-design/architecture.json`;
   const overviewPath = `${projectPath}/02-design/design-overview.md`;
+  const pngPath = `${projectPath}/02-design/architecture.png`;
+  const projectSlug = projectPath.split("/").pop() || "architecture";
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -161,6 +222,78 @@ export function ArchitectureEditor({ projectPath }: ArchitectureEditorProps) {
     }
   };
 
+  const capturePngDataUrl = async (): Promise<string> => {
+    if (nodes.length === 0) {
+      throw new Error("Add at least one node before exporting.");
+    }
+
+    const viewportEl = document.querySelector(".react-flow__viewport") as HTMLElement | null;
+    if (!viewportEl) {
+      throw new Error("Could not find diagram viewport.");
+    }
+
+    const nodesBounds = getNodesBounds(nodes);
+    const viewport = getViewportForBounds(
+      nodesBounds,
+      IMAGE_WIDTH,
+      IMAGE_HEIGHT,
+      0.5,
+      2,
+      0.12,
+    );
+
+    return toPng(viewportEl, {
+      backgroundColor: "#020617",
+      width: IMAGE_WIDTH,
+      height: IMAGE_HEIGHT,
+      pixelRatio: 2,
+      cacheBust: true,
+      style: {
+        width: `${IMAGE_WIDTH}px`,
+        height: `${IMAGE_HEIGHT}px`,
+        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+      },
+    });
+  };
+
+  const exportPng = async () => {
+    setExporting(true);
+    setMessage("");
+    try {
+      const dataUrl = await capturePngDataUrl();
+      const bytes = dataUrlToBytes(dataUrl);
+
+      const dest = await saveDialog({
+        title: "Save architecture diagram",
+        defaultPath: `${projectSlug}-architecture.png`,
+        filters: [{ name: "PNG image", extensions: ["png"] }],
+      });
+      if (!dest) return;
+
+      await api.writeBytesAbsolute(dest, bytes);
+      setMessage(`PNG exported to ${dest}`);
+    } catch (e) {
+      setMessage(String(e));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const savePngToProject = async () => {
+    setExporting(true);
+    setMessage("");
+    try {
+      const dataUrl = await capturePngDataUrl();
+      const bytes = dataUrlToBytes(dataUrl);
+      await api.writeBinary(pngPath, bytes);
+      setMessage(`PNG saved to ${pngPath}`);
+    } catch (e) {
+      setMessage(String(e));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-900/40 px-4 py-3">
@@ -175,7 +308,19 @@ export function ArchitectureEditor({ projectPath }: ArchitectureEditorProps) {
             {n.label}
           </button>
         ))}
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap gap-2">
+          <SecondaryButton onClick={savePngToProject} disabled={exporting || nodes.length === 0}>
+            <span className="inline-flex items-center gap-1.5">
+              <ImageDown size={14} />
+              {exporting ? "Exporting…" : "Save PNG to project"}
+            </span>
+          </SecondaryButton>
+          <SecondaryButton onClick={exportPng} disabled={exporting || nodes.length === 0}>
+            <span className="inline-flex items-center gap-1.5">
+              <ImageDown size={14} />
+              Export PNG…
+            </span>
+          </SecondaryButton>
           <SecondaryButton onClick={save} disabled={saving}>
             {saving ? "Saving…" : "Save diagram"}
           </SecondaryButton>
@@ -203,9 +348,18 @@ export function ArchitectureEditor({ projectPath }: ArchitectureEditorProps) {
         </ReactFlow>
       </div>
       <p className="border-t border-slate-800 px-4 py-2 text-xs text-slate-500">
-        Drag nodes to arrange. Connect handles to show data flow. Mermaid export:{" "}
+        Drag nodes to arrange. Double-click a node to rename. Click Save diagram to persist changes.
+        PNG export for slides; Mermaid via{" "}
         <code className="text-brand-400">02-design/design-overview.md</code>
       </p>
     </div>
+  );
+}
+
+export function ArchitectureEditor(props: ArchitectureEditorProps) {
+  return (
+    <ReactFlowProvider>
+      <ArchitectureEditorInner {...props} />
+    </ReactFlowProvider>
   );
 }

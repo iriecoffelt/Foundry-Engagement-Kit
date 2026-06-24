@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
   src1[Source System]
-  pipe1[Sync Pipeline]
+  pipe1[Test Pipeline]
   obj1[Object Type]
   app1[Workshop App]
   src1 --> pipe1

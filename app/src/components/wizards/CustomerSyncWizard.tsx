@@ -1,84 +1,50 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { api } from "../../lib/api";
-import { generateCustomerSyncMd, parseCustomerSyncMd, todayISO } from "../../lib/markdown";
+import { generateCustomerSyncMd, todayISO } from "../../lib/markdown";
 import type { CustomerSyncData } from "../../types";
 import { Field, FormCard, TextArea, TextInput } from "../forms/FormField";
 import { ProjectPicker } from "../forms/ProjectPicker";
 import { WizardShell } from "../wizard/WizardShell";
 
 const STEPS = [
-  { id: "project", label: "Project" },
-  { id: "meeting", label: "Meeting" },
-  { id: "content", label: "Content" },
-  { id: "review", label: "Review" },
+  { label: "Project" },
+  { label: "Meeting" },
+  { label: "Content" },
+  { label: "Review" },
 ];
 
-const emptyData = (): CustomerSyncData => ({
-  projectSlug: "",
-  projectDisplay: "",
-  meetingName: "Weekly customer sync",
-  attendees: "",
-  duration: "30 min",
-  objective: "",
-  statusSummary: "",
-  demoActions: "",
-  decisionsNeeded: "",
-  risks: "",
-});
-
 interface CustomerSyncWizardProps {
-  editPath?: string;
-  initialMarkdown?: string;
   onComplete: (path: string) => void;
   onCancel: () => void;
 }
 
-export function CustomerSyncWizard({
-  editPath,
-  initialMarkdown,
-  onComplete,
-  onCancel,
-}: CustomerSyncWizardProps) {
-  const initial = useMemo(() => {
-    const parsed = initialMarkdown ? parseCustomerSyncMd(initialMarkdown) : null;
-    return parsed ?? emptyData();
-  }, [initialMarkdown]);
-
-  const isEdit = Boolean(editPath);
+export function CustomerSyncWizard({ onComplete, onCancel }: CustomerSyncWizardProps) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [data, setData] = useState<CustomerSyncData>(initial);
-
-  const displayDate = initial.date || todayISO();
+  const [data, setData] = useState<CustomerSyncData>({
+    projectSlug: "",
+    projectDisplay: "",
+    meetingName: "Weekly customer sync",
+    attendees: "",
+    duration: "30 min",
+    objective: "",
+    statusSummary: "",
+    demoActions: "",
+    decisionsNeeded: "",
+    risks: "",
+  });
 
   const finish = async () => {
-    if (!data.projectSlug.trim()) {
-      setError("Select a project before saving.");
-      setStep(0);
-      return;
-    }
-
     setLoading(true);
     setError("");
     try {
-      const payload: CustomerSyncData = {
-        ...data,
-        date: initial.date || todayISO(),
-      };
-      const markdown = generateCustomerSyncMd(payload);
-
-      if (editPath) {
-        await api.writeFile(editPath, markdown);
-        onComplete(editPath);
-      } else {
-        const date = todayISO();
-        const dir = `weekly/${data.projectSlug}`;
-        const path = `${dir}/${date}-customer-sync.md`;
-        await api.createDirectory(dir);
-        await api.writeFile(path, markdown);
-        onComplete(path);
-      }
+      const date = todayISO();
+      const dir = `weekly/${data.projectSlug}`;
+      const path = `${dir}/${date}-customer-sync.md`;
+      await api.createDirectory(dir);
+      await api.writeFile(path, generateCustomerSyncMd(data));
+      onComplete(path);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -88,15 +54,16 @@ export function CustomerSyncWizard({
 
   return (
     <WizardShell
-      title={isEdit ? "Edit customer sync prep" : "Customer sync prep"}
+      title="Customer sync prep"
       subtitle="Prepare for your stakeholder meeting — agenda, demo, and decisions."
       steps={STEPS}
-      currentStep={step}
-      onBack={() => (step === 0 ? onCancel() : setStep((s) => s - 1))}
-      onNext={() => setStep((s) => s + 1)}
-      onFinish={finish}
-      canProceed={(step > 0 || !!data.projectSlug) && !loading}
-      loading={loading}
+      step={step}
+      onBack={() => setStep((s) => s - 1)}
+      onNext={() => (step === STEPS.length - 1 ? finish() : setStep((s) => s + 1))}
+      onCancel={onCancel}
+      canNext={(step > 0 || !!data.projectSlug) && !loading}
+      isLast={step === STEPS.length - 1}
+      finishLabel={loading ? "Saving…" : "Save prep doc"}
     >
       {error && (
         <div className="mb-4 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
@@ -176,15 +143,10 @@ export function CustomerSyncWizard({
       )}
 
       {step === 3 && (
-        <FormCard
-          title="Ready to save"
-          description={
-            isEdit ? `Updates ${editPath}` : `Saved to weekly/${data.projectSlug}/`
-          }
-        >
+        <FormCard title="Ready to save">
           <p className="text-sm text-slate-300">
             <strong className="text-white">{data.projectDisplay}</strong> — customer sync for{" "}
-            {displayDate}
+            {todayISO()}
           </p>
         </FormCard>
       )}

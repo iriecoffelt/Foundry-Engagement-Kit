@@ -5,6 +5,8 @@ use std::path::{Component, Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use walkdir::WalkDir;
 
+mod report_export;
+
 const CONFIG_FILE: &str = "workspace.json";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -271,6 +273,60 @@ fn create_project(app: AppHandle, name: String) -> Result<String, String> {
     Ok(relative)
 }
 
+#[tauri::command]
+fn clone_project(app: AppHandle, source_path: String, new_name: String) -> Result<String, String> {
+    let sanitized = new_name
+        .trim()
+        .to_lowercase()
+        .replace(' ', "-")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect::<String>();
+
+    if sanitized.is_empty() {
+        return Err("Invalid project name".into());
+    }
+
+    validate_relative_path(&source_path)?;
+    let root = resolve_workspace(&app)?;
+    let src = root.join(&source_path);
+    if !src.is_dir() {
+        return Err("Source project not found".into());
+    }
+
+    let relative = format!("project/{sanitized}");
+    let dest = root.join(&relative);
+    if dest.exists() {
+        return Err("A project with that name already exists".into());
+    }
+
+    copy_dir_recursive(&src, &dest)?;
+
+    let engagement_path = format!("{relative}/engagement.json");
+    if resolve_path(&app, &engagement_path).is_ok() {
+        let content = read_file_internal(&app, &engagement_path)?;
+        if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(obj) = json.as_object_mut() {
+                obj.insert(
+                    "displayName".to_string(),
+                    serde_json::Value::String(new_name.trim().to_string()),
+                );
+                obj.insert(
+                    "clonedFrom".to_string(),
+                    serde_json::Value::String(source_path.clone()),
+                );
+                obj.insert(
+                    "updatedAt".to_string(),
+                    serde_json::Value::String(chrono::Local::now().to_rfc3339()),
+                );
+            }
+            write_file_internal(&app, &engagement_path, &serde_json::to_string_pretty(&json).unwrap())?;
+        }
+    }
+
+    Ok(relative)
+}
+
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     fs::create_dir_all(dst).map_err(|e| e.to_string())?;
     for entry in fs::read_dir(src).map_err(|e| e.to_string())? {
@@ -484,6 +540,74 @@ fn open_path_with_system(app: AppHandle, relative: String) -> Result<(), String>
     open::that(absolute).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn export_project_report(
+    app: AppHandle,
+    project_path: String,
+    format: String,
+    dest_path: String,
+) -> Result<(), String> {
+    let root = resolve_workspace(&app)?;
+    let dest = PathBuf::from(&dest_path);
+    if dest.parent().is_none() {
+        return Err("Invalid destination path".into());
+    }
+    report_export::export_report(&root, &project_path, &format, &dest)
+}
+
+#[tauri::command]
+fn setup_engagement_project(
+    app: AppHandle,
+    slug: String,
+    engagement_json: serde_json::Value,
+    readme: String,
+    discovery: String,
+    scoping: String,
+) -> Result<String, String> {
+    let relative = create_project(app.clone(), slug)?;
+    write_json(
+        app.clone(),
+        format!("{relative}/engagement.json"),
+        engagement_json,
+    )?;
+    write_file_internal(&app, &format!("{relative}/README.md"), &readme)?;
+    write_file_internal(&app, &format!("{relative}/00-discovery/discovery.md"), &discovery)?;
+    write_file_internal(&app, &format!("{relative}/01-scoping/scoping.md"), &scoping)?;
+    create_directory(app, format!("{relative}/references"))?;
+    Ok(relative)
+}
+
+#[tauri::command]
+fn write_bytes_absolute(dest_path: String, bytes: Vec<u8>) -> Result<(), String> {
+    let dest = PathBuf::from(&dest_path);
+    if dest.parent().is_none() {
+        return Err("Invalid destination path".into());
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(dest, bytes).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn write_binary(app: AppHandle, relative: String, bytes: Vec<u8>) -> Result<(), String> {
+    let root = resolve_workspace(&app)?;
+    validate_relative_path(&relative)?;
+    let full = root.join(&relative);
+    if let Some(parent) = full.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let root_canonical = root.canonicalize().map_err(|e| e.to_string())?;
+    let parent_canonical = full
+        .parent()
+        .and_then(|p| p.canonicalize().ok())
+        .unwrap_or_else(|| root.clone());
+    if !parent_canonical.starts_with(&root_canonical) {
+        return Err("Access denied".into());
+    }
+    fs::write(full, bytes).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -508,6 +632,11 @@ pub fn run() {
             list_projects_with_meta,
             resolve_absolute_path,
             open_path_with_system,
+            export_project_report,
+            write_bytes_absolute,
+            write_binary,
+            setup_engagement_project,
+            clone_project,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

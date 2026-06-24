@@ -21,6 +21,8 @@ export function FormField({
   );
 }
 
+export const Field = FormField;
+
 export function TextInput({
   value,
   onChange,
@@ -88,8 +90,6 @@ export function SelectInput({
     </select>
   );
 }
-
-export { FormField as Field };
 
 export function FormCard({
   title,

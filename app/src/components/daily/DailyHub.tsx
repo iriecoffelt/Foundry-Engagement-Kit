@@ -1,8 +1,8 @@
-import { Calendar, Plus } from "lucide-react";
+import { Calendar, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import type { FileEntry } from "../../types";
-import { PrimaryButton } from "../forms/FormField";
+import type { FileEntry, ProjectMeta } from "../../types";
+import { PrimaryButton, SecondaryButton } from "../forms/FormField";
 import { MarkdownPreview } from "../MarkdownPreview";
 import { StandupWizard } from "../wizards/StandupWizard";
 
@@ -14,11 +14,16 @@ interface DailyHubProps {
 
 export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubProps) {
   const [showWizard, setShowWizard] = useState(false);
+  const [editPath, setEditPath] = useState<string | null>(null);
+  const [editMarkdown, setEditMarkdown] = useState<string | undefined>();
+  const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [groups, setGroups] = useState<{ project: string; entries: FileEntry[] }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [content, setContent] = useState("");
 
   const load = useCallback(async () => {
+    const projs = await api.listProjectsWithMeta();
+    setProjects(projs);
     const entries = await api.listDirectory("daily", true);
     const byProject: Record<string, FileEntry[]> = {};
 
@@ -47,6 +52,8 @@ export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubP
 
   useEffect(() => {
     if (startWizard) {
+      setEditPath(null);
+      setEditMarkdown(undefined);
       setShowWizard(true);
       onWizardConsumed?.();
     }
@@ -58,12 +65,28 @@ export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubP
     setContent(text);
   };
 
+  const startEdit = () => {
+    if (!selected) return;
+    setEditPath(selected);
+    setEditMarkdown(content);
+    setShowWizard(true);
+  };
+
+  const closeWizard = () => {
+    setShowWizard(false);
+    setEditPath(null);
+    setEditMarkdown(undefined);
+  };
+
   if (showWizard) {
     return (
       <StandupWizard
-        onCancel={() => setShowWizard(false)}
+        projects={projects}
+        editPath={editPath ?? undefined}
+        initialMarkdown={editMarkdown}
+        onCancel={closeWizard}
         onComplete={(path) => {
-          setShowWizard(false);
+          closeWizard();
           load();
           onRefresh();
           openEntry(path);
@@ -119,9 +142,23 @@ export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubP
         )}
       </div>
 
-      <div className="min-w-0 flex-1 overflow-y-auto">
+      <div className="flex min-w-0 flex-1 flex-col">
         {selected ? (
-          <MarkdownPreview content={content} />
+          <>
+            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/40 px-4 py-3">
+              <p className="text-sm text-slate-400">
+                {selected.split("/").pop()?.replace("-standup.md", "")}
+              </p>
+              <SecondaryButton onClick={startEdit}>
+                <span className="flex items-center gap-1.5">
+                  <Pencil size={14} /> Edit standup
+                </span>
+              </SecondaryButton>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <MarkdownPreview content={content} />
+            </div>
+          </>
         ) : (
           <div className="flex h-full flex-col items-center justify-center text-slate-500">
             <Calendar size={40} className="mb-3 opacity-40" />

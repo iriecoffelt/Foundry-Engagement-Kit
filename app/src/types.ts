@@ -69,6 +69,7 @@ export interface EngagementData {
 export interface StandupData {
   projectSlug: string;
   projectDisplay: string;
+  date?: string;
   milestone: string;
   yesterday: string[];
   today: { task: string; surface: string; priority: string }[];
@@ -80,41 +81,13 @@ export interface StandupData {
 export interface WeeklyReviewData {
   projectSlug: string;
   projectDisplay: string;
+  date?: string;
   phase: string;
   wins: string[];
   deliverables: { name: string; resource: string; customerVisible: boolean }[];
   risks: { risk: string; likelihood: string; impact: string; mitigation: string }[];
   nextWeek: string[];
   openQuestions: string;
-}
-
-export interface CustomerSyncData {
-  projectSlug: string;
-  projectDisplay: string;
-  date?: string;
-  meetingName: string;
-  attendees: string;
-  duration: string;
-  objective: string;
-  statusSummary: string;
-  demoActions: string;
-  decisionsNeeded: string;
-  risks: string;
-}
-
-export interface Milestone {
-  id: string;
-  name: string;
-  targetDate: string;
-  status: "pending" | "done" | "at-risk";
-}
-
-export interface OntologyObjectType {
-  id?: string;
-  name: string;
-  description: string;
-  primaryKey: string;
-  properties: string[];
 }
 
 export type ArchNodeType =
@@ -133,4 +106,32 @@ export interface ArchitectureGraph {
     data: { label: string; notes?: string };
   }[];
   edges: { id: string; source: string; target: string; label?: string }[];
+}
+
+export interface Milestone {
+  id: string;
+  name: string;
+  targetDate: string;
+  status: "pending" | "in_progress" | "done";
+}
+
+export interface OntologyObjectType {
+  id: string;
+  name: string;
+  description: string;
+  primaryKey: string;
+  properties: string[];
+}
+
+export interface CustomerSyncData {
+  projectSlug: string;
+  projectDisplay: string;
+  meetingName: string;
+  attendees: string;
+  duration: string;
+  objective: string;
+  statusSummary: string;
+  demoActions: string;
+  decisionsNeeded: string;
+  risks: string;
 }

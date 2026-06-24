@@ -119,10 +119,7 @@ export function OntologyQuickAdd({ projectPath }: OntologyQuickAddProps) {
                     PK: {o.primaryKey} · {o.properties.length} properties
                   </p>
                 </div>
-                <button
-                  onClick={() => o.id && remove(o.id)}
-                  className="text-red-400 hover:text-red-300"
-                >
+                <button onClick={() => remove(o.id)} className="text-red-400 hover:text-red-300">
                   <Trash2 size={16} />
                 </button>
               </div>

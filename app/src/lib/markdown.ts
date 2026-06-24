@@ -1,10 +1,10 @@
 import type {
-  CustomerSyncData,
   EngagementData,
-  OntologyObjectType,
   StandupData,
   WeeklyReviewData,
   ArchitectureGraph,
+  CustomerSyncData,
+  OntologyObjectType,
 } from "../types";
 
 export function slugify(name: string): string {
@@ -19,6 +19,197 @@ export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+const TEMPLATE_PLACEHOLDER = /\{\{[A-Z0-9_]+\}\}/;
+
+export function isUnfilledTemplate(content: string): boolean {
+  return TEMPLATE_PLACEHOLDER.test(content);
+}
+
+export function engagementFromJson(
+  json: Record<string, unknown>,
+  fallback?: { displayName?: string; customer?: string; status?: string; targetGoLive?: string },
+): EngagementData {
+  return {
+    displayName: String(json.displayName || fallback?.displayName || ""),
+    customer: String(json.customer || fallback?.customer || ""),
+    fdeLead: String(json.fdeLead || ""),
+    startDate: String(json.startDate || ""),
+    targetGoLive: String(json.targetGoLive || fallback?.targetGoLive || ""),
+    status: (json.status as EngagementData["status"]) || "discovery",
+    description: String(json.description || ""),
+    asIs: String(json.asIs || ""),
+    pain: String(json.pain || ""),
+    toBe: String(json.toBe || ""),
+    outOfScope: String(json.outOfScope || ""),
+    stakeholders: [],
+    successMetrics: [],
+  };
+}
+
+export function unfilledTemplateNotice(displayName: string): string {
+  return `# ${displayName}
+
+> This project was created from the template folder without running the **setup wizard**, so placeholder tags were never filled in.
+
+Use **Projects → New engagement** and complete the guided setup to generate a proper overview, or open **Documents** and edit \`README.md\` directly.
+`;
+}
+
+function parseFrontmatter(content: string): Record<string, string> {
+  if (!content.startsWith("---")) return {};
+  const end = content.indexOf("\n---", 3);
+  if (end === -1) return {};
+  const block = content.slice(3, end).trim();
+  const out: Record<string, string> = {};
+  for (const line of block.split("\n")) {
+    const idx = line.indexOf(":");
+    if (idx > 0) {
+      out[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    }
+  }
+  return out;
+}
+
+function bodyAfterFrontmatter(content: string): string {
+  if (!content.startsWith("---")) return content;
+  const end = content.indexOf("\n---", 3);
+  if (end === -1) return content;
+  return content.slice(end + 4).trimStart();
+}
+
+function sectionBody(body: string, heading: string): string {
+  const re = new RegExp(`## ${heading}\\n\\n([\\s\\S]*?)(?=\\n## |$)`);
+  const match = body.match(re);
+  return match?.[1]?.trim() ?? "";
+}
+
+function firstTableRow(body: string, tableHeader: string): string[] {
+  const section = body.includes(tableHeader) ? body.slice(body.indexOf(tableHeader)) : body;
+  const lines = section.split("\n").filter((l) => l.startsWith("|"));
+  if (lines.length < 3) return [];
+  const cells = lines[2]
+    .split("|")
+    .map((c) => c.trim())
+    .filter(Boolean);
+  return cells;
+}
+
+export function parseStandupMd(content: string): StandupData | null {
+  const fm = parseFrontmatter(content);
+  const body = bodyAfterFrontmatter(content);
+
+  const milestoneMatch = body.match(/\*\*Milestone:\*\*\s*(.+)/);
+  const milestone = milestoneMatch?.[1]?.trim().replace(/^—$/, "") || "";
+
+  const yesterdayRaw = sectionBody(body, "Yesterday");
+  const yesterday = yesterdayRaw
+    .split("\n")
+    .map((l) => l.replace(/^-\s*/, "").trim())
+    .filter((l) => l && l !== "—");
+
+  const todayCells = firstTableRow(body, "| Priority | Task");
+  const today =
+    todayCells.length >= 3 && todayCells[1]
+      ? [
+          {
+            priority: todayCells[0] || "P1",
+            task: todayCells[1],
+            surface: todayCells[2] || "Workshop",
+          },
+        ]
+      : [];
+
+  const blockerCells = firstTableRow(body, "| Blocker | Owner");
+  const blockers =
+    blockerCells.length >= 1 && blockerCells[0]
+      ? [
+          {
+            blocker: blockerCells[0],
+            owner: blockerCells[1] || "",
+            escalate: blockerCells[2]?.toLowerCase() === "yes",
+          },
+        ]
+      : [];
+
+  const meetings = sectionBody(body, "Customer touchpoints").replace(/^None scheduled$/, "");
+  const notesRaw = sectionBody(body, "Notes");
+  const notes = notesRaw === "—" ? "" : notesRaw;
+
+  if (!fm.project && !fm.projectDisplay) return null;
+
+  return {
+    projectSlug: fm.project || "",
+    projectDisplay: fm.projectDisplay || "",
+    date: fm.date,
+    milestone,
+    yesterday,
+    today,
+    blockers,
+    meetings,
+    notes,
+  };
+}
+
+export function parseWeeklyMd(content: string): WeeklyReviewData | null {
+  const fm = parseFrontmatter(content);
+  if (fm.type !== "weekly-review") return null;
+  const body = bodyAfterFrontmatter(content);
+
+  const phaseMatch = body.match(/\*\*Phase:\*\*\s*(.+)/);
+  const phase = phaseMatch?.[1]?.trim().replace(/^—$/, "") || "Build";
+
+  const winsRaw = sectionBody(body, "Wins");
+  const wins = winsRaw
+    .split("\n")
+    .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+    .filter(Boolean);
+
+  const deliverableCells = firstTableRow(body, "| Deliverable | Resource");
+  const deliverables =
+    deliverableCells.length >= 2 && deliverableCells[0]
+      ? [
+          {
+            name: deliverableCells[0],
+            resource: deliverableCells[1] || "",
+            customerVisible: deliverableCells[2]?.toLowerCase() === "yes",
+          },
+        ]
+      : [{ name: "", resource: "", customerVisible: false }];
+
+  const riskCells = firstTableRow(body, "| Risk | Likelihood");
+  const risks =
+    riskCells.length >= 3 && riskCells[0]
+      ? [
+          {
+            risk: riskCells[0],
+            likelihood: riskCells[1] || "Medium",
+            impact: riskCells[2] || "Medium",
+            mitigation: riskCells[3] || "",
+          },
+        ]
+      : [{ risk: "", likelihood: "Medium", impact: "Medium", mitigation: "" }];
+
+  const nextWeekRaw = sectionBody(body, "Next week");
+  const nextWeek = nextWeekRaw
+    .split("\n")
+    .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+    .filter(Boolean);
+
+  const openQuestions = sectionBody(body, "Open questions");
+
+  return {
+    projectSlug: fm.project || "",
+    projectDisplay: fm.projectDisplay || "",
+    date: fm.date,
+    phase,
+    wins: wins.length ? wins : [""],
+    deliverables,
+    risks,
+    nextWeek: nextWeek.length ? nextWeek : [""],
+    openQuestions: openQuestions === "—" ? "" : openQuestions,
+  };
+}
+
 export function engagementToJson(data: EngagementData) {
   return {
     displayName: data.displayName,
@@ -28,6 +219,10 @@ export function engagementToJson(data: EngagementData) {
     targetGoLive: data.targetGoLive,
     status: data.status,
     description: data.description,
+    asIs: data.asIs,
+    pain: data.pain,
+    toBe: data.toBe,
+    outOfScope: data.outOfScope,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -112,7 +307,7 @@ ${metricRows || "| | | | |"}
 }
 
 export function generateStandupMd(data: StandupData): string {
-  const date = todayISO();
+  const date = data.date || todayISO();
   const yesterday = data.yesterday
     .filter(Boolean)
     .map((y) => `- ${y}`)
@@ -172,7 +367,7 @@ ${data.notes || "—"}
 }
 
 export function generateWeeklyMd(data: WeeklyReviewData): string {
-  const date = todayISO();
+  const date = data.date || todayISO();
   const wins = data.wins.filter(Boolean).map((w, i) => `${i + 1}. ${w}`).join("\n");
   const deliverableRows = data.deliverables
     .filter((d) => d.name.trim())
@@ -264,7 +459,7 @@ _Edit visually in the Architecture tab. This file is auto-updated when you save 
 }
 
 export function generateCustomerSyncMd(data: CustomerSyncData): string {
-  const date = data.date || todayISO();
+  const date = todayISO();
   return `---
 project: ${data.projectSlug}
 projectDisplay: ${data.projectDisplay}
@@ -274,22 +469,22 @@ type: customer-sync
 
 # Customer Sync — ${data.projectDisplay}
 
-**Date:** ${date}
-**Meeting:** ${data.meetingName}
+**Date:** ${date}  
+**Meeting:** ${data.meetingName}  
+**Attendees:** ${data.attendees}  
 **Duration:** ${data.duration}
-**Attendees:** ${data.attendees || "—"}
 
 ## Objective
 
 ${data.objective || "—"}
 
-## Status summary
+## Status summary (customer-facing)
 
-${data.statusSummary || "—"}
+> ${data.statusSummary || "Add a plain-language progress update."}
 
-## Demo actions
+## Demo script
 
-${data.demoActions || "—"}
+${data.demoActions || "1. "}
 
 ## Decisions needed
 
@@ -301,51 +496,19 @@ ${data.risks || "—"}
 `;
 }
 
-export function parseCustomerSyncMd(body: string): CustomerSyncData | null {
-  const fm = body.match(/^---\n([\s\S]*?)\n---/);
-  const meta: Record<string, string> = {};
-  if (fm) {
-    for (const line of fm[1].split("\n")) {
-      const [k, ...rest] = line.split(":");
-      if (k) meta[k.trim()] = rest.join(":").trim();
-    }
-  }
-
-  const section = (title: string) => {
-    const re = new RegExp(`## ${title}\\n\\n([\\s\\S]*?)(?=\\n## |$)`);
-    const m = body.match(re);
-    return m?.[1]?.trim() || "";
-  };
-
-  if (!meta.project && !body.includes("Customer Sync")) return null;
-
-  return {
-    projectSlug: meta.project || "",
-    projectDisplay: meta.projectDisplay || "",
-    date: meta.date,
-    meetingName: body.match(/\*\*Meeting:\*\* (.+)/)?.[1] || "Weekly customer sync",
-    duration: body.match(/\*\*Duration:\*\* (.+)/)?.[1] || "30 min",
-    attendees: body.match(/\*\*Attendees:\*\* (.+)/)?.[1] || "",
-    objective: section("Objective"),
-    statusSummary: section("Status summary"),
-    demoActions: section("Demo actions"),
-    decisionsNeeded: section("Decisions needed"),
-    risks: section("Risks to surface"),
-  };
-}
-
 export function generateOntologySection(objects: OntologyObjectType[]): string {
-  if (!objects.length) return "## Object types\n\n_No object types defined yet._\n";
-  const rows = objects
-    .map(
-      (o) =>
-        `| ${o.name} | ${o.primaryKey} | ${o.description || "—"} | ${o.properties.join(", ") || "—"} |`,
-    )
-    .join("\n");
-  return `## Object types
+  if (objects.length === 0) return "";
+  const sections = objects.map(
+    (o) => `### ${o.name}
 
-| Name | Primary key | Description | Properties |
-|------|-------------|-------------|------------|
-${rows}
-`;
+| Attribute | Value |
+|-----------|-------|
+| Primary key | ${o.primaryKey} |
+| Description | ${o.description} |
+
+**Properties:** ${o.properties.join(", ") || "—"}
+`,
+  );
+  return `\n## Object types (quick-add)\n\n${sections.join("\n")}`;
 }
+

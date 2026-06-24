@@ -1,12 +1,4 @@
-import {
-  BookOpen,
-  Calendar,
-  CalendarDays,
-  FolderKanban,
-  Home,
-  RefreshCw,
-  Settings,
-} from "lucide-react";
+import { Calendar, CalendarDays, FolderKanban, Home, Library, RefreshCw, Settings, Timer } from "lucide-react";
 import type { Section } from "../types";
 
 interface SidebarProps {
@@ -18,10 +10,11 @@ interface SidebarProps {
 
 const navItems: { id: Section; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
+  { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "daily", label: "Daily", icon: Calendar },
   { id: "weekly", label: "Weekly", icon: CalendarDays },
-  { id: "projects", label: "Projects", icon: FolderKanban },
-  { id: "library", label: "Library", icon: BookOpen },
+  { id: "library", label: "Library", icon: Library },
+  { id: "focus", label: "Focus", icon: Timer },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -31,9 +24,7 @@ export function Sidebar({ section, onSectionChange, workspaceRoot, onRefresh }: 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-slate-800 bg-slate-900/80">
       <div className="border-b border-slate-800 px-4 py-5">
-        <h1 className="text-base font-bold leading-snug text-white">
-          Foundry Engagement Kit
-        </h1>
+        <h1 className="text-base font-bold leading-snug text-white">Foundry Engagement Kit</h1>
         <p className="mt-1 truncate text-xs text-slate-500" title={workspaceRoot}>
           {shortRoot}
         </p>

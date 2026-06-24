@@ -7,7 +7,7 @@ interface MarkdownPreviewProps {
 
 export function MarkdownPreview({ content }: MarkdownPreviewProps) {
   return (
-    <div className="prose-kit overflow-y-auto p-6">
+    <div className="prose-fde overflow-y-auto p-6">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );

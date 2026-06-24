@@ -16,25 +16,3 @@ Top 10 FDE-driven features implemented in this release:
 | 10 | **Recent Activity** | Resume where you left off | Home dashboard sidebar |
 
 Storage: phase checklists → `phase-checklist.json`; ontology → `ontology-objects.json`; milestones → `engagement.json`; customer syncs → `weekly/{project}/{date}-customer-sync.md`.
-
-## Focus timer (Pomodoro)
-
-| Feature | Details |
-|---------|---------|
-| **Where** | Sidebar → **Focus** · `⌘K` → "Start focus timer" |
-| **Default durations** | 25 min focus · 5 min short break · 15 min long break (every 4 sessions) |
-| **Full-screen** | Immersive mode with breathing gradients, progress ring, calm animations |
-| **Minimize** | Esc or Minimize — timer keeps running; floating pill bottom-right |
-| **Settings** | Gear icon — customize durations, auto-start, sound |
-| **Logging** | Completed focus sessions stored in localStorage |
-
-## Focus timer (Pomodoro)
-
-| Feature | Details |
-|---------|---------|
-| **Where** | Sidebar → **Focus** · `⌘K` → "Start focus timer" |
-| **Default durations** | 25 min focus · 5 min short break · 15 min long break (every 4 sessions) |
-| **Full-screen** | Immersive mode with breathing gradients, progress ring, calm animations |
-| **Minimize** | Esc or Minimize — timer keeps running; floating pill bottom-right |
-| **Settings** | Gear icon — customize durations, auto-start, sound |
-| **Logging** | Completed focus sessions stored in localStorage |

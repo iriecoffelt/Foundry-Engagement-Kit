@@ -1,12 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api } from "./lib/api";
+import { trackRecent } from "./lib/recent";
 import type { OpenFile, ProjectMeta, Section } from "./types";
 import { Dashboard } from "./components/Dashboard";
-import { SettingsView } from "./components/SettingsView";
-import { Sidebar } from "./components/Sidebar";
 import { Editor } from "./components/Editor";
+import { FocusFloatingPill } from "./components/focus/FocusFloatingPill";
 import { Modal } from "./components/Modal";
 import { SectionFallback } from "./components/SectionFallback";
+import { SettingsView } from "./components/SettingsView";
+import { Sidebar } from "./components/Sidebar";
 
 const ProjectsHub = lazy(() =>
   import("./components/projects/ProjectsHub").then((m) => ({ default: m.ProjectsHub })),
@@ -23,6 +25,9 @@ const LibraryHub = lazy(() =>
 const FocusTimer = lazy(() =>
   import("./components/focus/FocusTimer").then((m) => ({ default: m.FocusTimer })),
 );
+const CommandPalette = lazy(() =>
+  import("./components/CommandPalette").then((m) => ({ default: m.CommandPalette })),
+);
 
 export default function App() {
   const [section, setSection] = useState<Section>("home");
@@ -30,11 +35,11 @@ export default function App() {
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
-
-  const [projectsWizard, setProjectsWizard] = useState(false);
-  const [dailyWizard, setDailyWizard] = useState(false);
-  const [weeklyWizard, setWeeklyWizard] = useState(false);
-
+  const [dailyAutoStart, setDailyAutoStart] = useState(false);
+  const [weeklyAutoStart, setWeeklyAutoStart] = useState(false);
+  const [syncAutoStart, setSyncAutoStart] = useState(false);
+  const [projectsAutoWizard, setProjectsAutoWizard] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<OpenFile | null>(null);
 
   const refresh = useCallback(async () => {
@@ -42,8 +47,7 @@ export default function App() {
     try {
       const root = await api.getWorkspaceRoot();
       setWorkspaceRoot(root);
-      const projs = await api.listProjectsWithMeta();
-      setProjects(projs);
+      setProjects(await api.listProjectsWithMeta());
     } catch (e) {
       setError(String(e));
     }
@@ -53,14 +57,28 @@ export default function App() {
     refresh();
   }, [refresh, refreshKey]);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const openPath = async (path: string) => {
     try {
       const content = await api.readFile(path);
       setPreviewFile({ path, content, dirty: false });
+      trackRecent(path, path.split("/").pop() || path, section);
     } catch (e) {
       setError(String(e));
     }
   };
+
+  const bump = () => setRefreshKey((k) => k + 1);
 
   return (
     <div className="flex h-screen bg-slate-950">
@@ -68,13 +86,13 @@ export default function App() {
         section={section}
         onSectionChange={(s) => {
           setSection(s);
-          setPreviewFile(null);
-          setProjectsWizard(false);
-          setDailyWizard(false);
-          setWeeklyWizard(false);
+          setDailyAutoStart(false);
+          setWeeklyAutoStart(false);
+          setSyncAutoStart(false);
+          setProjectsAutoWizard(false);
         }}
         workspaceRoot={workspaceRoot}
-        onRefresh={() => setRefreshKey((k) => k + 1)}
+        onRefresh={bump}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -90,64 +108,106 @@ export default function App() {
         {section === "home" && (
           <Dashboard
             projects={projects}
-            onOpenFile={openPath}
-            onNavigate={(s) => setSection(s)}
-            onProjectCreated={() => setRefreshKey((k) => k + 1)}
+            onNavigate={setSection}
+            onStartStandup={() => {
+              setSection("daily");
+              setDailyAutoStart(true);
+            }}
+            onStartWeekly={() => {
+              setSection("weekly");
+              setWeeklyAutoStart(true);
+            }}
+            onStartCustomerSync={() => {
+              setSection("weekly");
+              setSyncAutoStart(true);
+            }}
+            onNewProject={() => {
+              setSection("projects");
+              setProjectsAutoWizard(true);
+            }}
+            onOpenRecent={openPath}
           />
         )}
 
-        {section === "projects" && (
-          <Suspense fallback={<SectionFallback />}>
+        <Suspense fallback={<SectionFallback />}>
+          {section === "projects" && (
             <ProjectsHub
-              startWizard={projectsWizard}
-              onWizardConsumed={() => setProjectsWizard(false)}
-              onRefresh={() => setRefreshKey((k) => k + 1)}
+              startWizard={projectsAutoWizard}
+              onWizardConsumed={() => setProjectsAutoWizard(false)}
+              onRefresh={bump}
             />
-          </Suspense>
-        )}
+          )}
 
-        {section === "daily" && (
-          <Suspense fallback={<SectionFallback />}>
+          {section === "daily" && (
             <DailyHub
-              startWizard={dailyWizard}
-              onWizardConsumed={() => setDailyWizard(false)}
-              onRefresh={() => setRefreshKey((k) => k + 1)}
+              startWizard={dailyAutoStart}
+              onWizardConsumed={() => setDailyAutoStart(false)}
+              onRefresh={bump}
             />
-          </Suspense>
-        )}
+          )}
 
-        {section === "weekly" && (
-          <Suspense fallback={<SectionFallback />}>
+          {section === "weekly" && (
             <WeeklyHub
-              startWizard={weeklyWizard}
-              onWizardConsumed={() => setWeeklyWizard(false)}
-              onRefresh={() => setRefreshKey((k) => k + 1)}
+              startWizard={weeklyAutoStart}
+              startSyncWizard={syncAutoStart}
+              onWizardConsumed={() => {
+                setWeeklyAutoStart(false);
+                setSyncAutoStart(false);
+              }}
+              onRefresh={bump}
             />
-          </Suspense>
-        )}
+          )}
 
-        {section === "library" && (
-          <Suspense fallback={<SectionFallback />}>
-            <LibraryHub />
-          </Suspense>
-        )}
+          {section === "library" && <LibraryHub />}
 
-        {section === "focus" && (
-          <Suspense fallback={<SectionFallback />}>
+          {section === "focus" && (
             <FocusTimer projects={projects} onExit={() => setSection("home")} />
-          </Suspense>
-        )}
+          )}
+        </Suspense>
 
         {section === "settings" && (
           <SettingsView
             workspaceRoot={workspaceRoot}
             onWorkspaceChange={(root) => {
               setWorkspaceRoot(root);
-              setRefreshKey((k) => k + 1);
+              bump();
             }}
           />
         )}
       </div>
+
+      {commandOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            open={commandOpen}
+            onClose={() => setCommandOpen(false)}
+            projects={projects}
+            onNavigate={setSection}
+            onStartFocus={() => setSection("focus")}
+            onStartStandup={() => {
+              setSection("daily");
+              setDailyAutoStart(true);
+            }}
+            onStartWeekly={() => {
+              setSection("weekly");
+              setWeeklyAutoStart(true);
+            }}
+            onStartCustomerSync={() => {
+              setSection("weekly");
+              setSyncAutoStart(true);
+            }}
+            onNewProject={() => {
+              setSection("projects");
+              setProjectsAutoWizard(true);
+            }}
+            onOpenFile={openPath}
+          />
+        </Suspense>
+      )}
+
+      {section !== "focus" && (
+        <FocusFloatingPill onOpen={() => setSection("focus")} />
+      )}
 
       <Modal
         open={!!previewFile}
@@ -181,7 +241,7 @@ export default function App() {
                 if (!confirm(`Delete ${previewFile.path}?`)) return;
                 await api.deletePath(previewFile.path);
                 setPreviewFile(null);
-                setRefreshKey((k) => k + 1);
+                bump();
               }}
             />
           </div>

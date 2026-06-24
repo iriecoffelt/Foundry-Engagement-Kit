@@ -8,31 +8,8 @@ import {
   slugify,
 } from "../../lib/markdown";
 import type { EngagementData, EngagementStatus, Stakeholder, SuccessMetric } from "../../types";
-import {
-  FormCard,
-  FormField,
-  SelectInput,
-  TextArea,
-  TextInput,
-} from "../forms/FormField";
+import { Field, FormCard, SelectInput, TextArea, TextInput } from "../forms/FormField";
 import { WizardShell } from "../wizard/WizardShell";
-
-const STEPS = [
-  { id: "basics", label: "Basics" },
-  { id: "problem", label: "Problem" },
-  { id: "people", label: "People" },
-  { id: "goals", label: "Goals" },
-  { id: "review", label: "Review" },
-];
-
-const STATUS_OPTIONS: { value: EngagementStatus; label: string }[] = [
-  { value: "discovery", label: "Discovery" },
-  { value: "scoping", label: "Scoping" },
-  { value: "design", label: "Design" },
-  { value: "build", label: "Build" },
-  { value: "deploy", label: "Deploy" },
-  { value: "handoff", label: "Handoff" },
-];
 
 const emptyStakeholder = (): Stakeholder => ({
   name: "",
@@ -47,7 +24,7 @@ const emptyMetric = (): SuccessMetric => ({
   target: "",
 });
 
-const initialData = (): EngagementData => ({
+const defaultData = (): EngagementData => ({
   displayName: "",
   customer: "",
   fdeLead: "",
@@ -70,33 +47,31 @@ interface ProjectSetupWizardProps {
 
 export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardProps) {
   const [step, setStep] = useState(0);
-  const [data, setData] = useState<EngagementData>(initialData);
+  const [data, setData] = useState<EngagementData>(defaultData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const slug = slugify(data.displayName);
-
-  const canProceed = () => {
-    if (step === 0) return data.displayName.trim().length > 0 && data.customer.trim().length > 0;
-    if (step === 1) return data.asIs.trim().length > 0 && data.toBe.trim().length > 0;
-    return true;
-  };
+  const steps = [
+    { label: "Basics" },
+    { label: "Problem" },
+    { label: "People" },
+    { label: "Goals" },
+    { label: "Review" },
+  ];
 
   const finish = async () => {
-    if (!slug) {
-      setError("Please enter a valid project name.");
-      return;
-    }
     setLoading(true);
     setError("");
     try {
-      const projectPath = await api.createProject(slug);
-      await api.writeJson(`${projectPath}/engagement.json`, engagementToJson(data));
-      await api.writeFile(`${projectPath}/README.md`, generateProjectReadme(slug, data));
-      await api.writeFile(`${projectPath}/00-discovery/discovery.md`, generateDiscoveryMd(data));
-      await api.writeFile(`${projectPath}/01-scoping/scoping.md`, generateScopingMd(data));
-      await api.createDirectory(`${projectPath}/references`);
-      onComplete(projectPath);
+      const slug = slugify(data.displayName);
+      const path = await api.setupEngagementProject(
+        slug,
+        engagementToJson(data),
+        generateProjectReadme(slug, data),
+        generateDiscoveryMd(data),
+        generateScopingMd(data),
+      );
+      onComplete(path);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -104,108 +79,125 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
     }
   };
 
+  const handleNext = () => {
+    if (step === steps.length - 1) {
+      finish();
+    } else {
+      setStep((s) => s + 1);
+    }
+  };
+
+  const canNext =
+    step === 0
+      ? data.displayName.trim().length > 0 && data.customer.trim().length > 0
+      : step === 1
+        ? data.asIs.trim().length > 0 && data.toBe.trim().length > 0
+        : true;
+
   return (
     <WizardShell
-      title="Set up a new engagement"
-      subtitle="We'll walk you through the essentials. Your answers become project docs automatically."
-      steps={STEPS}
-      currentStep={step}
-      onBack={() => (step === 0 ? onCancel() : setStep((s) => s - 1))}
-      onNext={() => setStep((s) => s + 1)}
-      onFinish={finish}
-      canProceed={canProceed()}
-      loading={loading}
+      title="Start a new engagement"
+      subtitle="We'll set up your project folder and documents automatically."
+      steps={steps}
+      step={step}
+      onBack={() => setStep((s) => s - 1)}
+      onNext={handleNext}
+      onCancel={onCancel}
+      canNext={canNext && !loading}
+      isLast={step === steps.length - 1}
+      finishLabel={loading ? "Creating…" : "Create project"}
     >
       {error && (
-        <div className="mb-4 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+        <div className="mb-4 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
           {error}
         </div>
       )}
 
       {step === 0 && (
-        <FormCard title="Engagement basics" description="Who, what, and when.">
-          <FormField label="Engagement name" hint="e.g. Acme Order Management">
+        <FormCard title="Engagement basics" description="Who is this for and when does it need to ship?">
+          <Field label="Project name" hint="How you'll refer to this engagement">
             <TextInput
               value={data.displayName}
               onChange={(v) => setData({ ...data, displayName: v })}
               placeholder="Acme Order Management"
             />
-          </FormField>
-          {slug && (
-            <p className="text-xs text-slate-500">
-              Folder name: <span className="text-brand-400">{slug}</span>
-            </p>
-          )}
-          <FormField label="Customer">
+          </Field>
+          <Field label="Customer">
             <TextInput
               value={data.customer}
               onChange={(v) => setData({ ...data, customer: v })}
               placeholder="Acme Corp"
             />
-          </FormField>
-          <FormField label="Your name">
+          </Field>
+          <Field label="Your name">
             <TextInput
               value={data.fdeLead}
               onChange={(v) => setData({ ...data, fdeLead: v })}
-              placeholder="Jane Smith"
             />
-          </FormField>
+          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Start date">
+            <Field label="Start date">
               <TextInput
                 type="date"
                 value={data.startDate}
                 onChange={(v) => setData({ ...data, startDate: v })}
               />
-            </FormField>
-            <FormField label="Target go-live">
+            </Field>
+            <Field label="Target go-live">
               <TextInput
                 type="date"
                 value={data.targetGoLive}
                 onChange={(v) => setData({ ...data, targetGoLive: v })}
               />
-            </FormField>
+            </Field>
           </div>
-          <FormField label="Current phase">
-            <SelectInput
-              value={data.status}
-              onChange={(v) => setData({ ...data, status: v as EngagementStatus })}
-              options={STATUS_OPTIONS}
-            />
-          </FormField>
-          <FormField label="One-line summary">
+          <Field label="One-line summary">
             <TextArea
               value={data.description}
               onChange={(v) => setData({ ...data, description: v })}
-              placeholder="What does this engagement deliver?"
+              placeholder="What will users be able to do when this is done?"
               rows={2}
             />
-          </FormField>
+          </Field>
+          <Field label="Current phase">
+            <SelectInput
+              value={data.status}
+              onChange={(v) => setData({ ...data, status: v as EngagementStatus })}
+              options={[
+                { value: "discovery", label: "Discovery" },
+                { value: "scoping", label: "Scoping" },
+                { value: "design", label: "Design" },
+                { value: "build", label: "Build" },
+                { value: "deploy", label: "Deploy" },
+                { value: "handoff", label: "Handoff" },
+              ]}
+            />
+          </Field>
         </FormCard>
       )}
 
       {step === 1 && (
-        <FormCard title="The problem" description="Frame the business case in plain language.">
-          <FormField label="How do they work today?">
+        <FormCard title="The problem" description="Describe the workflow you're improving.">
+          <Field label="How does it work today?">
             <TextArea value={data.asIs} onChange={(v) => setData({ ...data, asIs: v })} />
-          </FormField>
-          <FormField label="What's painful or costly?">
+          </Field>
+          <Field label="What's painful or costly?">
             <TextArea value={data.pain} onChange={(v) => setData({ ...data, pain: v })} />
-          </FormField>
-          <FormField label="What does success look like in Foundry?">
+          </Field>
+          <Field label="What should it look like in Foundry?">
             <TextArea value={data.toBe} onChange={(v) => setData({ ...data, toBe: v })} />
-          </FormField>
-          <FormField label="What's explicitly out of scope?">
+          </Field>
+          <Field label="Out of scope (for now)">
             <TextArea value={data.outOfScope} onChange={(v) => setData({ ...data, outOfScope: v })} />
-          </FormField>
+          </Field>
         </FormCard>
       )}
 
       {step === 2 && (
-        <FormCard title="Key people" description="Stakeholders you'll work with on this engagement.">
+        <FormCard title="Key people" description="Who cares about this engagement?">
           {data.stakeholders.map((s, i) => (
-            <div key={i} className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/50 p-4">
-              <div className="grid gap-3 sm:grid-cols-2">
+            <div key={i} className="rounded-lg border border-slate-800 p-4 space-y-3">
+              <Field label="Name">
                 <TextInput
                   value={s.name}
                   onChange={(v) => {
@@ -213,8 +205,9 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
                     stakeholders[i] = { ...s, name: v };
                     setData({ ...data, stakeholders });
                   }}
-                  placeholder="Name"
                 />
+              </Field>
+              <Field label="Role">
                 <TextInput
                   value={s.role}
                   onChange={(v) => {
@@ -222,18 +215,8 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
                     stakeholders[i] = { ...s, role: v };
                     setData({ ...data, stakeholders });
                   }}
-                  placeholder="Role"
                 />
-              </div>
-              <TextInput
-                value={s.notes}
-                onChange={(v) => {
-                  const stakeholders = [...data.stakeholders];
-                  stakeholders[i] = { ...s, notes: v };
-                  setData({ ...data, stakeholders });
-                }}
-                placeholder="Notes"
-              />
+              </Field>
             </div>
           ))}
           <button
@@ -243,42 +226,45 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
             }
             className="text-sm text-brand-400 hover:text-brand-300"
           >
-            + Add stakeholder
+            + Add another person
           </button>
         </FormCard>
       )}
 
       {step === 3 && (
-        <FormCard title="Success metrics" description="How will you know this engagement worked?">
+        <FormCard title="Success metrics" description="How will you know this worked?">
           {data.successMetrics.map((m, i) => (
-            <div key={i} className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/50 p-4 sm:grid-cols-3">
-              <TextInput
-                value={m.metric}
-                onChange={(v) => {
-                  const successMetrics = [...data.successMetrics];
-                  successMetrics[i] = { ...m, metric: v };
-                  setData({ ...data, successMetrics });
-                }}
-                placeholder="Metric"
-              />
-              <TextInput
-                value={m.baseline}
-                onChange={(v) => {
-                  const successMetrics = [...data.successMetrics];
-                  successMetrics[i] = { ...m, baseline: v };
-                  setData({ ...data, successMetrics });
-                }}
-                placeholder="Baseline"
-              />
-              <TextInput
-                value={m.target}
-                onChange={(v) => {
-                  const successMetrics = [...data.successMetrics];
-                  successMetrics[i] = { ...m, target: v };
-                  setData({ ...data, successMetrics });
-                }}
-                placeholder="Target"
-              />
+            <div key={i} className="grid gap-3 sm:grid-cols-3">
+              <Field label="Metric">
+                <TextInput
+                  value={m.metric}
+                  onChange={(v) => {
+                    const successMetrics = [...data.successMetrics];
+                    successMetrics[i] = { ...m, metric: v };
+                    setData({ ...data, successMetrics });
+                  }}
+                />
+              </Field>
+              <Field label="Baseline">
+                <TextInput
+                  value={m.baseline}
+                  onChange={(v) => {
+                    const successMetrics = [...data.successMetrics];
+                    successMetrics[i] = { ...m, baseline: v };
+                    setData({ ...data, successMetrics });
+                  }}
+                />
+              </Field>
+              <Field label="Target">
+                <TextInput
+                  value={m.target}
+                  onChange={(v) => {
+                    const successMetrics = [...data.successMetrics];
+                    successMetrics[i] = { ...m, target: v };
+                    setData({ ...data, successMetrics });
+                  }}
+                />
+              </Field>
             </div>
           ))}
           <button
@@ -294,10 +280,10 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
       )}
 
       {step === 4 && (
-        <FormCard title="Ready to create" description="We'll scaffold your project folder and fill in the starter docs.">
+        <FormCard title="Ready to create" description="We'll generate your project folder and starter docs.">
           <dl className="space-y-3 text-sm">
             <div>
-              <dt className="text-slate-500">Engagement</dt>
+              <dt className="text-slate-500">Project</dt>
               <dd className="text-white">{data.displayName}</dd>
             </div>
             <div>
@@ -305,12 +291,8 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
               <dd className="text-white">{data.customer}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Phase</dt>
-              <dd className="capitalize text-white">{data.status}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Goal</dt>
-              <dd className="text-slate-300">{data.toBe || "—"}</dd>
+              <dt className="text-slate-500">Folder</dt>
+              <dd className="font-mono text-brand-300">project/{slugify(data.displayName)}</dd>
             </div>
           </dl>
         </FormCard>

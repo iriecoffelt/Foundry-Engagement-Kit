@@ -30,7 +30,7 @@
     },
     {
       "data": {
-        "label": "Sync Pipeline"
+        "label": "Test Pipeline"
       },
       "id": "pipe1",
       "position": {

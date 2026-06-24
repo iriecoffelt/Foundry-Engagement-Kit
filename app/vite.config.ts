@@ -12,12 +12,18 @@ function vendorChunk(id: string): string | undefined {
     id.includes("remark-") ||
     id.includes("micromark") ||
     id.includes("mdast-") ||
-    id.includes("unist-")
+    id.includes("unist-") ||
+    id.includes("vfile") ||
+    id.includes("hast-") ||
+    id.includes("property-information")
   ) {
     return "markdown";
   }
+  if (id.includes("html-to-image")) return "html-to-image";
   if (id.includes("lucide-react")) return "lucide";
   if (id.includes("react-dom") || id.includes("/react/")) return "react-vendor";
+
+  return undefined;
 }
 
 export default defineConfig({
@@ -26,7 +32,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: vendorChunk,
+        manualChunks(id) {
+          return vendorChunk(id);
+        },
       },
     },
   },

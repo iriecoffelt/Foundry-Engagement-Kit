@@ -16,11 +16,11 @@ interface CommandPaletteProps {
   onClose: () => void;
   projects: ProjectMeta[];
   onNavigate: (section: Section) => void;
-  onStartFocus: () => void;
   onStartStandup: () => void;
   onStartWeekly: () => void;
   onStartCustomerSync: () => void;
   onNewProject: () => void;
+  onStartFocus?: () => void;
   onOpenFile?: (path: string) => void;
 }
 
@@ -29,11 +29,11 @@ export function CommandPalette({
   onClose,
   projects,
   onNavigate,
-  onStartFocus,
   onStartStandup,
   onStartWeekly,
   onStartCustomerSync,
   onNewProject,
+  onStartFocus,
   onOpenFile,
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
@@ -46,11 +46,11 @@ export function CommandPalette({
     { id: "daily", label: "Go to Daily", section: "daily", action: () => onNavigate("daily") },
     { id: "weekly", label: "Go to Weekly", section: "weekly", action: () => onNavigate("weekly") },
     { id: "library", label: "Go to Library", section: "library", action: () => onNavigate("library") },
-    { id: "focus", label: "Start focus timer", section: "focus", keywords: "pomodoro break deep work", action: onStartFocus },
     { id: "settings", label: "Go to Settings", section: "settings", action: () => onNavigate("settings") },
     { id: "standup", label: "Start today's standup", keywords: "daily", action: onStartStandup },
     { id: "weekly-w", label: "Start weekly review", action: onStartWeekly },
     { id: "sync", label: "Prep customer sync", keywords: "meeting stakeholder", action: onStartCustomerSync },
+    { id: "focus", label: "Open focus timer", keywords: "pomodoro break", action: () => onStartFocus?.() },
     { id: "new", label: "New engagement setup", keywords: "project create", action: onNewProject },
     ...projects.map((p) => ({
       id: `proj-${p.slug}`,
