@@ -1,12 +1,18 @@
 import {
   ArrowLeft,
   BookOpen,
+  ClipboardList,
   Copy,
   FileDown,
   FileText,
+  Gavel,
+  Handshake,
+  Kanban,
   Layers,
   Network,
-  Users,
+  ShieldAlert,
+  TestTube2,
+  UserCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ProjectMeta } from "../../types";
@@ -20,19 +26,29 @@ import { StatusBadge } from "../StatusBadge";
 
 export type ProjectTab =
   | "overview"
+  | "delivery"
+  | "register"
+  | "uat"
+  | "decisions"
   | "stakeholders"
   | "ontology"
   | "architecture"
   | "documents"
-  | "library";
+  | "library"
+  | "users";
 
 const TABS: { id: ProjectTab; label: string; icon: LucideIcon }[] = [
   { id: "overview", label: "Overview", icon: FileText },
-  { id: "stakeholders", label: "Stakeholders", icon: Users },
+  { id: "delivery", label: "Delivery", icon: Kanban },
+  { id: "register", label: "Register", icon: ShieldAlert },
+  { id: "uat", label: "UAT", icon: TestTube2 },
+  { id: "decisions", label: "Decisions", icon: Gavel },
+  { id: "stakeholders", label: "Stakeholders", icon: Handshake },
   { id: "ontology", label: "Ontology", icon: Layers },
   { id: "architecture", label: "Architecture", icon: Network },
-  { id: "documents", label: "Documents", icon: FileText },
+  { id: "documents", label: "Documents", icon: ClipboardList },
   { id: "library", label: "Library", icon: BookOpen },
+  { id: "users", label: "Users", icon: UserCircle },
 ];
 
 function ProgressRing({ progress, status }: { progress: number; status: string }) {
@@ -82,6 +98,7 @@ interface ProjectWorkspaceHeaderProps {
   onTabChange: (tab: ProjectTab) => void;
   onCopySummary: () => void;
   onExport: () => void;
+  onJiraExport: () => void;
 }
 
 export function ProjectWorkspaceHeader({
@@ -93,6 +110,7 @@ export function ProjectWorkspaceHeader({
   onTabChange,
   onCopySummary,
   onExport,
+  onJiraExport,
 }: ProjectWorkspaceHeaderProps) {
   const phase = normalizeStatus(project.status);
 
@@ -129,6 +147,9 @@ export function ProjectWorkspaceHeader({
             </div>
           </div>
           <div className="hidden shrink-0 gap-2 sm:flex">
+            <SecondaryButton onClick={onJiraExport}>
+              <span className="inline-flex items-center gap-2">Jira export</span>
+            </SecondaryButton>
             <SecondaryButton onClick={onCopySummary}>
               <span className="inline-flex items-center gap-2">
                 <Copy size={14} /> Copy summary

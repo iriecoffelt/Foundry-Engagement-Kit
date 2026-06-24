@@ -7,6 +7,8 @@ import { RecentActivity } from "./RecentActivity";
 import { StatusBadge } from "./StatusBadge";
 import { ShortcutKbd } from "./ShortcutKbd";
 
+import { TodayPanel } from "./today/TodayPanel";
+
 interface DashboardProps {
   projects: ProjectMeta[];
   onNavigate: (section: Section) => void;
@@ -15,6 +17,7 @@ interface DashboardProps {
   onStartCustomerSync: () => void;
   onNewProject: () => void;
   onOpenRecent: (path: string) => void;
+  onOpenProject?: (slug: string, tab?: string) => void;
 }
 
 export function Dashboard({
@@ -25,6 +28,7 @@ export function Dashboard({
   onStartCustomerSync,
   onNewProject,
   onOpenRecent,
+  onOpenProject,
 }: DashboardProps) {
   return (
     <div className="h-full overflow-y-auto p-8">
@@ -47,6 +51,8 @@ export function Dashboard({
           onStartStandup={onStartStandup}
           onStartWeekly={onStartWeekly}
         />
+
+        <TodayPanel projects={projects} onOpenProject={onOpenProject} />
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <ActionCard

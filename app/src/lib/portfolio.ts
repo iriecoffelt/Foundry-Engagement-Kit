@@ -9,12 +9,19 @@ import {
   type PhaseChecklist,
 } from "./phaseChecklist";
 import type { EngagementStatus, ProjectMeta } from "../types";
+import { loadRegister, openBlockers, openRisks } from "./engagementRegister";
+import { loadDeliveryBoard } from "./deliveryBoard";
+import { uatProgress, loadUatScenarios } from "./uatScenarios";
 
 export interface ProjectPortfolioRow {
   project: ProjectMeta;
   phaseProgress: number;
   handoffScore: number;
   overdueMilestones: number;
+  openBlockers: number;
+  openRisks: number;
+  blockedCards: number;
+  uatPercent: number;
   currentPhase: string;
 }
 
@@ -23,6 +30,7 @@ export interface PortfolioSummary {
   phaseCounts: Record<string, number>;
   lowHandoff: ProjectPortfolioRow[];
   overdueMilestones: { project: string; name: string; date: string }[];
+  totalOpenBlockers: number;
 }
 
 export async function loadPortfolioSummary(
@@ -93,16 +101,25 @@ export async function loadPortfolioSummary(
       /* no milestones */
     }
 
+    const register = await loadRegister(project.path);
+    const board = await loadDeliveryBoard(project.path);
+    const uat = await loadUatScenarios(project.path);
+
     rows.push({
       project,
       phaseProgress: progress.overall,
       handoffScore,
       overdueMilestones: overdue,
+      openBlockers: openBlockers(register).length,
+      openRisks: openRisks(register).length,
+      blockedCards: board.cards.filter((c) => c.status === "blocked").length,
+      uatPercent: uatProgress(uat).percent,
       currentPhase: PHASE_LABELS[status] || project.status,
     });
   }
 
   const lowHandoff = rows.filter((r) => r.handoffScore < 50).sort((a, b) => a.handoffScore - b.handoffScore);
+  const totalOpenBlockers = rows.reduce((n, r) => n + r.openBlockers, 0);
 
-  return { projects: rows, phaseCounts, lowHandoff, overdueMilestones };
+  return { projects: rows, phaseCounts, lowHandoff, overdueMilestones, totalOpenBlockers };
 }

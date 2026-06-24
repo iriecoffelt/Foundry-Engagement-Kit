@@ -56,6 +56,18 @@ export interface Stakeholder {
   notes: string;
 }
 
+export type ProjectUserKind = "team" | "stakeholder" | "both";
+
+export interface ProjectUser {
+  id: string;
+  name: string;
+  role: string;
+  email?: string;
+  organization?: string;
+  kind: ProjectUserKind;
+  stakeholderId?: string;
+}
+
 export interface SuccessMetric {
   metric: string;
   baseline: string;
@@ -75,6 +87,7 @@ export interface EngagementData {
   toBe: string;
   outOfScope: string;
   foundryStackUrl?: string;
+  teamMembers: ProjectUser[];
   stakeholders: Stakeholder[];
   successMetrics: SuccessMetric[];
 }
@@ -147,4 +160,114 @@ export interface CustomerSyncData {
   demoActions: string;
   decisionsNeeded: string;
   risks: string;
+}
+
+// --- FDE execution layer ---
+
+export type DeliveryStatus = "backlog" | "in_dev" | "in_uat" | "blocked" | "done";
+
+export type DeliveryComponentType =
+  | "objectType"
+  | "pipeline"
+  | "workshop"
+  | "function"
+  | "other";
+
+export interface DeliveryCard {
+  id: string;
+  title: string;
+  type: DeliveryComponentType;
+  status: DeliveryStatus;
+  owner: string;
+  designRef?: string;
+  resourceId?: string;
+  notes?: string;
+  blockerId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeliveryBoard {
+  cards: DeliveryCard[];
+}
+
+export type RegisterItemStatus = "open" | "resolved" | "mitigated" | "accepted";
+
+export interface BlockerEntry {
+  id: string;
+  title: string;
+  owner: string;
+  escalate: boolean;
+  status: RegisterItemStatus;
+  linkedCardId?: string;
+  sourcePath?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface RiskEntry {
+  id: string;
+  title: string;
+  likelihood: "Low" | "Medium" | "High";
+  impact: "Low" | "Medium" | "High";
+  mitigation: string;
+  status: RegisterItemStatus;
+  sourcePath?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface EngagementRegister {
+  blockers: BlockerEntry[];
+  risks: RiskEntry[];
+}
+
+export type UatStatus = "not_started" | "pass" | "fail" | "blocked";
+
+export interface UatScenario {
+  id: string;
+  scenario: string;
+  steps: string;
+  expected: string;
+  status: UatStatus;
+  tester?: string;
+  testedAt?: string;
+  notes?: string;
+}
+
+export interface ActionItem {
+  id: string;
+  title: string;
+  assignee: string;
+  stakeholderId?: string;
+  dueDate?: string;
+  status: "open" | "done";
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface DecisionSummary {
+  number: number;
+  title: string;
+  status: string;
+  date: string;
+  path: string;
+}
+
+export interface JiraConfig {
+  baseUrl?: string;
+  projectKey?: string;
+}
+
+export interface TodayItem {
+  id: string;
+  kind: "action" | "blocker" | "delivery" | "uat" | "cadence" | "milestone";
+  project: string;
+  projectSlug: string;
+  projectPath: string;
+  title: string;
+  meta?: string;
+  priority: "high" | "medium" | "low";
+  path?: string;
+  tab?: string;
 }

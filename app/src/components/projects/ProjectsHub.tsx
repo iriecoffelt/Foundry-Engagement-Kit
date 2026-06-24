@@ -6,16 +6,26 @@ import { PrimaryButton } from "../forms/FormField";
 import { StatusBadge } from "../StatusBadge";
 import { ProjectSetupWizard } from "../wizards/ProjectSetupWizard";
 import { ProjectWorkspace } from "./ProjectWorkspace";
+import type { ProjectTab } from "./ProjectWorkspaceHeader";
 
 interface ProjectsHubProps {
   onRefresh: () => void;
   startWizard?: boolean;
   onWizardConsumed?: () => void;
+  openProjectRequest?: { slug: string; tab?: string } | null;
+  onOpenConsumed?: () => void;
 }
 
-export function ProjectsHub({ onRefresh, startWizard, onWizardConsumed }: ProjectsHubProps) {
+export function ProjectsHub({
+  onRefresh,
+  startWizard,
+  onWizardConsumed,
+  openProjectRequest,
+  onOpenConsumed,
+}: ProjectsHubProps) {
   const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [selected, setSelected] = useState<ProjectMeta | null>(null);
+  const [initialTab, setInitialTab] = useState<ProjectTab | undefined>();
   const [showWizard, setShowWizard] = useState(false);
 
   const load = () => api.listProjectsWithMeta().then(setProjects);
@@ -30,6 +40,16 @@ export function ProjectsHub({ onRefresh, startWizard, onWizardConsumed }: Projec
       onWizardConsumed?.();
     }
   }, [startWizard, onWizardConsumed]);
+
+  useEffect(() => {
+    if (!openProjectRequest || !projects.length) return;
+    const p = projects.find((x) => x.slug === openProjectRequest.slug);
+    if (p) {
+      setSelected(p);
+      setInitialTab(openProjectRequest.tab as ProjectTab | undefined);
+      onOpenConsumed?.();
+    }
+  }, [openProjectRequest, projects, onOpenConsumed]);
 
   const cloneProject = async (p: ProjectMeta, e: { stopPropagation: () => void }) => {
     e.stopPropagation();
@@ -71,8 +91,10 @@ export function ProjectsHub({ onRefresh, startWizard, onWizardConsumed }: Projec
     return (
       <ProjectWorkspace
         project={selected}
+        initialTab={initialTab}
         onBack={() => {
           setSelected(null);
+          setInitialTab(undefined);
           load();
         }}
       />

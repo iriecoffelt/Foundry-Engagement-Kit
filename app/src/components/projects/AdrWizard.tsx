@@ -1,10 +1,10 @@
 import { FilePlus, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { adrDestPath, generateAdrMarkdown, type AdrData } from "../../lib/adr";
+import { adrDestPath, ADR_STATUSES, generateAdrMarkdown, type AdrData } from "../../lib/adr";
 import { api } from "../../lib/api";
 import { nextAdrNumber } from "../../lib/documentTemplates";
 import { Modal } from "../Modal";
-import { Field, PrimaryButton, SecondaryButton, TextArea, TextInput } from "../forms/FormField";
+import { Field, PrimaryButton, SecondaryButton, SelectInput, TextArea, TextInput } from "../forms/FormField";
 
 interface AdrWizardProps {
   open: boolean;
@@ -91,10 +91,10 @@ export function AdrWizard({ open, projectPath, onClose, onCreated }: AdrWizardPr
             />
           </Field>
           <Field label="Status">
-            <TextInput
+            <SelectInput
               value={data.status}
               onChange={(v) => update({ status: v })}
-              placeholder="Proposed, Accepted, Deprecated…"
+              options={ADR_STATUSES.map((s) => ({ value: s, label: s }))}
             />
           </Field>
         </div>

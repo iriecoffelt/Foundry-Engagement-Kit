@@ -22,6 +22,11 @@ import { HubEmpty, HubLayout, HubMain, HubSidebar } from "../layout/HubLayout";
 import { MarkdownPreview } from "../MarkdownPreview";
 import { SecondaryButton } from "../forms/FormField";
 import { SectionFallback } from "../SectionFallback";
+import { DeliveryBoardView } from "./DeliveryBoardView";
+import { EngagementRegisterView } from "./EngagementRegisterView";
+import { UatTrackerView } from "./UatTrackerView";
+import { DecisionIndexView } from "./DecisionIndexView";
+import { JiraExportModal } from "./JiraExportModal";
 import { ExportReportModal } from "./ExportReportModal";
 import { AdrWizard } from "./AdrWizard";
 import { DocumentTemplatePicker } from "./DocumentTemplatePicker";
@@ -32,6 +37,7 @@ import { PhaseStepper } from "./PhaseStepper";
 import { StakeholderMap } from "./StakeholderMap";
 import { ProjectWorkspaceHeader, type ProjectTab } from "./ProjectWorkspaceHeader";
 import { ProjectLibrary } from "./ProjectLibrary";
+import { ProjectUsersView } from "./ProjectUsersView";
 
 const ArchitectureEditor = lazy(() =>
   import("../architecture/ArchitectureEditor").then((m) => ({
@@ -41,11 +47,12 @@ const ArchitectureEditor = lazy(() =>
 
 interface ProjectWorkspaceProps {
   project: ProjectMeta;
+  initialTab?: ProjectTab;
   onBack: () => void;
 }
 
-export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
-  const [tab, setTab] = useState<ProjectTab>("overview");
+export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspaceProps) {
+  const [tab, setTab] = useState<ProjectTab>(initialTab ?? "overview");
   const [projectMeta, setProjectMeta] = useState(project);
   const [overview, setOverview] = useState("");
   const [uploads, setUploads] = useState<FileEntry[]>([]);
@@ -55,6 +62,7 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
   );
   const [message, setMessage] = useState("");
   const [showExport, setShowExport] = useState(false);
+  const [showJira, setShowJira] = useState(false);
   const [showAdrWizard, setShowAdrWizard] = useState(false);
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [checklistVersion, setChecklistVersion] = useState(0);
@@ -62,6 +70,10 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
   useEffect(() => {
     setProjectMeta(project);
   }, [project]);
+
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+  }, [initialTab, project.path]);
 
   const bumpChecklist = useCallback(() => {
     setChecklistVersion((v) => v + 1);
@@ -159,6 +171,7 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
         onTabChange={setTab}
         onCopySummary={copySummary}
         onExport={() => setShowExport(true)}
+        onJiraExport={() => setShowJira(true)}
       />
 
       <div className="min-h-0 flex-1">
@@ -191,6 +204,20 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
               )}
             </div>
           </div>
+        )}
+
+        {tab === "delivery" && <DeliveryBoardView projectPath={projectMeta.path} />}
+
+        {tab === "register" && <EngagementRegisterView projectPath={projectMeta.path} />}
+
+        {tab === "uat" && <UatTrackerView projectPath={projectMeta.path} />}
+
+        {tab === "decisions" && (
+          <DecisionIndexView
+            projectPath={projectMeta.path}
+            onOpenAdr={openDoc}
+            onNewAdr={() => setShowAdrWizard(true)}
+          />
         )}
 
         {tab === "stakeholders" && <StakeholderMap project={projectMeta} />}
@@ -269,6 +296,8 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
             }}
           />
         )}
+
+        {tab === "users" && <ProjectUsersView project={projectMeta} />}
       </div>
 
       <AdrWizard
@@ -276,6 +305,12 @@ export function ProjectWorkspace({ project, onBack }: ProjectWorkspaceProps) {
         projectPath={projectMeta.path}
         onClose={() => setShowAdrWizard(false)}
         onCreated={openDoc}
+      />
+
+      <JiraExportModal
+        open={showJira}
+        project={projectMeta}
+        onClose={() => setShowJira(false)}
       />
 
       <ExportReportModal

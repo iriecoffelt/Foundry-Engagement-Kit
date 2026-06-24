@@ -13,7 +13,9 @@ import {
 } from "../../lib/markdown";
 import type { EngagementData, EngagementStatus, SuccessMetric } from "../../types";
 import { emptyStakeholder } from "../../lib/stakeholders";
+import { emptyTeamMember } from "../../lib/projectUsers";
 import { Field, FormCard, SelectInput, TextArea, TextInput } from "../forms/FormField";
+import { RoleSelect } from "../RoleSelect";
 import { WizardShell } from "../wizard/WizardShell";
 
 const emptyMetric = (): SuccessMetric => ({
@@ -34,6 +36,7 @@ const defaultData = (): EngagementData => ({
   pain: "",
   toBe: "",
   outOfScope: "",
+  teamMembers: [emptyTeamMember()],
   stakeholders: [emptyStakeholder()],
   successMetrics: [emptyMetric()],
 });
@@ -193,9 +196,54 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
       )}
 
       {step === 2 && (
-        <FormCard title="Key people" description="Who cares about this engagement?">
+        <FormCard
+          title="People on this engagement"
+          description="Team members and customer stakeholders — all appear in the Users tab for assignments."
+        >
+          <p className="text-sm font-medium text-fg-primary">Delivery team</p>
+          <p className="mb-3 text-xs text-fg-muted">
+            You are added automatically from “Your name” on step 1. Add teammates below.
+          </p>
+          {data.teamMembers.map((member, i) => (
+            <div key={member.id} className="mb-3 rounded-lg border border-surface-border p-4 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Name">
+                  <TextInput
+                    value={member.name}
+                    onChange={(v) => {
+                      const teamMembers = [...data.teamMembers];
+                      teamMembers[i] = { ...member, name: v };
+                      setData({ ...data, teamMembers });
+                    }}
+                  />
+                </Field>
+                <Field label="Role">
+                  <RoleSelect
+                    value={member.role}
+                    onChange={(v) => {
+                      const teamMembers = [...data.teamMembers];
+                      teamMembers[i] = { ...member, role: v };
+                      setData({ ...data, teamMembers });
+                    }}
+                  />
+                </Field>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setData({ ...data, teamMembers: [...data.teamMembers, emptyTeamMember()] })
+            }
+            className="mb-6 text-sm text-brand-400 hover:text-brand-300"
+          >
+            + Add team member
+          </button>
+
+          <p className="text-sm font-medium text-fg-primary">Customer stakeholders</p>
+          <p className="mb-3 text-xs text-fg-muted">Synced to the stakeholder map and user list.</p>
           {data.stakeholders.map((s, i) => (
-            <div key={i} className="rounded-lg border border-surface-border p-4 space-y-3">
+            <div key={s.id ?? i} className="rounded-lg border border-surface-border p-4 space-y-3">
               <Field label="Name">
                 <TextInput
                   value={s.name}
@@ -207,7 +255,7 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
                 />
               </Field>
               <Field label="Role">
-                <TextInput
+                <RoleSelect
                   value={s.role}
                   onChange={(v) => {
                     const stakeholders = [...data.stakeholders];
@@ -225,7 +273,7 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
             }
             className="text-sm text-brand-400 hover:text-brand-300"
           >
-            + Add another person
+            + Add stakeholder
           </button>
         </FormCard>
       )}

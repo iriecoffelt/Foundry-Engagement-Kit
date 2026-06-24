@@ -71,6 +71,16 @@ export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
           </div>
         )}
 
+        {summary.totalOpenBlockers > 0 && (
+          <div className="mt-6 card-kit border-amber-500/30 p-4">
+            <div className="flex items-center gap-2 text-amber-500">
+              <ShieldAlert size={18} />
+              <h3 className="font-medium">Open blockers across portfolio</h3>
+            </div>
+            <p className="mt-2 text-sm text-fg-body">{summary.totalOpenBlockers} total — check Register tab per project</p>
+          </div>
+        )}
+
         {summary.lowHandoff.length > 0 && (
           <div className="mt-6 card-kit border-red-500/20 p-4">
             <div className="flex items-center gap-2 text-red-400">
@@ -105,6 +115,10 @@ export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
                   <div className="text-right text-xs text-fg-muted">
                     <p>{row.phaseProgress}% checklist</p>
                     <p>{row.handoffScore}% handoff</p>
+                    {row.openBlockers > 0 && (
+                      <p className="text-amber-500">{row.openBlockers} blockers</p>
+                    )}
+                    {row.uatPercent > 0 && <p>{row.uatPercent}% UAT</p>}
                     {row.overdueMilestones > 0 && (
                       <p className="text-amber-500">{row.overdueMilestones} overdue</p>
                     )}

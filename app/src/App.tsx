@@ -52,6 +52,10 @@ export default function App() {
   const [projectsAutoWizard, setProjectsAutoWizard] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<OpenFile | null>(null);
+  const [openProjectRequest, setOpenProjectRequest] = useState<{
+    slug: string;
+    tab?: string;
+  } | null>(null);
 
   const refresh = useCallback(async () => {
     setError("");
@@ -150,6 +154,10 @@ export default function App() {
               setProjectsAutoWizard(true);
             }}
             onOpenRecent={openPath}
+            onOpenProject={(slug, tab) => {
+              setOpenProjectRequest({ slug, tab });
+              setSection("projects");
+            }}
           />
         )}
 
@@ -166,6 +174,8 @@ export default function App() {
               startWizard={projectsAutoWizard}
               onWizardConsumed={() => setProjectsAutoWizard(false)}
               onRefresh={bump}
+              openProjectRequest={openProjectRequest}
+              onOpenConsumed={() => setOpenProjectRequest(null)}
             />
           )}
 

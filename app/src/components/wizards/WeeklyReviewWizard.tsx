@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../../lib/api";
+import { importRisksFromWeekly } from "../../lib/engagementRegister";
 import { generateWeeklyMd, todayISO } from "../../lib/markdown";
 import type { ProjectMeta, WeeklyReviewData } from "../../types";
 import { Field, FormCard, SelectInput, TextArea, TextInput } from "../forms/FormField";
@@ -56,6 +57,7 @@ export function WeeklyReviewWizard({ projects, onComplete, onCancel }: WeeklyRev
       await api.createDirectory(dir);
       const path = `${dir}/${date}-weekly-review.md`;
       await api.createFile(path, generateWeeklyMd(data));
+      await importRisksFromWeekly(project.path, data, path);
       onComplete(path);
     } catch (e) {
       setError(String(e));

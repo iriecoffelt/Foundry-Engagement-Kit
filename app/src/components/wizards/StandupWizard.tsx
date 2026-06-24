@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { api } from "../../lib/api";
+import { importBlockersFromStandup } from "../../lib/engagementRegister";
 import { generateStandupMd, parseStandupMd, todayISO } from "../../lib/markdown";
 import type { ProjectMeta, StandupData } from "../../types";
+import { FoundryAreaSelect } from "../FoundryAreaSelect";
 import { Field, FormCard, SelectInput, TextArea, TextInput } from "../forms/FormField";
 import { WizardShell } from "../wizard/WizardShell";
 
@@ -87,6 +89,7 @@ export function StandupWizard({
 
       if (editPath) {
         await api.writeFile(editPath, markdown);
+        await importBlockersFromStandup(project.path, data, editPath);
         onComplete(editPath);
       } else {
         const date = todayISO();
@@ -94,6 +97,7 @@ export function StandupWizard({
         await api.createDirectory(dir);
         const path = `${dir}/${date}-standup.md`;
         await api.writeFile(path, markdown);
+        await importBlockersFromStandup(project.path, data, path);
         onComplete(path);
       }
     } catch (e) {
@@ -174,17 +178,7 @@ export function StandupWizard({
             <TextInput value={todayTask} onChange={setTodayTask} />
           </Field>
           <Field label="Foundry area">
-            <SelectInput
-              value={todaySurface}
-              onChange={setTodaySurface}
-              options={[
-                { value: "Ontology", label: "Ontology" },
-                { value: "Pipeline", label: "Pipeline" },
-                { value: "Workshop", label: "Workshop" },
-                { value: "Customer sync", label: "Customer sync" },
-                { value: "Other", label: "Other" },
-              ]}
-            />
+            <FoundryAreaSelect value={todaySurface} onChange={setTodaySurface} />
           </Field>
           <Field label="Meetings today">
             <TextArea value={meetings} onChange={setMeetings} rows={2} />

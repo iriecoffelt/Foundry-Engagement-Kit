@@ -5,10 +5,12 @@ import type {
   ArchitectureGraph,
   CustomerSyncData,
   OntologyObjectType,
+  ProjectUser,
   Stakeholder,
   SuccessMetric,
 } from "../types";
 import { stackUrlFromEngagement } from "./foundryLinks";
+import { buildProjectUsersFromWizard } from "./projectUsers";
 
 export function slugify(name: string): string {
   return name
@@ -54,6 +56,19 @@ export function engagementFromJson(
           interest: String(s.interest || "M"),
           notes: String(s.notes || ""),
         }))
+      : [],
+    teamMembers: Array.isArray(json.projectUsers)
+      ? (json.projectUsers as ProjectUser[])
+          .filter((u) => u.kind === "team" || u.kind === "both")
+          .map((u) => ({
+            id: String(u.id),
+            name: String(u.name || ""),
+            role: String(u.role || ""),
+            email: String(u.email || ""),
+            organization: String(u.organization || ""),
+            kind: u.kind,
+            stakeholderId: u.stakeholderId,
+          }))
       : [],
     successMetrics: Array.isArray(json.successMetrics)
       ? (json.successMetrics as SuccessMetric[]).map((m) => ({
@@ -253,6 +268,11 @@ export function engagementToJson(data: EngagementData) {
         interest: s.interest || "M",
         notes: s.notes,
       })),
+    projectUsers: buildProjectUsersFromWizard(
+      data.fdeLead,
+      data.teamMembers,
+      data.stakeholders.filter((s) => s.name.trim() || s.role.trim()),
+    ),
     successMetrics: data.successMetrics.filter((m) => m.metric.trim()),
     updatedAt: new Date().toISOString(),
   };
