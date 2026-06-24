@@ -48,6 +48,10 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
       - name: Add Rust target (macOS)
         if: matrix.rust_target != ''
         run: rustup target add ${{ matrix.rust_target }}

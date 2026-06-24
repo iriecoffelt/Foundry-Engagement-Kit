@@ -43,6 +43,10 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -54,4 +58,10 @@ jobs:
             patchelf
 
       - name: cargo check
-        run: cargo check
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: cargo check
+        working-directory: app/src-tauri
