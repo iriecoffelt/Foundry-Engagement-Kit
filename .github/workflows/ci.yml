@@ -58,10 +58,11 @@ jobs:
             patchelf
 
       - name: cargo check
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          retry_wait_seconds: 15
-          command: cargo check
-        working-directory: app/src-tauri
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            cargo check && exit 0
+            echo "cargo check attempt $attempt failed, retrying in 15s..."
+            sleep 15
+          done
+          exit 1
