@@ -1,5 +1,6 @@
 import { ExternalLink, GripVertical, Layers, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { api } from "../../lib/api";
 import {
   boardByStatus,
   DELIVERY_STATUSES,
@@ -18,7 +19,7 @@ import {
   type DeliveryTypeDefinition,
 } from "../../lib/deliveryTypes";
 import { loadRegister, openBlockers } from "../../lib/engagementRegister";
-import { api } from "../../lib/api";
+import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
 import type {
   BlockerEntry,
   DeliveryBoard,
@@ -69,6 +70,9 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DeliveryStatus | null>(null);
   const [blockers, setBlockers] = useState<BlockerEntry[]>([]);
+  const boardRef = useRef(board);
+  boardRef.current = board;
+  const dropTargetRef = useRef<DeliveryStatus | null>(null);
   const sessionRef = useRef<PointerSession | null>(null);
   const draggingIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef(false);
@@ -94,49 +98,53 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
     }
   }, [initialSelectedCardId, board.cards]);
 
-  const persist = useCallback(
+  const { schedule: scheduleSave, flushNow: flushSave } = useDebouncedPersist<DeliveryBoard>({
+    save: (next) => saveDeliveryBoard(projectPath, next),
+    onSavingChange: setSaving,
+  });
+
+  const persistNow = useCallback(
     async (next: DeliveryBoard) => {
       setBoard(next);
-      setSaving(true);
-      try {
-        await saveDeliveryBoard(projectPath, next);
-      } finally {
-        setSaving(false);
-      }
+      boardRef.current = next;
+      await flushSave(next);
     },
-    [projectPath],
+    [flushSave],
+  );
+
+  const schedulePersist = useCallback(
+    (next: DeliveryBoard) => {
+      setBoard(next);
+      boardRef.current = next;
+      scheduleSave(next);
+    },
+    [scheduleSave],
   );
 
   const updateCard = useCallback(
     (id: string, patch: Partial<DeliveryCard>) => {
-      setBoard((prev) => {
-        const next = {
-          cards: prev.cards.map((c) =>
-            c.id === id ? { ...c, ...patch, updatedAt: new Date().toISOString() } : c,
-          ),
-        };
-        void persist(next);
-        return next;
-      });
+      const next = {
+        cards: boardRef.current.cards.map((c) =>
+          c.id === id ? { ...c, ...patch, updatedAt: new Date().toISOString() } : c,
+        ),
+      };
+      schedulePersist(next);
     },
-    [persist],
+    [schedulePersist],
   );
 
   const moveCard = useCallback(
     (id: string, status: DeliveryStatus) => {
-      setBoard((prev) => {
-        const card = prev.cards.find((c) => c.id === id);
-        if (!card || card.status === status) return prev;
-        const next = {
-          cards: prev.cards.map((c) =>
-            c.id === id ? { ...c, status, updatedAt: new Date().toISOString() } : c,
-          ),
-        };
-        void persist(next);
-        return next;
-      });
+      const card = boardRef.current.cards.find((c) => c.id === id);
+      if (!card || card.status === status) return;
+      const next = {
+        cards: boardRef.current.cards.map((c) =>
+          c.id === id ? { ...c, status, updatedAt: new Date().toISOString() } : c,
+        ),
+      };
+      void persistNow(next);
     },
-    [persist],
+    [persistNow],
   );
 
   const endPointerSession = useCallback(
@@ -147,6 +155,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
         if (status && draggingIdRef.current) moveCard(draggingIdRef.current, status);
         setDraggingId(null);
         draggingIdRef.current = null;
+        dropTargetRef.current = null;
         setDropTarget(null);
       } else {
         setSelectedId(session.cardId);
@@ -185,7 +194,11 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
       }
 
       if (active.moved) {
-        setDropTarget(columnFromPoint(ev.clientX, ev.clientY));
+        const status = columnFromPoint(ev.clientX, ev.clientY);
+        if (status !== dropTargetRef.current) {
+          dropTargetRef.current = status;
+          setDropTarget(status);
+        }
       }
     };
 
@@ -239,7 +252,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
       createdAt: now,
       updatedAt: now,
     };
-    persist({ cards: [...board.cards, card] });
+    void persistNow({ cards: [...boardRef.current.cards, card] });
     setNewTitle("");
     setSelectedId(card.id);
   };
@@ -249,7 +262,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
     if (card) {
       await removeArchitectureForDeliveryCard(projectPath, card);
     }
-    persist({ cards: board.cards.filter((c) => c.id !== id) });
+    void persistNow({ cards: boardRef.current.cards.filter((c) => c.id !== id) });
     if (selectedId === id) setSelectedId(null);
   };
 
@@ -371,7 +384,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   );
 }
 
-function DeliveryCardItem({
+const DeliveryCardItem = memo(function DeliveryCardItem({
   card,
   deliveryTypes,
   selected,
@@ -446,7 +459,7 @@ function DeliveryCardItem({
       </div>
     </div>
   );
-}
+});
 
 function DeliveryCardDetail({
   projectPath,

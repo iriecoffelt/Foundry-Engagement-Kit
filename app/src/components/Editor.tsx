@@ -1,5 +1,6 @@
 import { Columns2, Eye, FileText, Pencil, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { shortcut } from "../lib/shortcuts";
 
@@ -56,6 +57,7 @@ export function Editor({
   defaultView = "split",
 }: EditorProps) {
   const [view, setView] = useState<ViewMode>(defaultView);
+  const previewContent = useDebouncedValue(content, 200);
 
   useEffect(() => {
     setView(defaultView);
@@ -160,7 +162,7 @@ export function Editor({
               view === "split" ? "editor-pane-split-right" : "editor-pane-full"
             }`}
           >
-            <MarkdownPreview content={content} />
+            <MarkdownPreview content={previewContent} />
           </div>
         )}
       </div>

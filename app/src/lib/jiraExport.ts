@@ -1,37 +1,27 @@
-import { api } from "./api";
+import { loadEngagementJson, saveEngagementJson } from "./engagementData";
 import type { JiraConfig, ProjectMeta } from "../types";
 import { loadDeliveryBoard, boardByStatus, DELIVERY_STATUS_LABELS } from "./deliveryBoard";
 import { loadRegister, openBlockers, openRisks } from "./engagementRegister";
 import { loadActionItems, openActionItems } from "./actionItems";
 import { loadUatScenarios, uatProgress } from "./uatScenarios";
-import { computePhaseProgress, mergeChecklist, checklistPath, DEFAULT_CHECKLIST } from "./phaseChecklist";
+import { loadPhaseChecklist } from "./checklistData";
+import { computePhaseProgress } from "./phaseChecklist";
 
 export async function loadJiraConfig(projectPath: string): Promise<JiraConfig> {
-  try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    return {
-      baseUrl: (eng.jiraBaseUrl as string) || "",
-      projectKey: (eng.jiraProjectKey as string) || "",
-    };
-  } catch {
-    return {};
-  }
+  const eng = await loadEngagementJson(projectPath);
+  return {
+    baseUrl: (eng.jiraBaseUrl as string) || "",
+    projectKey: (eng.jiraProjectKey as string) || "",
+  };
 }
 
 export async function saveJiraConfig(projectPath: string, config: JiraConfig): Promise<void> {
-  try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    await api.writeJson(`${projectPath}/engagement.json`, {
-      ...eng,
-      jiraBaseUrl: config.baseUrl?.trim() || undefined,
-      jiraProjectKey: config.projectKey?.trim() || undefined,
-    });
-  } catch {
-    await api.writeJson(`${projectPath}/engagement.json`, {
-      jiraBaseUrl: config.baseUrl?.trim(),
-      jiraProjectKey: config.projectKey?.trim(),
-    });
-  }
+  const eng = await loadEngagementJson(projectPath);
+  await saveEngagementJson(projectPath, {
+    ...eng,
+    jiraBaseUrl: config.baseUrl?.trim() || undefined,
+    jiraProjectKey: config.projectKey?.trim() || undefined,
+  });
 }
 
 export function jiraIssueUrl(config: JiraConfig, issueKey: string): string | null {
@@ -59,9 +49,7 @@ export async function buildJiraExportMarkdown(
 
   let phasePct = 0;
   try {
-    const cl = mergeChecklist(
-      await api.readJson<typeof DEFAULT_CHECKLIST>(checklistPath(project.path)),
-    );
+    const cl = await loadPhaseChecklist(project.path);
     phasePct = computePhaseProgress(cl).overall;
   } catch {
     /* default 0 */

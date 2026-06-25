@@ -27,18 +27,38 @@ function initialState(settings: FocusSettings): FocusTimerState {
   };
 }
 
+const DISK_SAVE_INTERVAL_MS = 10_000;
+
 export function useFocusTimer() {
   const [settings, setSettings] = useState<FocusSettings>(loadSettings);
   const [state, setState] = useState<FocusTimerState>(() => initialState(loadSettings()));
   const [completedFlash, setCompletedFlash] = useState<string | null>(null);
   const stateRef = useRef(state);
   const settingsRef = useRef(settings);
+  const lastDiskSaveRef = useRef(0);
   stateRef.current = state;
   settingsRef.current = settings;
 
-  const persist = useCallback((next: FocusTimerState) => {
-    setState(next);
+  const persistToDisk = useCallback((next: FocusTimerState, force = false) => {
+    const now = Date.now();
+    if (!force && now - lastDiskSaveRef.current < DISK_SAVE_INTERVAL_MS) return;
     saveTimerState(next);
+    lastDiskSaveRef.current = now;
+  }, []);
+
+  const persist = useCallback(
+    (next: FocusTimerState, forceDisk = false) => {
+      stateRef.current = next;
+      setState(next);
+      persistToDisk(next, forceDisk);
+    },
+    [persistToDisk],
+  );
+
+  useEffect(() => {
+    return () => {
+      saveTimerState(stateRef.current);
+    };
   }, []);
 
   const completeSession = useCallback(() => {
@@ -76,14 +96,17 @@ export function useFocusTimer() {
       (finishedType === "focus" && cfg.autoStartBreaks) ||
       (finishedType !== "focus" && cfg.autoStartFocus);
 
-    persist({
-      sessionType: nextType,
-      status: autoStart ? "running" : "idle",
-      secondsRemaining: nextSeconds,
-      completedFocusSessions: newCompleted,
-      projectSlug: current.projectSlug,
-      startedAt: autoStart ? Date.now() : null,
-    });
+    persist(
+      {
+        sessionType: nextType,
+        status: autoStart ? "running" : "idle",
+        secondsRemaining: nextSeconds,
+        completedFocusSessions: newCompleted,
+        projectSlug: current.projectSlug,
+        startedAt: autoStart ? Date.now() : null,
+      },
+      true,
+    );
   }, [persist]);
 
   useEffect(() => {
@@ -98,8 +121,7 @@ export function useFocusTimer() {
         return;
       }
 
-      const next = { ...current, secondsRemaining: current.secondsRemaining - 1 };
-      persist(next);
+      persist({ ...current, secondsRemaining: current.secondsRemaining - 1 });
     }, 1000);
 
     return () => clearInterval(id);
@@ -108,29 +130,35 @@ export function useFocusTimer() {
   const start = useCallback(() => {
     const current = stateRef.current;
     const cfg = settingsRef.current;
-    persist({
-      ...current,
-      status: "running",
-      startedAt: Date.now(),
-      secondsRemaining:
-        current.status === "idle"
-          ? sessionDurationSeconds(current.sessionType, cfg)
-          : current.secondsRemaining,
-    });
+    persist(
+      {
+        ...current,
+        status: "running",
+        startedAt: Date.now(),
+        secondsRemaining:
+          current.status === "idle"
+            ? sessionDurationSeconds(current.sessionType, cfg)
+            : current.secondsRemaining,
+      },
+      true,
+    );
   }, [persist]);
 
   const pause = useCallback(() => {
-    persist({ ...stateRef.current, status: "paused", startedAt: null });
+    persist({ ...stateRef.current, status: "paused", startedAt: null }, true);
   }, [persist]);
 
   const reset = useCallback(() => {
     const current = stateRef.current;
-    persist({
-      ...current,
-      status: "idle",
-      secondsRemaining: sessionDurationSeconds(current.sessionType, settingsRef.current),
-      startedAt: null,
-    });
+    persist(
+      {
+        ...current,
+        status: "idle",
+        secondsRemaining: sessionDurationSeconds(current.sessionType, settingsRef.current),
+        startedAt: null,
+      },
+      true,
+    );
   }, [persist]);
 
   const skip = useCallback(() => {
@@ -140,21 +168,24 @@ export function useFocusTimer() {
   const setSessionType = useCallback(
     (type: SessionType) => {
       const current = stateRef.current;
-      persist({
-        sessionType: type,
-        status: "idle",
-        secondsRemaining: sessionDurationSeconds(type, settingsRef.current),
-        completedFocusSessions: current.completedFocusSessions,
-        projectSlug: current.projectSlug,
-        startedAt: null,
-      });
+      persist(
+        {
+          sessionType: type,
+          status: "idle",
+          secondsRemaining: sessionDurationSeconds(type, settingsRef.current),
+          completedFocusSessions: current.completedFocusSessions,
+          projectSlug: current.projectSlug,
+          startedAt: null,
+        },
+        true,
+      );
     },
     [persist],
   );
 
   const setProjectSlug = useCallback(
     (slug: string) => {
-      persist({ ...stateRef.current, projectSlug: slug });
+      persist({ ...stateRef.current, projectSlug: slug }, true);
     },
     [persist],
   );

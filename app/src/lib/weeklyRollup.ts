@@ -1,9 +1,7 @@
 import { api } from "./api";
+import { loadPhaseChecklist } from "./checklistData";
 import {
-  DEFAULT_CHECKLIST,
-  checklistPath,
   computePhaseProgress,
-  mergeChecklist,
 } from "./phaseChecklist";
 import { loadDeliveryBoard, boardByStatus, DELIVERY_STATUS_LABELS } from "./deliveryBoard";
 import { loadRegister, openBlockers, openRisks } from "./engagementRegister";
@@ -42,9 +40,7 @@ export async function buildWeeklyRollup(project: ProjectMeta): Promise<string> {
 
   let phasePct = 0;
   try {
-    const cl = mergeChecklist(
-      await api.readJson<typeof DEFAULT_CHECKLIST>(checklistPath(project.path)),
-    );
+    const cl = await loadPhaseChecklist(project.path);
     phasePct = computePhaseProgress(cl).overall;
   } catch {
     /* default */

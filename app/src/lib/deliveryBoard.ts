@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { cachedRead, cacheSet, invalidateDashboard, invalidatePortfolio, invalidateProject, projectCacheKey } from "./workspaceStore";
 import type { DeliveryBoard, DeliveryCard, DeliveryStatus } from "../types";
 
 export const DELIVERY_STATUSES: DeliveryStatus[] = [
@@ -38,12 +39,14 @@ export function emptyBoard(): DeliveryBoard {
 }
 
 export async function loadDeliveryBoard(projectPath: string): Promise<DeliveryBoard> {
-  try {
-    const data = await api.readJson<DeliveryBoard>(deliveryBoardPath(projectPath));
-    return { cards: data.cards ?? [] };
-  } catch {
-    return emptyBoard();
-  }
+  return cachedRead(projectCacheKey(projectPath, "deliveryBoard"), async () => {
+    try {
+      const data = await api.readJson<DeliveryBoard>(deliveryBoardPath(projectPath));
+      return { cards: data.cards ?? [] };
+    } catch {
+      return emptyBoard();
+    }
+  });
 }
 
 export async function saveDeliveryBoard(
@@ -51,6 +54,10 @@ export async function saveDeliveryBoard(
   board: DeliveryBoard,
 ): Promise<void> {
   await api.writeJson(deliveryBoardPath(projectPath), board);
+  cacheSet(projectCacheKey(projectPath, "deliveryBoard"), board);
+  invalidateProject(projectPath, "architecture");
+  invalidateDashboard();
+  invalidatePortfolio();
 }
 
 export function boardByStatus(board: DeliveryBoard): Record<DeliveryStatus, DeliveryCard[]> {

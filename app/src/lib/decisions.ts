@@ -54,6 +54,33 @@ export async function loadDecisions(projectPath: string): Promise<DecisionSummar
   return decisions.sort((a, b) => a.number - b.number);
 }
 
+/** Lightweight ADR index for timeline — parses filenames only, no file reads. */
+export async function listDecisionSummaries(projectPath: string): Promise<DecisionSummary[]> {
+  const adrDir = `${projectPath}/02-design/adrs`;
+  let files: { name: string; path: string }[] = [];
+  try {
+    const entries = await api.listDirectory(adrDir, false);
+    files = entries.filter((e) => !e.is_dir && e.name.endsWith(".md"));
+  } catch {
+    return [];
+  }
+
+  const decisions: DecisionSummary[] = [];
+  for (const f of files) {
+    const parsed = parseAdrFilename(f.name);
+    if (!parsed) continue;
+    decisions.push({
+      number: parsed.number,
+      title: parsed.slug.replace(/-/g, " "),
+      status: "",
+      date: "",
+      path: f.path,
+    });
+  }
+
+  return decisions.sort((a, b) => a.number - b.number);
+}
+
 export function decisionStatusTone(status: string): string {
   const s = status.toLowerCase();
   if (s.includes("accept")) return "text-emerald-400";

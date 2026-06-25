@@ -1,11 +1,12 @@
 import { Contact2, Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   emptyTeamMember,
   kindLabel,
   loadProjectUsers,
   saveProjectUsers,
 } from "../../lib/projectUsers";
+import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
 import type { ProjectMeta, ProjectUser } from "../../types";
 import { Field, PrimaryButton, TextInput } from "../forms/FormField";
 import { OrganizationSelect } from "../OrganizationSelect";
@@ -20,9 +21,12 @@ export function ProjectUsersView({ project }: ProjectUsersViewProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const usersRef = useRef<ProjectUser[]>([]);
+  usersRef.current = users;
 
   const load = useCallback(async () => {
     const list = await loadProjectUsers(project.path);
+    usersRef.current = list;
     setUsers(list);
     setSelectedId((current) => current ?? list.find((u) => u.kind === "team")?.id ?? list[0]?.id ?? null);
   }, [project.path]);
@@ -31,30 +35,40 @@ export function ProjectUsersView({ project }: ProjectUsersViewProps) {
     load();
   }, [load]);
 
-  const persist = async (next: ProjectUser[]) => {
-    setUsers(next);
-    setSaving(true);
-    setMessage("");
-    try {
-      await saveProjectUsers(project.path, next);
-      setMessage("Saved to engagement.json");
-      setTimeout(() => setMessage(""), 2500);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { schedule: scheduleSave, flushNow: flushSave } = useDebouncedPersist<ProjectUser[]>({
+    save: (next) => saveProjectUsers(project.path, next),
+    onSavingChange: setSaving,
+  });
+
+  const applyUsers = useCallback(
+    (next: ProjectUser[], immediate = false) => {
+      usersRef.current = next;
+      setUsers(next);
+      if (immediate) {
+        void flushSave(next).then(() => {
+          setMessage("Saved to engagement.json");
+          setTimeout(() => setMessage(""), 2500);
+        });
+      } else {
+        scheduleSave(next);
+      }
+    },
+    [flushSave, scheduleSave],
+  );
 
   const selected = users.find((u) => u.id === selectedId) ?? null;
 
   const updateSelected = (patch: Partial<ProjectUser>) => {
     if (!selected) return;
     if (selected.stakeholderId && patch.name !== undefined) return;
-    persist(users.map((u) => (u.id === selected.id ? { ...u, ...patch } : u)));
+    applyUsers(
+      usersRef.current.map((u) => (u.id === selected.id ? { ...u, ...patch } : u)),
+    );
   };
 
   const addTeamMember = () => {
     const member = emptyTeamMember();
-    persist([...users, member]);
+    applyUsers([...usersRef.current, member], true);
     setSelectedId(member.id);
   };
 
@@ -63,8 +77,8 @@ export function ProjectUsersView({ project }: ProjectUsersViewProps) {
     if (selected.stakeholderId && selected.kind !== "team") {
       if (!confirm("Remove this stakeholder from the user list? They remain on the stakeholder map.")) return;
     }
-    const next = users.filter((u) => u.id !== selected.id);
-    persist(next);
+    const next = usersRef.current.filter((u) => u.id !== selected.id);
+    applyUsers(next, true);
     setSelectedId(next[0]?.id ?? null);
   };
 

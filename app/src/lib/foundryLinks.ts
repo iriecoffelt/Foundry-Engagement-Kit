@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { loadEngagementJson, saveEngagementJson } from "./engagementData";
 
 export type FoundryLinkableNodeType =
   | "dataset"
@@ -41,22 +41,14 @@ export function stackUrlFromEngagement(eng: Record<string, unknown> | null): str
 }
 
 export async function loadProjectStackUrl(projectPath: string): Promise<string> {
-  try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    return stackUrlFromEngagement(eng);
-  } catch {
-    return "";
-  }
+  const eng = await loadEngagementJson(projectPath);
+  return stackUrlFromEngagement(eng);
 }
 
 export async function saveProjectStackUrl(projectPath: string, url: string): Promise<void> {
   const foundryStackUrl = normalizeStackUrl(url);
-  try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    await api.writeJson(`${projectPath}/engagement.json`, { ...eng, foundryStackUrl });
-  } catch {
-    await api.writeJson(`${projectPath}/engagement.json`, { foundryStackUrl });
-  }
+  const eng = await loadEngagementJson(projectPath);
+  await saveEngagementJson(projectPath, { ...eng, foundryStackUrl });
 }
 
 const LINK_HINTS: Record<FoundryLinkableNodeType, string> = {

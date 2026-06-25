@@ -1,4 +1,6 @@
 import { Calendar, CalendarDays, FolderKanban, Sparkles, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { loadDashboardSnapshot, type DashboardSnapshot } from "../lib/dashboardSnapshot";
 import type { ProjectMeta, Section } from "../types";
 import { CadenceAlerts } from "./CadenceAlerts";
 import { InsightsPanel } from "./insights/InsightsPanel";
@@ -11,6 +13,7 @@ import { TodayPanel } from "./today/TodayPanel";
 
 interface DashboardProps {
   projects: ProjectMeta[];
+  refreshKey?: number;
   onNavigate: (section: Section) => void;
   onStartStandup: () => void;
   onStartWeekly: () => void;
@@ -22,6 +25,7 @@ interface DashboardProps {
 
 export function Dashboard({
   projects,
+  refreshKey = 0,
   onNavigate,
   onStartStandup,
   onStartWeekly,
@@ -30,6 +34,26 @@ export function Dashboard({
   onOpenRecent,
   onOpenProject,
 }: DashboardProps) {
+  const projectKey = useMemo(
+    () => projects.map((p) => p.slug).sort().join(","),
+    [projects],
+  );
+  const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!projects.length) {
+      setSnapshot(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    loadDashboardSnapshot(projects).then((data) => {
+      setSnapshot(data);
+      setLoading(false);
+    });
+  }, [projectKey, projects, refreshKey]);
+
   return (
     <div className="h-full overflow-y-auto p-8">
       <div className="mx-auto max-w-3xl">
@@ -47,12 +71,17 @@ export function Dashboard({
         </div>
 
         <CadenceAlerts
-          projects={projects}
+          alerts={snapshot?.cadenceAlerts ?? []}
           onStartStandup={onStartStandup}
           onStartWeekly={onStartWeekly}
         />
 
-        <TodayPanel projects={projects} onOpenProject={onOpenProject} />
+        <TodayPanel
+          projects={projects}
+          items={snapshot?.todayItems}
+          loading={loading}
+          onOpenProject={onOpenProject}
+        />
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <ActionCard
@@ -120,7 +149,11 @@ export function Dashboard({
           )}
         </div>
 
-        <InsightsPanel projects={projects} onOpenProject={onOpenProject} />
+        <InsightsPanel
+          projects={projects}
+          insights={snapshot?.insights ?? null}
+          onOpenProject={onOpenProject}
+        />
 
         <RecentActivity onOpen={onOpenRecent} />
       </div>

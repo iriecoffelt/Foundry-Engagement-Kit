@@ -1,21 +1,13 @@
 import { AlertCircle, Calendar, CalendarDays } from "lucide-react";
-import { useEffect, useState } from "react";
-import { getCadenceAlerts, type CadenceAlert } from "../lib/cadence";
-import type { ProjectMeta } from "../types";
+import type { CadenceAlert } from "../lib/cadence";
 
 interface CadenceAlertsProps {
-  projects: ProjectMeta[];
+  alerts: CadenceAlert[];
   onStartStandup: () => void;
   onStartWeekly: () => void;
 }
 
-export function CadenceAlerts({ projects, onStartStandup, onStartWeekly }: CadenceAlertsProps) {
-  const [alerts, setAlerts] = useState<CadenceAlert[]>([]);
-
-  useEffect(() => {
-    getCadenceAlerts(projects).then(setAlerts);
-  }, [projects]);
-
+export function CadenceAlerts({ alerts, onStartStandup, onStartWeekly }: CadenceAlertsProps) {
   if (alerts.length === 0) return null;
 
   return (

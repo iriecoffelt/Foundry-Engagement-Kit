@@ -11,6 +11,12 @@ import {
 import { getCadenceAlerts } from "./lib/cadence";
 import { startCadenceNotificationPoller } from "./lib/notifications";
 import { trackRecent } from "./lib/recent";
+import { subscribeEngagementSaved } from "./lib/engagementData";
+import {
+  projectMetaPatchFromEngagement,
+  slugFromProjectPath,
+} from "./lib/engagementMeta";
+import { invalidateDashboard, invalidatePortfolio } from "./lib/workspaceStore";
 import type { OpenFile, ProjectMeta, Section } from "./types";
 import { Dashboard } from "./components/Dashboard";
 import { Editor } from "./components/Editor";
@@ -138,9 +144,23 @@ const AppMain = memo(function AppMain() {
   }, [refresh, refreshKey]);
 
   useEffect(() => {
-    if (!projects.length) return;
+    return subscribeEngagementSaved((projectPath, eng) => {
+      const slug = slugFromProjectPath(projectPath);
+      const patch = projectMetaPatchFromEngagement(eng);
+      if (Object.keys(patch).length === 0) return;
+      setProjects((prev) => prev.map((p) => (p.slug === slug ? { ...p, ...patch } : p)));
+    });
+  }, []);
+
+  const projectSlugs = useMemo(
+    () => projects.map((p) => p.slug).sort().join(","),
+    [projects],
+  );
+
+  useEffect(() => {
+    if (!projectSlugs) return;
     return startCadenceNotificationPoller(() => getCadenceAlerts(projects));
-  }, [projects]);
+  }, [projectSlugs, projects]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -168,7 +188,11 @@ const AppMain = memo(function AppMain() {
     }
   };
 
-  const bump = () => setRefreshKey((k) => k + 1);
+  const bump = () => {
+    invalidateDashboard();
+    invalidatePortfolio();
+    setRefreshKey((k) => k + 1);
+  };
 
   return (
     <div className="flex h-screen bg-surface-base">
@@ -207,6 +231,7 @@ const AppMain = memo(function AppMain() {
           {section === "home" && (
             <Dashboard
               projects={projects}
+              refreshKey={refreshKey}
               onNavigate={goToSection}
               onStartStandup={() => {
                 navigate({ section: "daily" });
@@ -231,11 +256,16 @@ const AppMain = memo(function AppMain() {
 
           <Suspense fallback={<SectionFallback />}>
             {section === "portfolio" && (
-              <PortfolioHub projects={projects} onOpenProject={openProject} />
+              <PortfolioHub
+                projects={projects}
+                refreshKey={refreshKey}
+                onOpenProject={openProject}
+              />
             )}
 
             {section === "projects" && (
               <ProjectsHub
+                projects={projects}
                 startWizard={projectsAutoWizard}
                 onWizardConsumed={() => setProjectsAutoWizard(false)}
                 onRefresh={bump}
@@ -248,6 +278,7 @@ const AppMain = memo(function AppMain() {
 
             {section === "daily" && (
               <DailyHub
+                projects={projects}
                 startWizard={dailyAutoStart}
                 onWizardConsumed={() => setDailyAutoStart(false)}
                 onRefresh={bump}
@@ -256,6 +287,7 @@ const AppMain = memo(function AppMain() {
 
             {section === "weekly" && (
               <WeeklyHub
+                projects={projects}
                 startWizard={weeklyAutoStart}
                 startSyncWizard={syncAutoStart}
                 onWizardConsumed={() => {
@@ -307,7 +339,7 @@ const AppMain = memo(function AppMain() {
       )}
 
       {!workspaceReady && (
-        <div className="pointer-events-none fixed inset-0 z-40 bg-surface-base/80 backdrop-blur-sm" />
+        <div className="pointer-events-none fixed inset-0 z-40 bg-surface-base/90" />
       )}
 
       <WorkspaceSetupModal

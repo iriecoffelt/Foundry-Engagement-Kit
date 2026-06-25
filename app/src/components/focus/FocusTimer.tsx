@@ -108,7 +108,7 @@ export function FocusTimer({ projects, onExit }: FocusTimerProps) {
       )}
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-12">
-        <div className="mb-8 flex gap-2 rounded-full bg-surface-raised/60 p-1 backdrop-blur-sm">
+        <div className="mb-8 flex gap-2 rounded-full bg-surface-raised/80 p-1">
           {(["focus", "shortBreak", "longBreak"] as const).map((type) => (
             <button
               key={type}
@@ -223,7 +223,7 @@ export function FocusTimer({ projects, onExit }: FocusTimerProps) {
       </main>
 
       {showSettings && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60">
           <div className="w-full max-w-md rounded-2xl border border-surface-border-strong bg-surface-raised p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-fg-primary">Timer settings</h3>

@@ -1,17 +1,19 @@
 import { api } from "./api";
+import { loadPhaseChecklist } from "./checklistData";
 import {
   DEFAULT_CHECKLIST,
-  checklistPath,
   computeHandoffReadiness,
   computePhaseProgress,
-  mergeChecklist,
   PHASE_LABELS,
   type PhaseChecklist,
 } from "./phaseChecklist";
 import type { EngagementStatus, ProjectMeta } from "../types";
+import { loadEngagementJson } from "./engagementData";
+import { normalizeEngagementStatus } from "./engagementMeta";
 import { loadRegister, openBlockers, openRisks } from "./engagementRegister";
 import { loadDeliveryBoard } from "./deliveryBoard";
 import { uatProgress, loadUatScenarios } from "./uatScenarios";
+import { cachedRead } from "./workspaceStore";
 
 export interface ProjectPortfolioRow {
   project: ProjectMeta;
@@ -23,6 +25,7 @@ export interface ProjectPortfolioRow {
   blockedCards: number;
   uatPercent: number;
   currentPhase: string;
+  currentPhaseStatus: EngagementStatus;
 }
 
 export interface PortfolioSummary {
@@ -33,80 +36,74 @@ export interface PortfolioSummary {
   totalOpenBlockers: number;
 }
 
-export async function loadPortfolioSummary(
-  projects: ProjectMeta[],
-): Promise<PortfolioSummary> {
-  const rows: ProjectPortfolioRow[] = [];
-  const phaseCounts: Record<string, number> = {};
-  const overdueMilestones: PortfolioSummary["overdueMilestones"] = [];
-  const today = new Date().toISOString().slice(0, 10);
+async function loadProjectPortfolioRow(
+  project: ProjectMeta,
+  today: string,
+): Promise<{
+  row: ProjectPortfolioRow;
+  phaseStatus: EngagementStatus;
+  overdueMilestones: PortfolioSummary["overdueMilestones"];
+}> {
+  let checklist: PhaseChecklist = DEFAULT_CHECKLIST;
+  try {
+    checklist = await loadPhaseChecklist(project.path);
+  } catch {
+    /* default */
+  }
 
-  for (const project of projects) {
-    let checklist: PhaseChecklist = DEFAULT_CHECKLIST;
-    try {
-      checklist = mergeChecklist(
-        await api.readJson<PhaseChecklist>(checklistPath(project.path)),
-      );
-    } catch {
-      /* default */
-    }
+  const progress = computePhaseProgress(checklist);
 
-    const progress = computePhaseProgress(checklist);
-    const status = (project.status as EngagementStatus) || "discovery";
-    phaseCounts[status] = (phaseCounts[status] || 0) + 1;
+  let status = normalizeEngagementStatus(project.status);
+  let overdue = 0;
+  const projectOverdue: PortfolioSummary["overdueMilestones"] = [];
 
-    let handoffScore = 0;
-    try {
-      const hasRunbook = await api
-        .readFile(`${project.path}/04-deploy/runbook.md`)
-        .then(() => true)
-        .catch(() => false);
-      const hasHandoff = await api
-        .readFile(`${project.path}/05-handoff/handoff.md`)
-        .then(() => true)
-        .catch(() => false);
-      let uploadCount = 0;
-      try {
-        const refs = await api.listDirectory(`${project.path}/references`, false);
-        uploadCount = refs.filter((f) => !f.is_dir).length;
-      } catch {
-        /* none */
+  try {
+    const eng = await loadEngagementJson(project.path);
+    status = normalizeEngagementStatus(String(eng.status ?? ""), status);
+    const milestones =
+      (eng.milestones as { name: string; targetDate: string; status: string }[]) ?? [];
+    for (const m of milestones) {
+      if (m.status !== "done" && m.targetDate && m.targetDate < today) {
+        overdue += 1;
+        projectOverdue.push({
+          project: project.display_name,
+          projectSlug: project.slug,
+          name: m.name,
+          date: m.targetDate,
+        });
       }
-      handoffScore = computeHandoffReadiness(
-        checklist,
-        hasRunbook,
-        hasHandoff,
-        uploadCount,
-      ).score;
-    } catch {
-      /* skip */
     }
+  } catch {
+    /* no engagement.json */
+  }
 
-    let overdue = 0;
-    try {
-      const eng = await api.readJson<{ milestones?: { name: string; targetDate: string; status: string }[] }>(
-        `${project.path}/engagement.json`,
-      );
-      for (const m of eng.milestones || []) {
-        if (m.status !== "done" && m.targetDate && m.targetDate < today) {
-          overdue += 1;
-          overdueMilestones.push({
-            project: project.display_name,
-            projectSlug: project.slug,
-            name: m.name,
-            date: m.targetDate,
-          });
-        }
-      }
-    } catch {
-      /* no milestones */
-    }
+  let handoffScore = 0;
+  try {
+    const [hasRunbook, hasHandoff, refs] = await Promise.all([
+      api.readFile(`${project.path}/04-deploy/runbook.md`).then(
+        () => true,
+        () => false,
+      ),
+      api.readFile(`${project.path}/05-handoff/handoff.md`).then(
+        () => true,
+        () => false,
+      ),
+      api.listDirectory(`${project.path}/references`, false).catch(() => []),
+    ]);
+    const uploadCount = refs.filter((f) => !f.is_dir).length;
+    handoffScore = computeHandoffReadiness(checklist, hasRunbook, hasHandoff, uploadCount).score;
+  } catch {
+    /* skip */
+  }
 
-    const register = await loadRegister(project.path);
-    const board = await loadDeliveryBoard(project.path);
-    const uat = await loadUatScenarios(project.path);
+  const [register, board, uat] = await Promise.all([
+    loadRegister(project.path),
+    loadDeliveryBoard(project.path),
+    loadUatScenarios(project.path),
+  ]);
 
-    rows.push({
+  return {
+    row: {
       project,
       phaseProgress: progress.overall,
       handoffScore,
@@ -115,12 +112,37 @@ export async function loadPortfolioSummary(
       openRisks: openRisks(register).length,
       blockedCards: board.cards.filter((c) => c.status === "blocked").length,
       uatPercent: uatProgress(uat).percent,
-      currentPhase: PHASE_LABELS[status] || project.status,
-    });
+      currentPhase: PHASE_LABELS[status],
+      currentPhaseStatus: status,
+    },
+    phaseStatus: status,
+    overdueMilestones: projectOverdue,
+  };
+}
+
+async function buildPortfolioSummary(projects: ProjectMeta[]): Promise<PortfolioSummary> {
+  const today = new Date().toISOString().slice(0, 10);
+  const results = await Promise.all(projects.map((p) => loadProjectPortfolioRow(p, today)));
+
+  const rows = results.map((r) => r.row);
+  const phaseCounts: Record<string, number> = {};
+  for (const { phaseStatus } of results) {
+    phaseCounts[phaseStatus] = (phaseCounts[phaseStatus] || 0) + 1;
   }
 
+  const overdueMilestones = results.flatMap((r) => r.overdueMilestones);
   const lowHandoff = rows.filter((r) => r.handoffScore < 50).sort((a, b) => a.handoffScore - b.handoffScore);
   const totalOpenBlockers = rows.reduce((n, r) => n + r.openBlockers, 0);
 
   return { projects: rows, phaseCounts, lowHandoff, overdueMilestones, totalOpenBlockers };
+}
+
+export async function loadPortfolioSummary(
+  projects: ProjectMeta[],
+): Promise<PortfolioSummary> {
+  const slugKey = projects
+    .map((p) => p.slug)
+    .sort()
+    .join(",");
+  return cachedRead(`portfolio::${slugKey}`, () => buildPortfolioSummary(projects));
 }

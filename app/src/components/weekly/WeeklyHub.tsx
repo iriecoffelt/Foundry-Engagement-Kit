@@ -2,6 +2,7 @@ import { CalendarDays, Copy, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { copyToClipboard } from "../../lib/customerSummary";
+import { listWeeklyDocsByProject } from "../../lib/hubListings";
 import { buildPortfolioWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
 import type { FileEntry, ProjectMeta } from "../../types";
@@ -20,6 +21,7 @@ import { CustomerSyncWizard } from "../wizards/CustomerSyncWizard";
 import { WeeklyReviewWizard } from "../wizards/WeeklyReviewWizard";
 
 interface WeeklyHubProps {
+  projects: ProjectMeta[];
   onRefresh: () => void;
   startWizard?: boolean;
   startSyncWizard?: boolean;
@@ -34,6 +36,7 @@ function formatWeeklyLabel(name: string): string {
 }
 
 export function WeeklyHub({
+  projects,
   onRefresh,
   startWizard,
   startSyncWizard,
@@ -41,7 +44,6 @@ export function WeeklyHub({
 }: WeeklyHubProps) {
   const [showReviewWizard, setShowReviewWizard] = useState(false);
   const [showSyncWizard, setShowSyncWizard] = useState(false);
-  const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [groups, setGroups] = useState<{ project: string; label: string; entries: FileEntry[] }[]>(
     [],
   );
@@ -58,26 +60,15 @@ export function WeeklyHub({
   };
 
   const load = useCallback(async () => {
-    const projs = await api.listProjectsWithMeta();
-    setProjects(projs);
-    const entries = await api.listDirectory("weekly", true);
-    const byProject: Record<string, FileEntry[]> = {};
-
-    for (const entry of entries) {
-      if (entry.is_dir) {
-        const files = entry.children?.filter((c) => c.name.endsWith(".md")) || [];
-        if (files.length) byProject[entry.name] = files;
-      }
-    }
-
+    const byProject = await listWeeklyDocsByProject(projects);
     setGroups(
-      projs.map((p) => ({
+      projects.map((p) => ({
         project: p.slug,
         label: p.display_name,
         entries: (byProject[p.slug] || []).sort((a, b) => b.name.localeCompare(a.name)),
       })),
     );
-  }, []);
+  }, [projects]);
 
   useEffect(() => {
     load();

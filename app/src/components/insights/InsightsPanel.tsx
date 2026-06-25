@@ -1,23 +1,16 @@
 import type { ReactNode } from "react";
 import { AlertTriangle, Ban, CalendarClock, TrendingUp } from "lucide-react";
-import { useEffect, useState } from "react";
-import { loadWorkspaceInsights, type WorkspaceInsights } from "../../lib/insights";
+import type { WorkspaceInsights } from "../../lib/insights";
 import type { ProjectMeta } from "../../types";
 import type { ProjectTab } from "../projects/ProjectWorkspaceHeader";
 
 interface InsightsPanelProps {
   projects: ProjectMeta[];
+  insights: WorkspaceInsights | null;
   onOpenProject?: (slug: string, tab?: ProjectTab) => void;
 }
 
-export function InsightsPanel({ projects, onOpenProject }: InsightsPanelProps) {
-  const [insights, setInsights] = useState<WorkspaceInsights | null>(null);
-
-  useEffect(() => {
-    if (!projects.length) return;
-    loadWorkspaceInsights(projects).then(setInsights);
-  }, [projects]);
-
+export function InsightsPanel({ projects, insights, onOpenProject }: InsightsPanelProps) {
   if (!insights || !projects.length) return null;
 
   const hasContent =

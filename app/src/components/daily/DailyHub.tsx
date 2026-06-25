@@ -1,6 +1,7 @@
 import { Calendar, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { listDailyStandupsByProject } from "../../lib/hubListings";
 import type { FileEntry, ProjectMeta } from "../../types";
 import { PrimaryButton, SecondaryButton } from "../forms/FormField";
 import {
@@ -16,6 +17,7 @@ import { MarkdownPreview } from "../MarkdownPreview";
 import { StandupWizard } from "../wizards/StandupWizard";
 
 interface DailyHubProps {
+  projects: ProjectMeta[];
   onRefresh: () => void;
   startWizard?: boolean;
   onWizardConsumed?: () => void;
@@ -25,39 +27,36 @@ function formatStandupLabel(path: string): string {
   return path.split("/").pop()?.replace("-standup.md", "").replace(".md", "") ?? path;
 }
 
-export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubProps) {
+export function DailyHub({ projects, onRefresh, startWizard, onWizardConsumed }: DailyHubProps) {
   const [showWizard, setShowWizard] = useState(false);
   const [editPath, setEditPath] = useState<string | null>(null);
   const [editMarkdown, setEditMarkdown] = useState<string | undefined>();
-  const [projects, setProjects] = useState<ProjectMeta[]>([]);
   const [groups, setGroups] = useState<{ project: string; entries: FileEntry[] }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [content, setContent] = useState("");
 
-  const load = useCallback(async () => {
-    const projs = await api.listProjectsWithMeta();
-    setProjects(projs);
-    const entries = await api.listDirectory("daily", true);
-    const byProject: Record<string, FileEntry[]> = {};
+  const projectNames = useCallback(
+    () => Object.fromEntries(projects.map((p) => [p.slug, p.display_name])),
+    [projects],
+  );
 
-    for (const entry of entries) {
-      if (entry.is_dir) {
-        const files = entry.children?.filter((c) => c.name.endsWith(".md")) || [];
-        if (files.length) byProject[entry.name] = files;
-      } else if (entry.name.endsWith(".md") && entry.name !== "standup.md") {
-        byProject["_general"] = [...(byProject["_general"] || []), entry];
-      }
-    }
+  const load = useCallback(async () => {
+    const byProject = await listDailyStandupsByProject(projects);
+    const names = projectNames();
 
     setGroups(
       Object.entries(byProject)
-        .map(([project, ents]) => ({
+        .map(([project, entries]) => ({
           project,
-          entries: ents.sort((a, b) => b.name.localeCompare(a.name)),
+          entries: entries.sort((a, b) => b.name.localeCompare(a.name)),
         }))
-        .sort((a, b) => a.project.localeCompare(b.project)),
+        .sort((a, b) => {
+          const labelA = a.project === "_general" ? "General" : names[a.project] ?? a.project;
+          const labelB = b.project === "_general" ? "General" : names[b.project] ?? b.project;
+          return labelA.localeCompare(labelB);
+        }),
     );
-  }, []);
+  }, [projects, projectNames]);
 
   useEffect(() => {
     load();
@@ -90,6 +89,8 @@ export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubP
     setEditPath(null);
     setEditMarkdown(undefined);
   };
+
+  const names = projectNames();
 
   if (showWizard) {
     return (
@@ -140,7 +141,7 @@ export function DailyHub({ onRefresh, startWizard, onWizardConsumed }: DailyHubP
           groups.map((g) => (
             <HubSection
               key={g.project}
-              label={g.project === "_general" ? "General" : g.project}
+              label={g.project === "_general" ? "General" : names[g.project] ?? g.project}
             >
               {g.entries.map((e) => (
                 <HubItem
