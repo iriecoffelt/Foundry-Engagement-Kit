@@ -154,7 +154,7 @@ export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
                       <p className="text-amber-500">{row.overdueMilestones} overdue</p>
                     )}
                   </div>
-                  <StatusBadge status={row.project.status} />
+                  <StatusBadge status={row.currentPhaseStatus} />
                 </div>
               </button>
             ))}

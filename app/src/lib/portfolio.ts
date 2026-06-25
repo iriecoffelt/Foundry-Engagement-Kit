@@ -9,6 +9,7 @@ import {
   type PhaseChecklist,
 } from "./phaseChecklist";
 import type { EngagementStatus, ProjectMeta } from "../types";
+import { normalizeEngagementStatus } from "./engagementMeta";
 import { loadRegister, openBlockers, openRisks } from "./engagementRegister";
 import { loadDeliveryBoard } from "./deliveryBoard";
 import { uatProgress, loadUatScenarios } from "./uatScenarios";
@@ -23,6 +24,7 @@ export interface ProjectPortfolioRow {
   blockedCards: number;
   uatPercent: number;
   currentPhase: string;
+  currentPhaseStatus: EngagementStatus;
 }
 
 export interface PortfolioSummary {
@@ -52,7 +54,30 @@ export async function loadPortfolioSummary(
     }
 
     const progress = computePhaseProgress(checklist);
-    const status = (project.status as EngagementStatus) || "discovery";
+
+    let status = normalizeEngagementStatus(project.status);
+    let overdue = 0;
+    try {
+      const eng = await api.readJson<{
+        status?: string;
+        milestones?: { name: string; targetDate: string; status: string }[];
+      }>(`${project.path}/engagement.json`);
+      status = normalizeEngagementStatus(eng.status, status);
+      for (const m of eng.milestones || []) {
+        if (m.status !== "done" && m.targetDate && m.targetDate < today) {
+          overdue += 1;
+          overdueMilestones.push({
+            project: project.display_name,
+            projectSlug: project.slug,
+            name: m.name,
+            date: m.targetDate,
+          });
+        }
+      }
+    } catch {
+      /* no engagement.json */
+    }
+
     phaseCounts[status] = (phaseCounts[status] || 0) + 1;
 
     let handoffScore = 0;
@@ -82,26 +107,6 @@ export async function loadPortfolioSummary(
       /* skip */
     }
 
-    let overdue = 0;
-    try {
-      const eng = await api.readJson<{ milestones?: { name: string; targetDate: string; status: string }[] }>(
-        `${project.path}/engagement.json`,
-      );
-      for (const m of eng.milestones || []) {
-        if (m.status !== "done" && m.targetDate && m.targetDate < today) {
-          overdue += 1;
-          overdueMilestones.push({
-            project: project.display_name,
-            projectSlug: project.slug,
-            name: m.name,
-            date: m.targetDate,
-          });
-        }
-      }
-    } catch {
-      /* no milestones */
-    }
-
     const register = await loadRegister(project.path);
     const board = await loadDeliveryBoard(project.path);
     const uat = await loadUatScenarios(project.path);
@@ -115,7 +120,8 @@ export async function loadPortfolioSummary(
       openRisks: openRisks(register).length,
       blockedCards: board.cards.filter((c) => c.status === "blocked").length,
       uatPercent: uatProgress(uat).percent,
-      currentPhase: PHASE_LABELS[status] || project.status,
+      currentPhase: PHASE_LABELS[status],
+      currentPhaseStatus: status,
     });
   }
 
