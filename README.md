@@ -32,7 +32,7 @@ npm run tauri:build
 | Linux | `.deb`, `.AppImage`, `.rpm` |
 
 **Download pre-built installers** from [GitHub Releases](https://github.com/iriecoffelt/Foundry-Engagement-Kit/releases) (push a `v*` tag to build all platforms — see [`app/README.md`](app/README.md#github-releases-all-platforms)).
-**MAC Issue On first Launch** If you get an error about the app being corrupt, it just means that mac's gate is blocking it because it is not signed yet. Run this command in terminal and launch the app again. `xattr -cr "/Applications/Foundry Engagement Kit.app"`
+**macOS first launch:** Releases from GitHub are code-signed and notarized — they should open without extra steps. If you built locally without signing and see a “damaged” error, clear the download quarantine: `xattr -cr "/Applications/Foundry Engagement Kit.app"`
 
 ### First launch
 
