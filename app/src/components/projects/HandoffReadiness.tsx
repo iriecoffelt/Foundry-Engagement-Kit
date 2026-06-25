@@ -1,15 +1,15 @@
 import { Archive, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { loadPhaseChecklist } from "../../lib/checklistData";
 import {
   DEFAULT_CHECKLIST,
-  checklistPath,
   computeHandoffReadiness,
-  mergeChecklist,
   type PhaseChecklist,
 } from "../../lib/phaseChecklist";
 import { SecondaryButton } from "../forms/FormField";
 import { HandoffPackModal } from "./HandoffPackModal";
+import { useProjectDataOptional } from "./ProjectDataProvider";
 
 interface HandoffReadinessProps {
   projectPath: string;
@@ -24,6 +24,7 @@ export function HandoffReadiness({
   uploadCount,
   checklistVersion = 0,
 }: HandoffReadinessProps) {
+  const projectData = useProjectDataOptional();
   const [readiness, setReadiness] = useState<{
     score: number;
     items: { label: string; ok: boolean }[];
@@ -32,13 +33,15 @@ export function HandoffReadiness({
 
   useEffect(() => {
     (async () => {
-      let checklist: PhaseChecklist = DEFAULT_CHECKLIST;
-      try {
-        checklist = mergeChecklist(
-          await api.readJson<PhaseChecklist>(checklistPath(projectPath)),
-        );
-      } catch {
-        /* default */
+      if (projectData?.checklist === null) return;
+
+      let checklist: PhaseChecklist = projectData?.checklist ?? DEFAULT_CHECKLIST;
+      if (!projectData) {
+        try {
+          checklist = await loadPhaseChecklist(projectPath);
+        } catch {
+          /* default */
+        }
       }
 
       const hasRunbook = await api
@@ -52,7 +55,7 @@ export function HandoffReadiness({
 
       setReadiness(computeHandoffReadiness(checklist, hasRunbook, hasHandoff, uploadCount));
     })();
-  }, [projectPath, uploadCount, checklistVersion]);
+  }, [projectPath, uploadCount, checklistVersion, projectData?.checklist]);
 
   if (!readiness) return null;
 

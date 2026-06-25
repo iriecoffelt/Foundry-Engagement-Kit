@@ -153,6 +153,29 @@
     @apply card-kit transition duration-150 hover:border-brand-600/35 hover:shadow-card-hover;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .card-kit-interactive,
+    .editor-action,
+    .nav-item {
+      transition: none;
+    }
+
+    .focus-timer-screen {
+      animation: none;
+      background-size: 100% 100%;
+    }
+
+    .focus-timer-orb {
+      animation: none;
+      @apply blur-xl;
+    }
+
+    .focus-floating-pill,
+    .focus-pill-pulse {
+      animation: none;
+    }
+  }
+
   .nav-section-label {
     @apply px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-fg-faint;
   }

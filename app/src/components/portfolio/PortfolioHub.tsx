@@ -8,16 +8,24 @@ import { StatusBadge } from "../StatusBadge";
 
 interface PortfolioHubProps {
   projects: ProjectMeta[];
+  refreshKey?: number;
   onOpenProject: (slug: string, tab?: ProjectTab) => void;
 }
 
-export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
+export function PortfolioHub({ projects, refreshKey = 0, onOpenProject }: PortfolioHubProps) {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
+  const projectKey = projects
+    .map((p) => p.slug)
+    .sort()
+    .join(",");
 
   useEffect(() => {
-    if (!projects.length) return;
+    if (!projects.length) {
+      setSummary(null);
+      return;
+    }
     loadPortfolioSummary(projects).then(setSummary);
-  }, [projects]);
+  }, [projectKey, projects, refreshKey]);
 
   if (!projects.length) {
     return (

@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { loadEngagementJson, saveEngagementJson } from "./engagementData";
 import type { ActionItem } from "../types";
 
 export function newActionId() {
@@ -6,24 +6,16 @@ export function newActionId() {
 }
 
 export async function loadActionItems(projectPath: string): Promise<ActionItem[]> {
-  try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    return (eng.actionItems as ActionItem[]) ?? [];
-  } catch {
-    return [];
-  }
+  const eng = await loadEngagementJson(projectPath);
+  return (eng.actionItems as ActionItem[]) ?? [];
 }
 
 export async function saveActionItems(
   projectPath: string,
   items: ActionItem[],
 ): Promise<void> {
-  try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    await api.writeJson(`${projectPath}/engagement.json`, { ...eng, actionItems: items });
-  } catch {
-    await api.writeJson(`${projectPath}/engagement.json`, { actionItems: items });
-  }
+  const eng = await loadEngagementJson(projectPath);
+  await saveEngagementJson(projectPath, { ...eng, actionItems: items });
 }
 
 export function openActionItems(items: ActionItem[]): ActionItem[] {

@@ -1,5 +1,5 @@
 import { Copy, FolderKanban, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 import type { ProjectMeta } from "../../types";
 import { PrimaryButton } from "../forms/FormField";
@@ -9,6 +9,7 @@ import { ProjectWorkspace } from "./ProjectWorkspace";
 import type { ProjectTab } from "./ProjectWorkspaceHeader";
 
 interface ProjectsHubProps {
+  projects: ProjectMeta[];
   onRefresh: () => void;
   startWizard?: boolean;
   onWizardConsumed?: () => void;
@@ -19,6 +20,7 @@ interface ProjectsHubProps {
 }
 
 export function ProjectsHub({
+  projects,
   onRefresh,
   startWizard,
   onWizardConsumed,
@@ -27,15 +29,12 @@ export function ProjectsHub({
   onOpenProject,
   onBack,
 }: ProjectsHubProps) {
-  const [projects, setProjects] = useState<ProjectMeta[]>([]);
-  const [activeProject, setActiveProject] = useState<ProjectMeta | null>(null);
   const [showWizard, setShowWizard] = useState(false);
 
-  const load = () => api.listProjectsWithMeta().then(setProjects);
-
-  useEffect(() => {
-    load();
-  }, []);
+  const activeProject = useMemo(
+    () => (activeProjectSlug ? projects.find((p) => p.slug === activeProjectSlug) ?? null : null),
+    [activeProjectSlug, projects],
+  );
 
   useEffect(() => {
     if (startWizard) {
@@ -44,24 +43,12 @@ export function ProjectsHub({
     }
   }, [startWizard, onWizardConsumed]);
 
-  useEffect(() => {
-    if (!activeProjectSlug) {
-      setActiveProject(null);
-      return;
-    }
-    api.listProjectsWithMeta().then((list) => {
-      setProjects(list);
-      setActiveProject(list.find((p) => p.slug === activeProjectSlug) ?? null);
-    });
-  }, [activeProjectSlug]);
-
   const cloneProject = async (p: ProjectMeta, e: { stopPropagation: () => void }) => {
     e.stopPropagation();
     const name = prompt("Name for cloned engagement:", `${p.display_name} (copy)`);
     if (!name?.trim()) return;
     try {
       await api.cloneProject(p.path, name);
-      load();
       onRefresh();
     } catch (err) {
       alert(String(err));
@@ -75,11 +62,8 @@ export function ProjectsHub({
         onComplete={(path) => {
           setShowWizard(false);
           onRefresh();
-          api.listProjectsWithMeta().then((list) => {
-            const slug = path.replace("project/", "");
-            const created = list.find((x) => x.slug === slug);
-            if (created) onOpenProject(created.slug);
-          });
+          const slug = path.replace("project/", "");
+          onOpenProject(slug);
         }}
       />
     );

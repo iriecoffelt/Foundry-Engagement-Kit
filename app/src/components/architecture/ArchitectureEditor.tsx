@@ -316,7 +316,7 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
           {
             ...connection,
             id: `e-${Date.now()}`,
-            animated: true,
+            animated: false,
             style: { stroke: "#64748b" },
             labelStyle: { fill: "#94a3b8", fontSize: 11 },
             labelBgStyle: { fill: "#0f172a", fillOpacity: 0.85 },
@@ -515,12 +515,15 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
       ? foundryLinkPlaceholder(String(selectedNode.data.nodeType) as Parameters<typeof foundryLinkPlaceholder>[0])
       : "Foundry URL or RID";
 
-  const contextValue: ArchEditorContextValue = {
-    stackUrl,
-    typeById,
-    deliveryByNodeId,
-    onOpenDelivery,
-  };
+  const contextValue = useMemo<ArchEditorContextValue>(
+    () => ({
+      stackUrl,
+      typeById,
+      deliveryByNodeId,
+      onOpenDelivery,
+    }),
+    [stackUrl, typeById, deliveryByNodeId, onOpenDelivery],
+  );
 
   return (
     <ArchEditorContext.Provider value={contextValue}>

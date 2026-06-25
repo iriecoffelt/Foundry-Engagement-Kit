@@ -1,20 +1,19 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { api } from "../../lib/api";
+import { loadPhaseChecklist, savePhaseChecklist } from "../../lib/checklistData";
 import { updateEngagementStatus } from "../../lib/engagementMeta";
 import {
   DEFAULT_CHECKLIST,
   PHASE_LABELS,
   PHASE_ORDER,
-  checklistPath,
   computePhaseProgress,
-  mergeChecklist,
   newChecklistItemId,
   type PhaseChecklist,
 } from "../../lib/phaseChecklist";
 import { statusBarClass } from "../../lib/engagementStatus";
 import type { EngagementStatus } from "../../types";
 import { SelectInput, TextInput } from "../forms/FormField";
+import { useProjectDataOptional } from "./ProjectDataProvider";
 
 interface PhaseStepperProps {
   projectPath: string;
@@ -31,6 +30,7 @@ export function PhaseStepper({
   onStatusChange,
   onChecklistSaved,
 }: PhaseStepperProps) {
+  const projectData = useProjectDataOptional();
   const onProgressChangeRef = useRef(onProgressChange);
   const onStatusChangeRef = useRef(onStatusChange);
   const onChecklistSavedRef = useRef(onChecklistSaved);
@@ -38,7 +38,9 @@ export function PhaseStepper({
   onStatusChangeRef.current = onStatusChange;
   onChecklistSavedRef.current = onChecklistSaved;
 
-  const [checklist, setChecklist] = useState<PhaseChecklist>(DEFAULT_CHECKLIST);
+  const [localChecklist, setLocalChecklist] = useState<PhaseChecklist | null>(null);
+  const checklist = projectData?.checklist ?? localChecklist ?? DEFAULT_CHECKLIST;
+  const setChecklist = projectData?.setChecklist ?? setLocalChecklist;
   const [activePhase, setActivePhase] = useState<EngagementStatus>(
     (PHASE_ORDER.includes(currentStatus as EngagementStatus)
       ? currentStatus
@@ -54,26 +56,37 @@ export function PhaseStepper({
   }, []);
 
   const load = useCallback(async () => {
+    if (projectData) {
+      if (projectData.checklist) {
+        notifyProgress(projectData.checklist);
+      }
+      return;
+    }
     try {
-      const data = await api.readJson<PhaseChecklist>(checklistPath(projectPath));
-      const merged = mergeChecklist(data);
-      setChecklist(merged);
+      const merged = await loadPhaseChecklist(projectPath);
+      setLocalChecklist(merged);
       notifyProgress(merged);
     } catch {
       const initial = structuredClone(DEFAULT_CHECKLIST);
-      setChecklist(initial);
+      setLocalChecklist(initial);
       notifyProgress(initial);
       try {
-        await api.writeJson(checklistPath(projectPath), initial);
+        await savePhaseChecklist(projectPath, initial);
       } catch {
         /* best effort — will save on first change */
       }
     }
-  }, [projectPath, notifyProgress]);
+  }, [projectPath, notifyProgress, projectData]);
 
   useEffect(() => {
+    if (projectData) {
+      if (projectData.checklist) {
+        notifyProgress(projectData.checklist);
+      }
+      return;
+    }
     load();
-  }, [load]);
+  }, [load, projectData, projectData?.checklist, notifyProgress]);
 
   useEffect(() => {
     const phase = PHASE_ORDER.includes(currentStatus as EngagementStatus)
@@ -87,7 +100,7 @@ export function PhaseStepper({
     notifyProgress(updated);
     setSaving(true);
     try {
-      await api.writeJson(checklistPath(projectPath), updated);
+      await savePhaseChecklist(projectPath, updated);
       onChecklistSavedRef.current?.();
     } finally {
       setSaving(false);
@@ -167,6 +180,14 @@ export function PhaseStepper({
   const progress = computePhaseProgress(checklist);
   const activeIndex = PHASE_ORDER.indexOf(activePhase);
   const phaseItems = checklist.phases[activePhase] || [];
+
+  if (projectData && projectData.checklist === null) {
+    return (
+      <div className="card-kit p-5">
+        <p className="text-sm text-fg-muted">Loading checklist…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="card-kit p-5">

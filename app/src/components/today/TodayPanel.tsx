@@ -1,10 +1,10 @@
 import { ArrowRight, ListTodo } from "lucide-react";
-import { useEffect, useState } from "react";
-import { loadTodayItems } from "../../lib/today";
 import type { ProjectMeta, TodayItem } from "../../types";
 
 interface TodayPanelProps {
   projects: ProjectMeta[];
+  items?: TodayItem[];
+  loading?: boolean;
   onOpenProject?: (slug: string, tab?: string) => void;
 }
 
@@ -23,23 +23,7 @@ const PRIORITY_STYLES: Record<TodayItem["priority"], string> = {
   low: "border-l-surface-border",
 };
 
-export function TodayPanel({ projects, onOpenProject }: TodayPanelProps) {
-  const [items, setItems] = useState<TodayItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!projects.length) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    loadTodayItems(projects).then((list) => {
-      setItems(list);
-      setLoading(false);
-    });
-  }, [projects]);
-
+export function TodayPanel({ projects, items = [], loading = false, onOpenProject }: TodayPanelProps) {
   if (!projects.length) return null;
 
   return (

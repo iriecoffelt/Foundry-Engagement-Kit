@@ -1,5 +1,5 @@
 import { Plus, Trash2, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   emptyStakeholder,
   INFLUENCE_LEVELS,
@@ -14,6 +14,7 @@ import {
   newActionId,
   saveActionItems,
 } from "../../lib/actionItems";
+import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
 import type { ActionItem, ProjectMeta, Stakeholder } from "../../types";
 import {
   Field,
@@ -59,6 +60,8 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
   const [message, setMessage] = useState("");
   const [newActionTitle, setNewActionTitle] = useState("");
   const [newActionAssignee, setNewActionAssignee] = useState("");
+  const stakeholdersRef = useRef<Stakeholder[]>([]);
+  stakeholdersRef.current = stakeholders;
 
   const load = useCallback(async () => {
     const list = await loadStakeholders(project.path, {
@@ -76,67 +79,92 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
     load();
   }, [load]);
 
-  const persist = async (updated: Stakeholder[]) => {
-    setStakeholders(updated);
-    setSaving(true);
-    setMessage("");
-    try {
-      await saveStakeholders(project.path, updated);
-      setMessage("Saved to engagement.json and discovery.md");
-      setTimeout(() => setMessage(""), 2500);
-    } catch (e) {
-      setMessage(String(e));
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { schedule: scheduleStakeholderSave, flushNow: flushStakeholderSave } =
+    useDebouncedPersist<Stakeholder[]>({
+      save: (updated) => saveStakeholders(project.path, updated),
+      onSavingChange: setSaving,
+    });
+
+  const applyStakeholders = useCallback(
+    (updated: Stakeholder[], immediate = false) => {
+      stakeholdersRef.current = updated;
+      setStakeholders(updated);
+      if (immediate) {
+        void flushStakeholderSave(updated).then(() => {
+          setMessage("Saved to engagement.json and discovery.md");
+          setTimeout(() => setMessage(""), 2500);
+        });
+      } else {
+        scheduleStakeholderSave(updated);
+      }
+    },
+    [flushStakeholderSave, scheduleStakeholderSave],
+  );
+
+  const { schedule: scheduleActionSave, flushNow: flushActionSave } = useDebouncedPersist<
+    ActionItem[]
+  >({
+    save: (items) => saveActionItems(project.path, items),
+    onSavingChange: setSaving,
+  });
+
+  const applyActionItems = useCallback(
+    (items: ActionItem[], immediate = false) => {
+      setActionItems(items);
+      if (immediate) {
+        void flushActionSave(items);
+      } else {
+        scheduleActionSave(items);
+      }
+    },
+    [flushActionSave, scheduleActionSave],
+  );
 
   const selected = stakeholders.find((s) => s.id === selectedId) ?? null;
 
   const updateSelected = (patch: Partial<Stakeholder>) => {
     if (!selected?.id) return;
-    const updated = stakeholders.map((s) => (s.id === selected.id ? { ...s, ...patch } : s));
-    persist(updated);
+    const updated = stakeholdersRef.current.map((s) =>
+      s.id === selected.id ? { ...s, ...patch } : s,
+    );
+    applyStakeholders(updated);
   };
 
   const addPerson = () => {
     const person = emptyStakeholder();
-    const updated = [...stakeholders, person];
+    const updated = [...stakeholdersRef.current, person];
     setSelectedId(person.id ?? null);
-    persist(updated);
+    applyStakeholders(updated, true);
   };
 
   const removeSelected = () => {
     if (!selected?.id) return;
-    const updated = stakeholders.filter((s) => s.id !== selected.id);
+    const updated = stakeholdersRef.current.filter((s) => s.id !== selected.id);
     setSelectedId(updated[0]?.id ?? null);
-    persist(updated);
+    applyStakeholders(updated, true);
   };
 
-  const persistActions = async (items: ActionItem[]) => {
-    setActionItems(items);
-    setSaving(true);
-    try {
-      await saveActionItems(project.path, items);
-    } finally {
-      setSaving(false);
-    }
+  const persistActions = (items: ActionItem[], immediate = false) => {
+    applyActionItems(items, immediate);
   };
 
   const addAction = () => {
     const title = newActionTitle.trim();
     if (!title) return;
-    persistActions([
-      ...actionItems,
-      {
-        id: newActionId(),
-        title,
-        assignee: newActionAssignee.trim() || selected?.name || "",
-        stakeholderId: selected?.id,
-        status: "open",
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+    persistActions(
+      [
+        ...actionItems,
+        {
+          id: newActionId(),
+          title,
+          assignee: newActionAssignee.trim() || selected?.name || "",
+          stakeholderId: selected?.id,
+          status: "open",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      true,
+    );
     setNewActionTitle("");
     setNewActionAssignee("");
   };
@@ -153,6 +181,7 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
             }
           : a,
       ),
+      true,
     );
   };
 

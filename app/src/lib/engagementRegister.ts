@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { cachedRead, cacheSet, invalidateDashboard, invalidatePortfolio, projectCacheKey } from "./workspaceStore";
 import type { BlockerEntry, EngagementRegister, RiskEntry, StandupData, WeeklyReviewData } from "../types";
 
 export function registerPath(projectPath: string) {
@@ -14,15 +15,17 @@ export function emptyRegister(): EngagementRegister {
 }
 
 export async function loadRegister(projectPath: string): Promise<EngagementRegister> {
-  try {
-    const data = await api.readJson<EngagementRegister>(registerPath(projectPath));
-    return {
-      blockers: data.blockers ?? [],
-      risks: data.risks ?? [],
-    };
-  } catch {
-    return emptyRegister();
-  }
+  return cachedRead(projectCacheKey(projectPath, "register"), async () => {
+    try {
+      const data = await api.readJson<EngagementRegister>(registerPath(projectPath));
+      return {
+        blockers: data.blockers ?? [],
+        risks: data.risks ?? [],
+      };
+    } catch {
+      return emptyRegister();
+    }
+  });
 }
 
 export async function saveRegister(
@@ -30,6 +33,9 @@ export async function saveRegister(
   register: EngagementRegister,
 ): Promise<void> {
   await api.writeJson(registerPath(projectPath), register);
+  cacheSet(projectCacheKey(projectPath, "register"), register);
+  invalidateDashboard();
+  invalidatePortfolio();
 }
 
 function normalizeLikelihood(v: string): "Low" | "Medium" | "High" {

@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { loadEngagementJson, saveEngagementJson } from "./engagementData";
 import { engagementFromJson } from "./markdown";
 import { mergeStakeholdersIntoUsers, seedUsersFromEngagement } from "./projectUsers";
 import type { Stakeholder } from "../types";
@@ -126,7 +127,7 @@ export async function loadStakeholders(
   fallback?: { displayName?: string; customer?: string; status?: string; targetGoLive?: string },
 ): Promise<Stakeholder[]> {
   try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
+    const eng = await loadEngagementJson(projectPath);
     const fromJson = eng.stakeholders;
     if (Array.isArray(fromJson) && fromJson.length > 0) {
       return withIds(fromJson).filter((s) => s.name.trim() || s.role.trim());
@@ -204,23 +205,17 @@ export async function saveStakeholders(
     notes: s.notes.trim(),
   }));
 
-  try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    const existingUsers = Array.isArray(eng.projectUsers)
-      ? (eng.projectUsers as import("../types").ProjectUser[])
-      : seedUsersFromEngagement(eng);
-    const projectUsers = mergeStakeholdersIntoUsers(existingUsers, cleaned);
-    await api.writeJson(`${projectPath}/engagement.json`, {
-      ...eng,
-      stakeholders: cleaned,
-      projectUsers,
-    });
-  } catch {
-    await api.writeJson(`${projectPath}/engagement.json`, {
-      stakeholders: cleaned,
-      projectUsers: mergeStakeholdersIntoUsers([], cleaned),
-    });
-  }
+  const eng = await loadEngagementJson(projectPath);
+  const existingUsers = Array.isArray(eng.projectUsers)
+    ? (eng.projectUsers as import("../types").ProjectUser[])
+    : seedUsersFromEngagement(eng);
+  const projectUsers = mergeStakeholdersIntoUsers(existingUsers, cleaned);
+
+  await saveEngagementJson(projectPath, {
+    ...eng,
+    stakeholders: cleaned,
+    projectUsers,
+  });
 
   await syncDiscoveryStakeholders(projectPath, cleaned);
 }

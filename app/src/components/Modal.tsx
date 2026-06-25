@@ -29,7 +29,7 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div
         className={`w-full rounded-xl border border-surface-border bg-surface-raised shadow-2xl ${
           wide ? "max-w-lg" : "max-w-md"

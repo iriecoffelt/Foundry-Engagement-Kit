@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { loadEngagementJson, saveEngagementJson } from "./engagementData";
 import type { ProjectUser, ProjectUserKind, Stakeholder } from "../types";
 
 export function newProjectUserId() {
@@ -156,7 +156,7 @@ export function buildProjectUsersFromWizard(
 
 export async function loadProjectUsers(projectPath: string): Promise<ProjectUser[]> {
   try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
+    const eng = await loadEngagementJson(projectPath);
     let users = Array.isArray(eng.projectUsers)
       ? (eng.projectUsers as ProjectUser[]).map(normalizeUser)
       : [];
@@ -164,7 +164,7 @@ export async function loadProjectUsers(projectPath: string): Promise<ProjectUser
     if (!users.length) {
       users = seedUsersFromEngagement(eng);
       if (users.length) {
-        await api.writeJson(`${projectPath}/engagement.json`, { ...eng, projectUsers: users });
+        await saveEngagementJson(projectPath, { ...eng, projectUsers: users });
       }
     }
 
@@ -182,12 +182,8 @@ export async function saveProjectUsers(
     .filter((u) => u.name.trim())
     .map(normalizeUser);
 
-  try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-    await api.writeJson(`${projectPath}/engagement.json`, { ...eng, projectUsers: cleaned });
-  } catch {
-    await api.writeJson(`${projectPath}/engagement.json`, { projectUsers: cleaned });
-  }
+  const eng = await loadEngagementJson(projectPath);
+  await saveEngagementJson(projectPath, { ...eng, projectUsers: cleaned });
 }
 
 export function kindLabel(kind: ProjectUserKind): string {

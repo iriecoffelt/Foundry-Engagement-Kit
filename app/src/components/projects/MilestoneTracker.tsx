@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { loadEngagementJson, saveEngagementJson } from "../../lib/engagementData";
+import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
 import type { Milestone } from "../../types";
 import { SelectInput, TextInput } from "../forms/FormField";
 
@@ -20,15 +21,15 @@ interface MilestoneTrackerProps {
 export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
   const [milestones, setMilestones] = useState<Milestone[]>(DEFAULT_MILESTONES);
   const [saving, setSaving] = useState(false);
+  const milestonesRef = useRef(milestones);
+  milestonesRef.current = milestones;
 
   const load = useCallback(async () => {
-    try {
-      const eng = await api.readJson<{ milestones?: Milestone[] }>(
-        `${projectPath}/engagement.json`,
-      );
-      if (eng.milestones?.length) setMilestones(eng.milestones);
-    } catch {
-      /* use defaults */
+    const eng = await loadEngagementJson(projectPath);
+    const loaded = (eng.milestones as Milestone[] | undefined) ?? [];
+    if (loaded.length) {
+      milestonesRef.current = loaded;
+      setMilestones(loaded);
     }
   }, [projectPath]);
 
@@ -36,28 +37,41 @@ export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
     load();
   }, [load]);
 
-  const save = async (updated: Milestone[]) => {
-    setMilestones(updated);
-    setSaving(true);
-    try {
-      const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
-      await api.writeJson(`${projectPath}/engagement.json`, { ...eng, milestones: updated });
-    } catch {
-      await api.writeJson(`${projectPath}/engagement.json`, { milestones: updated });
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { schedule: scheduleSave, flushNow: flushSave } = useDebouncedPersist<Milestone[]>({
+    save: async (updated) => {
+      const eng = await loadEngagementJson(projectPath);
+      await saveEngagementJson(projectPath, { ...eng, milestones: updated });
+    },
+    onSavingChange: setSaving,
+  });
+
+  const applyMilestones = useCallback(
+    (updated: Milestone[], immediate = false) => {
+      milestonesRef.current = updated;
+      setMilestones(updated);
+      if (immediate) {
+        void flushSave(updated);
+      } else {
+        scheduleSave(updated);
+      }
+    },
+    [flushSave, scheduleSave],
+  );
 
   const update = (id: string, patch: Partial<Milestone>) => {
-    save(milestones.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    applyMilestones(
+      milestonesRef.current.map((m) => (m.id === id ? { ...m, ...patch } : m)),
+    );
   };
 
   const addCustom = () => {
-    save([
-      ...milestones,
-      { id: `m-${Date.now()}`, name: "New milestone", targetDate: "", status: "pending" },
-    ]);
+    applyMilestones(
+      [
+        ...milestonesRef.current,
+        { id: `m-${Date.now()}`, name: "New milestone", targetDate: "", status: "pending" },
+      ],
+      true,
+    );
   };
 
   return (

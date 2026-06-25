@@ -2,16 +2,12 @@ import { FilePlus, FileText } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { pushNavHistory } from "../../lib/appNavigation";
 import { api } from "../../lib/api";
-import {
-  DEFAULT_CHECKLIST,
-  checklistPath,
-  computePhaseProgress,
-  mergeChecklist,
-} from "../../lib/phaseChecklist";
+import { loadPhaseChecklist } from "../../lib/checklistData";
+import { computePhaseProgress } from "../../lib/phaseChecklist";
 import { copyToClipboard, generateCustomerSummary } from "../../lib/customerSummary";
 import { buildWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
-import type { EngagementStatus, FileEntry, ProjectMeta } from "../../types";
+import type { EngagementStatus, ProjectMeta } from "../../types";
 import {
   engagementFromJson,
   generateProjectReadme,
@@ -41,6 +37,9 @@ import { StakeholderMap } from "./StakeholderMap";
 import { ProjectWorkspaceHeader, PROJECT_TAB_LABELS, type ProjectTab } from "./ProjectWorkspaceHeader";
 import { ProjectLibrary } from "./ProjectLibrary";
 import { ProjectUsersView } from "./ProjectUsersView";
+import { loadEngagementJson } from "../../lib/engagementData";
+import { loadEngagementStatus } from "../../lib/engagementMeta";
+import { ProjectDataProvider, useProjectData } from "./ProjectDataProvider";
 
 const ArchitectureEditor = lazy(() =>
   import("../architecture/ArchitectureEditor").then((m) => ({
@@ -55,13 +54,20 @@ interface ProjectWorkspaceProps {
 }
 
 export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspaceProps) {
+  return (
+    <ProjectDataProvider projectPath={project.path}>
+      <ProjectWorkspaceInner project={project} initialTab={initialTab} onBack={onBack} />
+    </ProjectDataProvider>
+  );
+}
+
+function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspaceProps) {
+  const { uploads, docTree, loadDocTree, reloadDocTree, refreshUploads } = useProjectData();
   const [tab, setTab] = useState<ProjectTab>(initialTab ?? "overview");
   const tabHistoryRef = useRef<ProjectTab[]>([]);
   const [tabBackLabel, setTabBackLabel] = useState<string | undefined>();
   const [projectMeta, setProjectMeta] = useState(project);
   const [overview, setOverview] = useState("");
-  const [uploads, setUploads] = useState<FileEntry[]>([]);
-  const [docTree, setDocTree] = useState<FileEntry[]>([]);
   const [openFile, setOpenFile] = useState<{ path: string; content: string; dirty: boolean } | null>(
     null,
   );
@@ -72,9 +78,17 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [checklistVersion, setChecklistVersion] = useState(0);
   const [deliveryCardId, setDeliveryCardId] = useState<string | null>(null);
+  const hydrateGenRef = useRef(0);
 
   useEffect(() => {
-    setProjectMeta(project);
+    const gen = ++hydrateGenRef.current;
+    loadEngagementStatus(project.path, project.status).then((status) => {
+      if (gen !== hydrateGenRef.current) return;
+      setProjectMeta({ ...project, status });
+    });
+    return () => {
+      hydrateGenRef.current += 1;
+    };
   }, [project]);
 
   useEffect(() => {
@@ -138,9 +152,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
         overviewContent = readme;
       } else {
         try {
-          const eng = await api.readJson<Record<string, unknown>>(
-            `${projectMeta.path}/engagement.json`,
-          );
+          const eng = await loadEngagementJson(projectMeta.path);
           const data = engagementFromJson(eng, {
             displayName: projectMeta.display_name,
             customer: projectMeta.customer,
@@ -157,15 +169,6 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
     } catch {
       setOverview(unfilledTemplateNotice(projectMeta.display_name));
     }
-    const tree = await api.listDirectory(projectMeta.path, true);
-    setDocTree(tree);
-    try {
-      await api.createDirectory(`${projectMeta.path}/references`);
-      const refs = await api.listDirectory(`${projectMeta.path}/references`, false);
-      setUploads(refs.filter((e) => !e.is_dir));
-    } catch {
-      setUploads([]);
-    }
   }, [
     projectMeta.path,
     projectMeta.display_name,
@@ -177,9 +180,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
 
   const refreshPhaseProgress = useCallback(async () => {
     try {
-      const cl = mergeChecklist(
-        await api.readJson<typeof DEFAULT_CHECKLIST>(checklistPath(projectMeta.path)),
-      );
+      const cl = await loadPhaseChecklist(projectMeta.path);
       setPhaseProgress(computePhaseProgress(cl).overall);
     } catch {
       setPhaseProgress(0);
@@ -189,6 +190,18 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (tab === "documents") {
+      loadDocTree();
+    }
+  }, [tab, loadDocTree]);
+
+  useEffect(() => {
+    if (tab === "library") {
+      refreshUploads();
+    }
+  }, [tab, refreshUploads]);
 
   useEffect(() => {
     if (checklistVersion === 0) return;
@@ -204,9 +217,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
 
   const copySummary = async () => {
     try {
-      const eng = await api.readJson<Record<string, unknown>>(
-        `${projectMeta.path}/engagement.json`,
-      );
+      const eng = await loadEngagementJson(projectMeta.path);
       const text = generateCustomerSummary(projectMeta, eng, phaseProgress);
       const ok = await copyToClipboard(text);
       setMessage(ok ? "Customer summary copied to clipboard" : "Could not copy — check permissions");
@@ -369,7 +380,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
                     if (!confirm(`Delete ${openFile.path}?`)) return;
                     await api.deletePath(openFile.path);
                     setOpenFile(null);
-                    await refresh();
+                    await reloadDocTree();
                   }}
                 />
               ) : (

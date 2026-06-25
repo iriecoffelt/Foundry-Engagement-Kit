@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { loadDecisions } from "./decisions";
+import { loadEngagementJson } from "./engagementData";
 import { loadRegister } from "./engagementRegister";
 import { loadUatScenarios } from "./uatScenarios";
 
@@ -40,7 +41,7 @@ export async function loadEngagementTimeline(
   const events: TimelineEvent[] = [];
 
   try {
-    const eng = await api.readJson<Record<string, unknown>>(`${projectPath}/engagement.json`);
+    const eng = await loadEngagementJson(projectPath);
     const startDate = isoDate(String(eng.startDate || ""));
     if (startDate) {
       events.push({

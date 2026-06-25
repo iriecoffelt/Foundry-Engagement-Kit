@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { cachedRead, cacheSet, invalidateDashboard, invalidatePortfolio, projectCacheKey } from "./workspaceStore";
 import type { UatScenario } from "../types";
 
 export const UAT_STATUS_LABELS = {
@@ -17,12 +18,14 @@ export function newUatId() {
 }
 
 export async function loadUatScenarios(projectPath: string): Promise<UatScenario[]> {
-  try {
-    const data = await api.readJson<{ scenarios: UatScenario[] }>(uatPath(projectPath));
-    return data.scenarios ?? [];
-  } catch {
-    return [];
-  }
+  return cachedRead(projectCacheKey(projectPath, "uat"), async () => {
+    try {
+      const data = await api.readJson<{ scenarios: UatScenario[] }>(uatPath(projectPath));
+      return data.scenarios ?? [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 export async function saveUatScenarios(
@@ -30,6 +33,9 @@ export async function saveUatScenarios(
   scenarios: UatScenario[],
 ): Promise<void> {
   await api.writeJson(uatPath(projectPath), { scenarios });
+  cacheSet(projectCacheKey(projectPath, "uat"), scenarios);
+  invalidateDashboard();
+  invalidatePortfolio();
 }
 
 function parseUatTable(content: string): Omit<UatScenario, "id" | "status">[] {

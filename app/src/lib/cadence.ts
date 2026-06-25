@@ -25,10 +25,42 @@ function latestFileDate(files: { name: string }[]): string | null {
   return dates.sort().reverse()[0] ?? null;
 }
 
-export async function getCadenceAlerts(projects: ProjectMeta[]): Promise<CadenceAlert[]> {
+export function cadenceAlertsForProject(
+  project: ProjectMeta,
+  dailyFiles: { name: string }[],
+  weeklyFiles: { name: string }[],
+): CadenceAlert[] {
   const alerts: CadenceAlert[] = [];
   const today = todayISO();
   const dayOfWeek = new Date().getDay();
+
+  const hasTodayStandup = dailyFiles.some((f) => f.name.startsWith(today));
+  if (!hasTodayStandup && dayOfWeek >= 1 && dayOfWeek <= 5) {
+    alerts.push({
+      type: "standup",
+      projectSlug: project.slug,
+      projectName: project.display_name,
+      message: `No standup logged today for ${project.display_name}`,
+    });
+  }
+
+  if (dayOfWeek === 5) {
+    const latest = latestFileDate(weeklyFiles);
+    if (!latest || daysSince(latest) > 7) {
+      alerts.push({
+        type: "weekly",
+        projectSlug: project.slug,
+        projectName: project.display_name,
+        message: `Weekly review due for ${project.display_name}`,
+      });
+    }
+  }
+
+  return alerts;
+}
+
+export async function getCadenceAlerts(projects: ProjectMeta[]): Promise<CadenceAlert[]> {
+  const alerts: CadenceAlert[] = [];
 
   for (const project of projects) {
     try {
@@ -40,34 +72,16 @@ export async function getCadenceAlerts(projects: ProjectMeta[]): Promise<Cadence
         /* no daily folder yet */
       }
 
-      const hasTodayStandup = dailyFiles.some((f) => f.name.startsWith(today));
-      if (!hasTodayStandup && dayOfWeek >= 1 && dayOfWeek <= 5) {
-        alerts.push({
-          type: "standup",
-          projectSlug: project.slug,
-          projectName: project.display_name,
-          message: `No standup logged today for ${project.display_name}`,
-        });
-      }
-
-      if (dayOfWeek === 5) {
-        const weeklyDir = `weekly/${project.slug}`;
-        let weeklyFiles: { name: string }[] = [];
+      let weeklyFiles: { name: string }[] = [];
+      if (new Date().getDay() === 5) {
         try {
-          weeklyFiles = await api.listDirectory(weeklyDir, false);
+          weeklyFiles = await api.listDirectory(`weekly/${project.slug}`, false);
         } catch {
           /* none */
         }
-        const latest = latestFileDate(weeklyFiles);
-        if (!latest || daysSince(latest) > 7) {
-          alerts.push({
-            type: "weekly",
-            projectSlug: project.slug,
-            projectName: project.display_name,
-            message: `Weekly review due for ${project.display_name}`,
-          });
-        }
       }
+
+      alerts.push(...cadenceAlertsForProject(project, dailyFiles, weeklyFiles));
     } catch {
       /* skip project */
     }
