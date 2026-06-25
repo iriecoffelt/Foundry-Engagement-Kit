@@ -15,7 +15,14 @@ export function InsightsPanel({ projects, onOpenProject }: InsightsPanelProps) {
 
   useEffect(() => {
     if (!projects.length) return;
-    loadWorkspaceInsights(projects).then(setInsights);
+
+    const reload = () => {
+      loadWorkspaceInsights(projects).then(setInsights);
+    };
+
+    reload();
+    window.addEventListener("focus", reload);
+    return () => window.removeEventListener("focus", reload);
   }, [projects]);
 
   if (!insights || !projects.length) return null;
