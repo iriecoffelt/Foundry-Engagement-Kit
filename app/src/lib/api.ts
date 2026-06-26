@@ -3,6 +3,8 @@ import type { FileEntry, ProjectMeta } from "../types";
 
 export const api = {
   isWorkspaceConfigured: () => invoke<boolean>("is_workspace_configured"),
+  isMobilePlatform: () => invoke<boolean>("is_mobile_platform"),
+  getDefaultWorkspaceParent: () => invoke<string>("get_default_workspace_parent"),
   getWorkspaceRoot: () => invoke<string>("get_workspace_root"),
   initializeWorkspace: (parentPath: string, folderName: string, createSubfolder: boolean) =>
     invoke<string>("initialize_workspace", { parentPath, folderName, createSubfolder }),

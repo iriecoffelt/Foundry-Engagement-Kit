@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderOpen } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 import { joinPath, pickDirectoryPath } from "../../lib/path";
 import { PrimaryButton } from "../forms/FormField";
@@ -20,20 +20,46 @@ export function WorkspaceSetupModal({ open: isOpen, onComplete }: WorkspaceSetup
   const [useExisting, setUseExisting] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const mobile = await api.isMobilePlatform();
+        if (cancelled) return;
+        setIsMobile(mobile);
+        if (mobile) {
+          const parent = await api.getDefaultWorkspaceParent();
+          if (!cancelled) setParentPath(parent);
+        }
+      } catch {
+        if (!cancelled) setIsMobile(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   const pickParent = async () => {
     setError("");
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: useExisting
-        ? "Select an existing workspace folder"
-        : "Choose where to create your workspace",
-    });
-    if (!selected) return;
-    const path = pickDirectoryPath(selected);
-    if (!path) return;
-    setParentPath(path);
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: useExisting
+          ? "Select an existing workspace folder"
+          : "Choose where to create your workspace",
+      });
+      if (!selected) return;
+      const path = pickDirectoryPath(selected);
+      if (!path) return;
+      setParentPath(path);
+    } catch (e) {
+      setError(String(e));
+    }
   };
 
   const submit = async () => {
@@ -80,42 +106,44 @@ export function WorkspaceSetupModal({ open: isOpen, onComplete }: WorkspaceSetup
       }
     >
       <p className="text-sm text-fg-secondary">
-        Your engagements, standups, and reference guides are stored as plain files on disk. Pick
-        where that folder should live — Documents, a network drive, or anywhere you have write
-        access.
+        {isMobile
+          ? "Your engagements, standups, and reference guides are stored as plain files in this app's Documents folder. Tap Create workspace to set up the default folder structure."
+          : "Your engagements, standups, and reference guides are stored as plain files on disk. Pick where that folder should live — Documents, a network drive, or anywhere you have write access."}
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setUseExisting(false);
-            setError("");
-          }}
-          className={`rounded-lg px-3 py-1.5 text-sm ${
-            !useExisting
-              ? "bg-brand-600 text-fg-on-accent"
-              : "bg-surface-elevated text-fg-secondary hover:text-fg-primary"
-          }`}
-        >
-          Create new
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setUseExisting(true);
-            setCreateSubfolder(false);
-            setError("");
-          }}
-          className={`rounded-lg px-3 py-1.5 text-sm ${
-            useExisting
-              ? "bg-brand-600 text-fg-on-accent"
-              : "bg-surface-elevated text-fg-secondary hover:text-fg-primary"
-          }`}
-        >
-          Use existing
-        </button>
-      </div>
+      {!isMobile && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setUseExisting(false);
+              setError("");
+            }}
+            className={`rounded-lg px-3 py-1.5 text-sm ${
+              !useExisting
+                ? "bg-brand-600 text-fg-on-accent"
+                : "bg-surface-elevated text-fg-secondary hover:text-fg-primary"
+            }`}
+          >
+            Create new
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setUseExisting(true);
+              setCreateSubfolder(false);
+              setError("");
+            }}
+            className={`rounded-lg px-3 py-1.5 text-sm ${
+              useExisting
+                ? "bg-brand-600 text-fg-on-accent"
+                : "bg-surface-elevated text-fg-secondary hover:text-fg-primary"
+            }`}
+          >
+            Use existing
+          </button>
+        </div>
+      )}
 
       <div className="mt-5 space-y-4">
         <div>
@@ -124,16 +152,24 @@ export function WorkspaceSetupModal({ open: isOpen, onComplete }: WorkspaceSetup
           </label>
           <div className="mt-2 flex gap-2">
             <div className="min-h-10 flex-1 rounded-lg bg-surface-base px-3 py-2 font-mono text-xs text-fg-body break-all">
-              {parentPath || "No folder selected"}
+              {parentPath
+                ? isMobile
+                  ? joinPath(parentPath, folderName.trim() || DEFAULT_FOLDER_NAME)
+                  : parentPath
+                : isMobile
+                  ? "Preparing location…"
+                  : "No folder selected"}
             </div>
-            <button
-              type="button"
-              onClick={pickParent}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-surface-border bg-surface-elevated px-3 py-2 text-sm text-fg-body hover:bg-surface-raised"
-            >
-              <FolderOpen size={16} />
-              Browse
-            </button>
+            {!isMobile && (
+              <button
+                type="button"
+                onClick={pickParent}
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-surface-border bg-surface-elevated px-3 py-2 text-sm text-fg-body hover:bg-surface-raised"
+              >
+                <FolderOpen size={16} />
+                Browse
+              </button>
+            )}
           </div>
         </div>
 

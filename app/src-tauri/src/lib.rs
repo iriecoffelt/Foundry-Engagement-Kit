@@ -170,6 +170,27 @@ fn is_workspace_configured(app: AppHandle) -> bool {
 }
 
 #[tauri::command]
+fn is_mobile_platform() -> bool {
+    cfg!(any(target_os = "ios", target_os = "android"))
+}
+
+fn mobile_workspace_parent(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().document_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+#[tauri::command]
+fn get_default_workspace_parent(app: AppHandle) -> Result<String, String> {
+    if !cfg!(any(target_os = "ios", target_os = "android")) {
+        return Err("Default workspace location is only available on mobile.".into());
+    }
+    Ok(mobile_workspace_parent(&app)?
+        .to_string_lossy()
+        .to_string())
+}
+
+#[tauri::command]
 fn get_workspace_root(app: AppHandle) -> Result<String, String> {
     Ok(resolve_workspace(&app)?.to_string_lossy().to_string())
 }
@@ -729,6 +750,8 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             is_workspace_configured,
+            is_mobile_platform,
+            get_default_workspace_parent,
             get_workspace_root,
             initialize_workspace,
             set_workspace_root,
