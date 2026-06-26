@@ -8,6 +8,7 @@ import {
 } from "../../lib/engagementRegister";
 import { getRegisterShowResolved, setRegisterShowResolved } from "../../lib/uiPrefs";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
+import { useToast } from "../../context/ToastContext";
 import type { BlockerEntry, EngagementRegister, RiskEntry } from "../../types";
 import { Field, SelectInput, TextArea, TextInput } from "../forms/FormField";
 import { UserPicker } from "./UserPicker";
@@ -17,6 +18,7 @@ interface EngagementRegisterViewProps {
 }
 
 export function EngagementRegisterView({ projectPath }: EngagementRegisterViewProps) {
+  const showToast = useToast();
   const [register, setRegister] = useState<EngagementRegister>(emptyRegister());
   const [saving, setSaving] = useState(false);
   const [showResolved, setShowResolved] = useState(() => getRegisterShowResolved(projectPath));
@@ -47,6 +49,7 @@ export function EngagementRegisterView({ projectPath }: EngagementRegisterViewPr
   const { schedule: scheduleSave, flushNow: flushSave } = useDebouncedPersist<EngagementRegister>({
     save: (next) => saveRegister(projectPath, next),
     onSavingChange: setSaving,
+    onSaved: () => showToast("Register saved"),
   });
 
   const applyRegister = useCallback(
@@ -158,7 +161,7 @@ export function EngagementRegisterView({ projectPath }: EngagementRegisterViewPr
   const visibleRisks = showResolved ? register.risks : openRisks;
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="page-shell">
       <div className="mx-auto max-w-4xl space-y-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

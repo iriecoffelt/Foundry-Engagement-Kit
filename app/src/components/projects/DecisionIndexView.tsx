@@ -26,7 +26,7 @@ export function DecisionIndexView({
   }, [load]);
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="page-shell">
       <div className="mx-auto max-w-3xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

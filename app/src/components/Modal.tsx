@@ -1,6 +1,8 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEscapeKey } from "../lib/useEscapeKey";
+import { useFocusTrap } from "../lib/useFocusTrap";
+import { OverlayPortal } from "./OverlayPortal";
 
 interface ModalProps {
   open: boolean;
@@ -25,18 +27,28 @@ export function Modal({
   closeOnEscape = true,
 }: ModalProps) {
   useEscapeKey(onClose, open && closeOnEscape);
-
-  if (!open) return null;
+  const dialogRef = useFocusTrap(open);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <OverlayPortal open={open}>
       <div
-        className={`w-full rounded-xl border border-surface-border bg-surface-raised shadow-2xl ${
-          wide ? "max-w-lg" : "max-w-md"
-        }`}
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        onClick={closeOnEscape ? onClose : undefined}
       >
+        <div
+          ref={dialogRef}
+          className={`w-full rounded-xl border border-surface-border bg-surface-raised shadow-2xl ${
+            wide ? "max-w-lg" : "max-w-md"
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
         <div className="flex items-center justify-between border-b border-surface-border px-5 py-4">
-          <h2 className="text-lg font-semibold text-fg-primary">{title}</h2>
+          <h2 id="modal-title" className="text-lg font-semibold text-fg-primary">
+            {title}
+          </h2>
           {!hideClose && (
             <button
               type="button"
@@ -54,7 +66,8 @@ export function Modal({
             {footer}
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

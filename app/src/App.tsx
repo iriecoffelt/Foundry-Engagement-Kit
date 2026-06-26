@@ -17,6 +17,7 @@ import {
   slugFromProjectPath,
 } from "./lib/engagementMeta";
 import { invalidateDashboard, invalidatePortfolio } from "./lib/workspaceStore";
+import { useConfirm } from "./context/ConfirmContext";
 import type { OpenFile, ProjectMeta, Section } from "./types";
 import { Dashboard } from "./components/Dashboard";
 import { Editor } from "./components/Editor";
@@ -73,6 +74,7 @@ function FocusFloatingPillGate() {
 }
 
 const AppMain = memo(function AppMain() {
+  const confirm = useConfirm();
   const { current, canGoBack, previousFrame, navigate, goBack } = useAppNavigation({
     section: "home",
   });
@@ -410,7 +412,17 @@ const AppMain = memo(function AppMain() {
                 setPreviewFile({ ...previewFile, dirty: false });
               }}
               onDelete={async () => {
-                if (!confirm(`Delete ${previewFile.path}?`)) return;
+                if (!previewFile) return;
+                const name = previewFile.path.split("/").pop() || previewFile.path;
+                if (
+                  !(await confirm({
+                    title: "Delete document",
+                    message: `Delete ${name}? This cannot be undone.`,
+                    destructive: true,
+                  }))
+                ) {
+                  return;
+                }
                 await api.deletePath(previewFile.path);
                 setPreviewFile(null);
                 bump();

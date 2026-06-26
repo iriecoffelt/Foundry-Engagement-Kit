@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadEngagementJson, saveEngagementJson } from "../../lib/engagementData";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
+import { useToast } from "../../context/ToastContext";
 import type { Milestone } from "../../types";
 import { SelectInput, TextInput } from "../forms/FormField";
 
@@ -19,6 +20,7 @@ interface MilestoneTrackerProps {
 }
 
 export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
+  const showToast = useToast();
   const [milestones, setMilestones] = useState<Milestone[]>(DEFAULT_MILESTONES);
   const [saving, setSaving] = useState(false);
   const milestonesRef = useRef(milestones);
@@ -43,6 +45,7 @@ export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
       await saveEngagementJson(projectPath, { ...eng, milestones: updated });
     },
     onSavingChange: setSaving,
+    onSaved: () => showToast("Milestones saved"),
   });
 
   const applyMilestones = useCallback(

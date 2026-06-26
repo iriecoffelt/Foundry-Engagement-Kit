@@ -20,6 +20,7 @@ import {
 } from "../../lib/deliveryTypes";
 import { loadRegister, openBlockers } from "../../lib/engagementRegister";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
+import { useToast } from "../../context/ToastContext";
 import type {
   BlockerEntry,
   DeliveryBoard,
@@ -36,6 +37,7 @@ import {
 } from "../forms/FormField";
 import { UserPicker } from "./UserPicker";
 import { useEscapeKey } from "../../lib/useEscapeKey";
+import { SlideOverBackdrop, slideOverPanelClass } from "../SlideOverBackdrop";
 
 interface DeliveryBoardViewProps {
   projectPath: string;
@@ -60,6 +62,7 @@ type PointerSession = {
 };
 
 export function DeliveryBoardView({ projectPath, initialSelectedCardId }: DeliveryBoardViewProps) {
+  const showToast = useToast();
   const [board, setBoard] = useState<DeliveryBoard>({ cards: [] });
   const [deliveryTypes, setDeliveryTypes] = useState<DeliveryTypeDefinition[]>([]);
   const [saving, setSaving] = useState(false);
@@ -101,6 +104,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   const { schedule: scheduleSave, flushNow: flushSave } = useDebouncedPersist<DeliveryBoard>({
     save: (next) => saveDeliveryBoard(projectPath, next),
     onSavingChange: setSaving,
+    onSaved: () => showToast("Delivery board saved"),
   });
 
   const persistNow = useCallback(
@@ -302,12 +306,13 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
             </button>
           </div>
 
-          <div className="mt-6 grid gap-3 lg:grid-cols-5">
+          <div className="mt-6 overflow-x-auto overscroll-x-contain pb-2 xl:overflow-visible">
+            <div className="flex w-max min-w-full gap-3 xl:grid xl:w-full xl:grid-cols-5">
             {DELIVERY_STATUSES.map((status) => (
               <div
                 key={status}
                 data-delivery-status={status}
-                className={`flex min-h-[12rem] flex-col rounded-2xl border border-surface-border bg-surface-base/40 p-3 ${
+                className={`flex w-56 shrink-0 flex-col rounded-2xl border border-surface-border bg-surface-base/40 p-3 xl:w-auto xl:shrink ${
                   dropTarget === status
                     ? "bg-brand-950/25 ring-2 ring-brand-500/50"
                     : "ring-1 ring-[rgb(var(--ring-subtle)/0.03)]"
@@ -343,6 +348,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
                 </div>
               </div>
             ))}
+            </div>
           </div>
 
           <div className="mt-6 card-kit p-4">
@@ -371,14 +377,17 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
       </div>
 
       {selectedCard && (
-        <DeliveryCardDetail
-          projectPath={projectPath}
-          card={selectedCard}
-          blockers={blockers}
-          onClose={() => setSelectedId(null)}
-          onUpdate={(patch) => updateCard(selectedCard.id, patch)}
-          onDelete={() => removeCard(selectedCard.id)}
-        />
+        <>
+          <SlideOverBackdrop onClose={() => setSelectedId(null)} />
+          <DeliveryCardDetail
+            projectPath={projectPath}
+            card={selectedCard}
+            blockers={blockers}
+            onClose={() => setSelectedId(null)}
+            onUpdate={(patch) => updateCard(selectedCard.id, patch)}
+            onDelete={() => removeCard(selectedCard.id)}
+          />
+        </>
       )}
     </div>
   );
@@ -480,7 +489,9 @@ function DeliveryCardDetail({
   const isUrl = resourceUrl?.startsWith("http://") || resourceUrl?.startsWith("https://");
 
   return (
-    <aside className="flex w-[22rem] shrink-0 flex-col border-l border-surface-border bg-surface-raised/40">
+    <aside
+      className={`flex w-[22rem] shrink-0 flex-col border-l border-surface-border bg-surface-raised/40 ${slideOverPanelClass}`}
+    >
       <div className="flex items-start justify-between gap-2 border-b border-surface-border px-4 py-3">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Component</p>

@@ -41,7 +41,7 @@ export function SearchHub({ projects, onOpenPath }: SearchHubProps) {
   }, [runSearch]);
 
   return (
-    <div className="h-full overflow-y-auto p-8">
+    <div className="hub-page-shell">
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center gap-3">
           <Search size={24} className="text-brand-500" />

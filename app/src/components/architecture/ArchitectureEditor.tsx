@@ -45,6 +45,7 @@ import {
 } from "../../lib/deliveryBoard";
 import type { ArchitectureGraph, DeliveryCard } from "../../types";
 import { SecondaryButton } from "../forms/FormField";
+import { SlideOverBackdrop } from "../SlideOverBackdrop";
 import { useEscapeKey } from "../../lib/useEscapeKey";
 import { ArchNodeDetailsPanel, EdgeDetailsPanel } from "./ArchNodeDetailsPanel";
 import { ProjectFoundryStackField } from "../projects/ProjectFoundryStackField";
@@ -598,6 +599,14 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
               <MiniMap className="!bg-surface-raised" />
             </ReactFlow>
           </div>
+          {(selectedNode || selectedEdge) && (
+            <SlideOverBackdrop
+              onClose={() => {
+                setSelectedNode(null);
+                setSelectedEdge(null);
+              }}
+            />
+          )}
           {selectedNode ? (
             <ArchNodeDetailsPanel
               node={selectedNode}

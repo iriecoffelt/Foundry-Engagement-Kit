@@ -6,6 +6,7 @@ import {
   DELIVERY_STATUS_LABELS,
 } from "../../lib/deliveryBoard";
 import { Field, SecondaryButton, TextArea, TextInput } from "../forms/FormField";
+import { slideOverPanelClass } from "../SlideOverBackdrop";
 
 interface ArchNodeDetailsPanelProps {
   node: Node | null;
@@ -40,7 +41,9 @@ export function ArchNodeDetailsPanel({
   const notes = String(node.data.notes || "");
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-l border-surface-border bg-surface-raised/40">
+    <aside
+      className={`flex w-72 shrink-0 flex-col border-l border-surface-border bg-surface-raised/40 ${slideOverPanelClass}`}
+    >
       <div className="flex items-start justify-between gap-2 border-b border-surface-border px-4 py-3">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Selected node</p>
@@ -134,7 +137,9 @@ export function EdgeDetailsPanel({ edge, onUpdateLabel, onClose }: EdgeDetailsPa
   const label = typeof edge.label === "string" ? edge.label : "";
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-l border-surface-border bg-surface-raised/40">
+    <aside
+      className={`flex w-72 shrink-0 flex-col border-l border-surface-border bg-surface-raised/40 ${slideOverPanelClass}`}
+    >
       <div className="flex items-start justify-between gap-2 border-b border-surface-border px-4 py-3">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Selected edge</p>

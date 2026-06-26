@@ -2,6 +2,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { Archive, Download, Upload } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../lib/api";
+import { useConfirm } from "../../context/ConfirmContext";
 import { PrimaryButton, SecondaryButton } from "../forms/FormField";
 
 interface BackupSectionProps {
@@ -9,6 +10,7 @@ interface BackupSectionProps {
 }
 
 export function BackupSection({ onRefresh }: BackupSectionProps) {
+  const confirm = useConfirm();
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -39,13 +41,13 @@ export function BackupSection({ onRefresh }: BackupSectionProps) {
       filters: [{ name: "ZIP archive", extensions: ["zip"] }],
     });
     if (!source || typeof source !== "string") return;
-    if (
-      !confirm(
+    const ok = await confirm({
+      title: "Import workspace backup",
+      message:
         "Import will merge files from the archive into your workspace. Existing files with the same path may be overwritten. Continue?",
-      )
-    ) {
-      return;
-    }
+      confirmLabel: "Import",
+    });
+    if (!ok) return;
     setBusy(true);
     setStatus("");
     try {

@@ -40,7 +40,7 @@ export function PortfolioHub({ projects, refreshKey = 0, onOpenProject }: Portfo
   }
 
   return (
-    <div className="h-full overflow-y-auto p-8">
+    <div className="hub-page-shell">
       <div className="mx-auto max-w-4xl">
         <div className="flex items-center gap-3">
           <BarChart3 size={24} className="text-brand-500" />

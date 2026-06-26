@@ -15,6 +15,8 @@ import {
   saveActionItems,
 } from "../../lib/actionItems";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
+import { useConfirm } from "../../context/ConfirmContext";
+import { useToast } from "../../context/ToastContext";
 import type { ActionItem, ProjectMeta, Stakeholder } from "../../types";
 import {
   Field,
@@ -53,11 +55,13 @@ function LevelSelect({
 }
 
 export function StakeholderMap({ project }: StakeholderMapProps) {
+  const confirm = useConfirm();
+  const showToast = useToast();
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [dirty, setDirty] = useState(false);
   const [newActionTitle, setNewActionTitle] = useState("");
   const [newActionAssignee, setNewActionAssignee] = useState("");
   const stakeholdersRef = useRef<Stakeholder[]>([]);
@@ -70,42 +74,40 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
       status: project.status,
       targetGoLive: project.target_go_live,
     });
-    setStakeholders(list.length ? list : []);
+    stakeholdersRef.current = list.length ? list : [];
+    setStakeholders(stakeholdersRef.current);
     setSelectedId((current) => current ?? list[0]?.id ?? null);
     setActionItems(await loadActionItems(project.path));
+    setDirty(false);
   }, [project]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const { schedule: scheduleStakeholderSave, flushNow: flushStakeholderSave } =
-    useDebouncedPersist<Stakeholder[]>({
-      save: (updated) => saveStakeholders(project.path, updated),
-      onSavingChange: setSaving,
-    });
+  const updateStakeholders = useCallback((updated: Stakeholder[]) => {
+    stakeholdersRef.current = updated;
+    setStakeholders(updated);
+    setDirty(true);
+  }, []);
 
-  const applyStakeholders = useCallback(
-    (updated: Stakeholder[], immediate = false) => {
-      stakeholdersRef.current = updated;
-      setStakeholders(updated);
-      if (immediate) {
-        void flushStakeholderSave(updated).then(() => {
-          setMessage("Saved to engagement.json and discovery.md");
-          setTimeout(() => setMessage(""), 2500);
-        });
-      } else {
-        scheduleStakeholderSave(updated);
-      }
-    },
-    [flushStakeholderSave, scheduleStakeholderSave],
-  );
+  const saveStakeholdersNow = async () => {
+    setSaving(true);
+    try {
+      await saveStakeholders(project.path, stakeholdersRef.current);
+      setDirty(false);
+      showToast("Stakeholders saved");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const { schedule: scheduleActionSave, flushNow: flushActionSave } = useDebouncedPersist<
     ActionItem[]
   >({
     save: (items) => saveActionItems(project.path, items),
     onSavingChange: setSaving,
+    onSaved: () => showToast("Action items saved"),
   });
 
   const applyActionItems = useCallback(
@@ -127,21 +129,28 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
     const updated = stakeholdersRef.current.map((s) =>
       s.id === selected.id ? { ...s, ...patch } : s,
     );
-    applyStakeholders(updated);
+    updateStakeholders(updated);
   };
 
   const addPerson = () => {
     const person = emptyStakeholder();
-    const updated = [...stakeholdersRef.current, person];
+    updateStakeholders([...stakeholdersRef.current, person]);
     setSelectedId(person.id ?? null);
-    applyStakeholders(updated, true);
   };
 
-  const removeSelected = () => {
+  const removeSelected = async () => {
     if (!selected?.id) return;
+    const label = selected.name.trim() || selected.role.trim() || "this person";
+    const ok = await confirm({
+      title: "Remove stakeholder",
+      message: `Remove ${label} from the stakeholder map?`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     const updated = stakeholdersRef.current.filter((s) => s.id !== selected.id);
     setSelectedId(updated[0]?.id ?? null);
-    applyStakeholders(updated, true);
+    updateStakeholders(updated);
   };
 
   const persistActions = (items: ActionItem[], immediate = false) => {
@@ -188,7 +197,7 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
   const named = stakeholders.filter((s) => s.name.trim() || s.role.trim());
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="page-shell">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -201,11 +210,19 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
               and <code className="text-brand-300">00-discovery/discovery.md</code>
             </p>
           </div>
-          <PrimaryButton onClick={addPerson} disabled={saving}>
-            <span className="inline-flex items-center gap-2">
-              <Plus size={16} /> Add person
-            </span>
-          </PrimaryButton>
+          <div className="flex flex-wrap items-center gap-2">
+            {dirty && (
+              <span className="text-sm text-amber-400/90">Unsaved changes</span>
+            )}
+            <PrimaryButton onClick={saveStakeholdersNow} disabled={!dirty || saving}>
+              {saving ? "Saving…" : "Save"}
+            </PrimaryButton>
+            <SecondaryButton onClick={addPerson} disabled={saving}>
+              <span className="inline-flex items-center gap-2">
+                <Plus size={16} /> Add person
+              </span>
+            </SecondaryButton>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-5">
@@ -403,8 +420,7 @@ export function StakeholderMap({ project }: StakeholderMapProps) {
           </div>
         </div>
 
-        {message && <p className="text-sm text-brand-300">{message}</p>}
-        {saving && <p className="text-sm text-fg-muted">Saving…</p>}
+        {saving && !dirty && <p className="text-sm text-fg-muted">Saving…</p>}
       </div>
     </div>
   );

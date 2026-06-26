@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { ArrowLeft, BookOpen, ExternalLink, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { useConfirm } from "../../context/ConfirmContext";
 import type { FileEntry } from "../../types";
 import { Editor } from "../Editor";
 import { PrimaryButton, SecondaryButton } from "../forms/FormField";
@@ -12,6 +13,7 @@ interface ProjectLibraryProps {
 }
 
 export function ProjectLibrary({ projectPath, onMessage }: ProjectLibraryProps) {
+  const confirm = useConfirm();
   const [uploads, setUploads] = useState<FileEntry[]>([]);
   const [guides, setGuides] = useState<FileEntry[]>([]);
   const [openGuide, setOpenGuide] = useState<{
@@ -88,7 +90,17 @@ export function ProjectLibrary({ projectPath, onMessage }: ProjectLibraryProps) 
               onMessage("Guide saved");
             }}
             onDelete={async () => {
-              if (!confirm(`Delete ${openGuide.path}?`)) return;
+              if (!openGuide) return;
+              const name = openGuide.path.split("/").pop() || openGuide.path;
+              if (
+                !(await confirm({
+                  title: "Delete guide",
+                  message: `Delete ${name}? This cannot be undone.`,
+                  destructive: true,
+                }))
+              ) {
+                return;
+              }
               await api.deletePath(openGuide.path);
               setOpenGuide(null);
               refresh();
@@ -100,7 +112,7 @@ export function ProjectLibrary({ projectPath, onMessage }: ProjectLibraryProps) 
   }
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="page-shell">
       <div className="mx-auto max-w-3xl space-y-8">
         <section>
           <div className="mb-4 flex items-center justify-between gap-4">

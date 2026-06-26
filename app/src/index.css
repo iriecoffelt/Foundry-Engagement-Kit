@@ -132,7 +132,35 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .page-shell {
+    @apply h-full overflow-y-auto p-6;
+  }
+
+  .page-padding {
+    @apply p-6;
+  }
+
+  .hub-page-shell {
+    @apply h-full overflow-y-auto p-8;
+  }
+
+  .hub-sidebar-drawer {
+    @apply max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-[90] max-lg:w-72 max-lg:shadow-2xl;
+  }
+
+  .hub-sidebar-drawer-closed {
+    @apply max-lg:hidden;
+  }
+
+  .hub-sidebar-desktop-collapsed {
+    @apply lg:hidden;
+  }
+
   .overview-section {
+    /* Avoid content-visibility here — it creates a containing block that clips position:fixed overlays. */
+  }
+
+  .overview-section-lazy {
     content-visibility: auto;
     contain-intrinsic-size: auto 320px;
   }

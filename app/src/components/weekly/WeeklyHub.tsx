@@ -42,6 +42,7 @@ export function WeeklyHub({
   startSyncWizard,
   onWizardConsumed,
 }: WeeklyHubProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showReviewWizard, setShowReviewWizard] = useState(false);
   const [showSyncWizard, setShowSyncWizard] = useState(false);
   const [groups, setGroups] = useState<{ project: string; label: string; entries: FileEntry[] }[]>(
@@ -90,6 +91,7 @@ export function WeeklyHub({
     const text = await api.readFile(path);
     setContent(text);
     trackRecent(path, name, "Weekly");
+    setSidebarOpen(false);
   };
 
   const onDocComplete = (path: string) => {
@@ -128,6 +130,8 @@ export function WeeklyHub({
       <HubSidebar
         title="Weekly"
         subtitle="Reviews and customer sync prep"
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
         actions={
           <div className="flex flex-col gap-2">
             <PrimaryButton onClick={() => setShowReviewWizard(true)}>
@@ -182,6 +186,7 @@ export function WeeklyHub({
       </HubSidebar>
 
       <HubMain
+        onOpenSidebar={() => setSidebarOpen(true)}
         header={
           selected ? (
             <HubMainTitle

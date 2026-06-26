@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { BookOpen, Library, Tags, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { useConfirm } from "../../context/ConfirmContext";
 import type { FileEntry } from "../../types";
 import { Editor } from "../Editor";
 import {
@@ -30,6 +31,7 @@ type LibraryPanel =
   | "guide";
 
 export function LibraryHub() {
+  const confirm = useConfirm();
   const [guides, setGuides] = useState<FileEntry[]>([]);
   const [uploads, setUploads] = useState<FileEntry[]>([]);
   const [openFile, setOpenFile] = useState<{
@@ -39,6 +41,20 @@ export function LibraryHub() {
   } | null>(null);
   const [status, setStatus] = useState("");
   const [panel, setPanel] = useState<LibraryPanel>("none");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const selectPanel = (next: LibraryPanel) => {
+    setPanel(next);
+    setOpenFile(null);
+    setSidebarOpen(false);
+  };
+
+  const openGuide = async (path: string) => {
+    setPanel("guide");
+    const content = await api.readFile(path);
+    setOpenFile({ path, content, dirty: false });
+    setSidebarOpen(false);
+  };
 
   const refresh = useCallback(async () => {
     const ref = await api.listDirectory("reference", false);
@@ -56,12 +72,6 @@ export function LibraryHub() {
     refresh();
   }, [refresh]);
 
-  const openGuide = async (path: string) => {
-    setPanel("guide");
-    const content = await api.readFile(path);
-    setOpenFile({ path, content, dirty: false });
-  };
-
   const upload = async () => {
     const selected = await open({ multiple: false });
     if (!selected) return;
@@ -77,59 +87,43 @@ export function LibraryHub() {
 
   return (
     <HubLayout>
-      <HubSidebar title="Library" subtitle="Guides, reference lists, and uploads">
+      <HubSidebar
+        title="Library"
+        subtitle="Guides, reference lists, and uploads"
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
+      >
         <HubSection label="Reference lists" icon={Tags}>
-          <HubItem
-            selected={panel === "roles"}
-            onClick={() => {
-              setPanel("roles");
-              setOpenFile(null);
-            }}
-          >
+          <HubItem selected={panel === "roles"} onClick={() => selectPanel("roles")}>
             Engagement roles
           </HubItem>
           <HubItem
             selected={panel === "foundry-areas"}
-            onClick={() => {
-              setPanel("foundry-areas");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("foundry-areas")}
           >
             Foundry areas
           </HubItem>
           <HubItem
             selected={panel === "organizations"}
-            onClick={() => {
-              setPanel("organizations");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("organizations")}
           >
             Organizations
           </HubItem>
           <HubItem
             selected={panel === "delivery-types"}
-            onClick={() => {
-              setPanel("delivery-types");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("delivery-types")}
           >
             Delivery types
           </HubItem>
           <HubItem
             selected={panel === "architecture-node-types"}
-            onClick={() => {
-              setPanel("architecture-node-types");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("architecture-node-types")}
           >
             Architecture node types
           </HubItem>
           <HubItem
             selected={panel === "ontology-element-types"}
-            onClick={() => {
-              setPanel("ontology-element-types");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("ontology-element-types")}
           >
             Ontology element types
           </HubItem>
@@ -179,7 +173,7 @@ export function LibraryHub() {
         </HubSection>
       </HubSidebar>
 
-      <HubMain>
+      <HubMain onOpenSidebar={() => setSidebarOpen(true)}>
         {panel === "roles" ? (
           <RolesEditor
             onStatus={(msg) => {
@@ -235,7 +229,16 @@ export function LibraryHub() {
                 setOpenFile({ ...openFile, dirty: false });
               }}
               onDelete={async () => {
-                if (!confirm(`Delete ${openFile.path}?`)) return;
+                const name = openFile.path.split("/").pop() || openFile.path;
+                if (
+                  !(await confirm({
+                    title: "Delete guide",
+                    message: `Delete ${name}? This cannot be undone.`,
+                    destructive: true,
+                  }))
+                ) {
+                  return;
+                }
                 await api.deletePath(openFile.path);
                 setOpenFile(null);
                 refresh();

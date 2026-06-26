@@ -23,6 +23,7 @@ import {
   statusRingStrokeClass,
 } from "../../lib/engagementStatus";
 import { PrimaryButton, SecondaryButton } from "../forms/FormField";
+import { OverflowMenu } from "../OverflowMenu";
 import { StatusBadge } from "../StatusBadge";
 
 export type ProjectTab =
@@ -193,21 +194,15 @@ export function ProjectWorkspaceHeader({
             </button>
           ))}
         </nav>
-        <div className="flex shrink-0 gap-2 pb-2 sm:hidden">
-          <button
-            onClick={onCopySummary}
-            className="rounded-lg border border-surface-border-strong p-2 text-fg-secondary hover:text-fg-primary"
-            title="Copy summary"
-          >
-            <Copy size={16} />
-          </button>
-          <button
-            onClick={onExport}
-            className="rounded-lg bg-brand-600 p-2 text-fg-on-accent hover:bg-brand-500"
-            title="Export report"
-          >
-            <FileDown size={16} />
-          </button>
+        <div className="pb-2 sm:hidden">
+          <OverflowMenu
+            items={[
+              { label: "Weekly rollup", icon: CalendarDays, onClick: onCopyWeeklyRollup },
+              { label: "Jira export", icon: FileDown, onClick: onJiraExport },
+              { label: "Copy summary", icon: Copy, onClick: onCopySummary },
+              { label: "Export report", icon: FileDown, onClick: onExport, primary: true },
+            ]}
+          />
         </div>
       </div>
 

@@ -55,7 +55,7 @@ export function Dashboard({
   }, [projectKey, projects, refreshKey]);
 
   return (
-    <div className="h-full overflow-y-auto p-8">
+    <div className="hub-page-shell">
       <div className="mx-auto max-w-3xl">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600/20 text-brand-400">

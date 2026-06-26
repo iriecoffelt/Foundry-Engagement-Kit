@@ -8,6 +8,7 @@ export function createDebouncedSaver<T>(options: {
   delayMs?: number;
   save: (value: T) => Promise<void>;
   onSavingChange?: (saving: boolean) => void;
+  onSaved?: (value: T) => void;
 }): DebouncedSaver<T> {
   const delayMs = options.delayMs ?? 400;
   let pending: T | null = null;
@@ -30,6 +31,7 @@ export function createDebouncedSaver<T>(options: {
     options.onSavingChange?.(true);
     try {
       await options.save(value);
+      options.onSaved?.(value);
     } finally {
       saving = false;
       options.onSavingChange?.(false);

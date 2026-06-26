@@ -80,7 +80,7 @@ export function ProjectsHub({
   }
 
   return (
-    <div className="h-full overflow-y-auto p-8">
+    <div className="hub-page-shell">
       <div className="mx-auto max-w-4xl">
         <div className="flex items-center justify-between">
           <div>

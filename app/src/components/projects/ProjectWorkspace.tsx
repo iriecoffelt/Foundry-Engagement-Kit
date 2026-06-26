@@ -39,6 +39,7 @@ import { ProjectLibrary } from "./ProjectLibrary";
 import { ProjectUsersView } from "./ProjectUsersView";
 import { loadEngagementJson } from "../../lib/engagementData";
 import { loadEngagementStatus } from "../../lib/engagementMeta";
+import { useConfirm } from "../../context/ConfirmContext";
 import { ProjectDataProvider, useProjectData } from "./ProjectDataProvider";
 
 const ArchitectureEditor = lazy(() =>
@@ -62,6 +63,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
 }
 
 function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspaceProps) {
+  const confirm = useConfirm();
   const { uploads, docTree, loadDocTree, reloadDocTree, refreshUploads } = useProjectData();
   const [tab, setTab] = useState<ProjectTab>(initialTab ?? "overview");
   const tabHistoryRef = useRef<ProjectTab[]>([]);
@@ -78,6 +80,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [checklistVersion, setChecklistVersion] = useState(0);
   const [deliveryCardId, setDeliveryCardId] = useState<string | null>(null);
+  const [docsSidebarOpen, setDocsSidebarOpen] = useState(true);
   const hydrateGenRef = useRef(0);
 
   useEffect(() => {
@@ -258,7 +261,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
 
       <div className="min-h-0 flex-1">
         {tab === "overview" && (
-          <div className="h-full scroll-region p-6">
+          <div className="h-full scroll-region page-padding">
             <div className="mx-auto max-w-3xl space-y-6">
               <div className="overview-section">
                 <PhaseStepper
@@ -288,7 +291,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
                 />
               </div>
               {overview ? (
-                <div className="overview-section card-kit-scroll p-4">
+                <div className="overview-section overview-section-lazy card-kit-scroll p-4">
                   <MarkdownPreview content={overview} />
                 </div>
               ) : (
@@ -343,6 +346,9 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
             <HubSidebar
               title="Documents"
               subtitle="Project folder tree"
+              open={docsSidebarOpen}
+              onOpenChange={setDocsSidebarOpen}
+              collapsibleOnDesktop
               actions={
                 <div className="flex flex-wrap gap-2">
                   <DocumentTemplatePicker projectPath={projectMeta.path} onCreated={openDoc} />
@@ -361,10 +367,21 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
                   const content = await api.readFile(path);
                   setOpenFile({ path, content, dirty: false });
                   trackRecent(path, path.split("/").pop() || path, "Documents");
+                  setDocsSidebarOpen(false);
                 }}
               />
             </HubSidebar>
-            <HubMain>
+            <HubMain
+              onOpenSidebar={() => setDocsSidebarOpen(true)}
+              sidebarToggleOnDesktop={!docsSidebarOpen}
+              header={
+                openFile ? (
+                  <p className="truncate text-sm font-medium text-fg-primary">
+                    {openFile.path.split("/").pop()}
+                  </p>
+                ) : undefined
+              }
+            >
               {openFile ? (
                 <Editor
                   path={openFile.path}
@@ -377,7 +394,16 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
                     setOpenFile({ ...openFile, dirty: false });
                   }}
                   onDelete={async () => {
-                    if (!confirm(`Delete ${openFile.path}?`)) return;
+                    const name = openFile.path.split("/").pop() || openFile.path;
+                    if (
+                      !(await confirm({
+                        title: "Delete document",
+                        message: `Delete ${name}? This cannot be undone.`,
+                        destructive: true,
+                      }))
+                    ) {
+                      return;
+                    }
                     await api.deletePath(openFile.path);
                     setOpenFile(null);
                     await reloadDocTree();

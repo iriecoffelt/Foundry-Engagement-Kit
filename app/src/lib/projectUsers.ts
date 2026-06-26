@@ -82,7 +82,37 @@ export function mergeStakeholdersIntoUsers(
   users: ProjectUser[],
   stakeholders: Stakeholder[],
 ): ProjectUser[] {
-  const next = users.map((u) => ({ ...u }));
+  const stakeholderIds = new Set(
+    stakeholders.map((sh) => sh.id).filter((id): id is string => Boolean(id)),
+  );
+  const stakeholderNames = new Set(
+    stakeholders
+      .map((sh) => sh.name?.trim().toLowerCase())
+      .filter((name): name is string => Boolean(name)),
+  );
+
+  const pruned = users.flatMap((u): ProjectUser[] => {
+    if (u.stakeholderId) {
+      if (stakeholderIds.has(u.stakeholderId)) return [u];
+      if (u.kind === "both") {
+        return [{ ...u, kind: "team", stakeholderId: undefined }];
+      }
+      if (u.kind === "stakeholder") {
+        return [];
+      }
+      return [{ ...u, stakeholderId: undefined }];
+    }
+
+    if (u.kind === "stakeholder") {
+      const nameKey = u.name.trim().toLowerCase();
+      if (nameKey && stakeholderNames.has(nameKey)) return [u];
+      return [];
+    }
+
+    return [u];
+  });
+
+  const next = pruned.map((u) => ({ ...u }));
   const byStakeholderId = new Map(
     next.filter((u) => u.stakeholderId).map((u) => [u.stakeholderId!, u]),
   );
@@ -157,18 +187,33 @@ export function buildProjectUsersFromWizard(
 export async function loadProjectUsers(projectPath: string): Promise<ProjectUser[]> {
   try {
     const eng = await loadEngagementJson(projectPath);
+    const stakeholders = Array.isArray(eng.stakeholders)
+      ? (eng.stakeholders as Stakeholder[])
+      : [];
+
     let users = Array.isArray(eng.projectUsers)
       ? (eng.projectUsers as ProjectUser[]).map(normalizeUser)
       : [];
 
     if (!users.length) {
       users = seedUsersFromEngagement(eng);
-      if (users.length) {
-        await saveEngagementJson(projectPath, { ...eng, projectUsers: users });
-      }
     }
 
-    return users.filter((u) => u.name.trim());
+    const synced = mergeStakeholdersIntoUsers(users, stakeholders).filter((u) => u.name.trim());
+
+    const syncKey = (list: ProjectUser[]) =>
+      [...list]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((u) => `${u.id}:${u.kind}:${u.stakeholderId ?? ""}:${u.name}`)
+        .join("|");
+
+    const changed = users.length > 0 && syncKey(synced) !== syncKey(users);
+
+    if (changed) {
+      await saveEngagementJson(projectPath, { ...eng, projectUsers: synced });
+    }
+
+    return synced;
   } catch {
     return [];
   }
@@ -183,7 +228,12 @@ export async function saveProjectUsers(
     .map(normalizeUser);
 
   const eng = await loadEngagementJson(projectPath);
-  await saveEngagementJson(projectPath, { ...eng, projectUsers: cleaned });
+  const stakeholders = Array.isArray(eng.stakeholders)
+    ? (eng.stakeholders as Stakeholder[])
+    : [];
+  const synced = mergeStakeholdersIntoUsers(cleaned, stakeholders);
+
+  await saveEngagementJson(projectPath, { ...eng, projectUsers: synced });
 }
 
 export function kindLabel(kind: ProjectUserKind): string {

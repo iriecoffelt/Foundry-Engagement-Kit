@@ -7,6 +7,9 @@ import {
   saveProjectUsers,
 } from "../../lib/projectUsers";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
+import { useConfirm } from "../../context/ConfirmContext";
+import { useToast } from "../../context/ToastContext";
+import { subscribeEngagementSaved } from "../../lib/engagementData";
 import type { ProjectMeta, ProjectUser } from "../../types";
 import { Field, PrimaryButton, TextInput } from "../forms/FormField";
 import { OrganizationSelect } from "../OrganizationSelect";
@@ -17,10 +20,11 @@ interface ProjectUsersViewProps {
 }
 
 export function ProjectUsersView({ project }: ProjectUsersViewProps) {
+  const confirm = useConfirm();
+  const showToast = useToast();
   const [users, setUsers] = useState<ProjectUser[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
   const usersRef = useRef<ProjectUser[]>([]);
   usersRef.current = users;
 
@@ -35,9 +39,16 @@ export function ProjectUsersView({ project }: ProjectUsersViewProps) {
     load();
   }, [load]);
 
+  useEffect(() => {
+    return subscribeEngagementSaved((projectPath) => {
+      if (projectPath === project.path) load();
+    });
+  }, [load, project.path]);
+
   const { schedule: scheduleSave, flushNow: flushSave } = useDebouncedPersist<ProjectUser[]>({
     save: (next) => saveProjectUsers(project.path, next),
     onSavingChange: setSaving,
+    onSaved: () => showToast("Users saved"),
   });
 
   const applyUsers = useCallback(
@@ -45,10 +56,7 @@ export function ProjectUsersView({ project }: ProjectUsersViewProps) {
       usersRef.current = next;
       setUsers(next);
       if (immediate) {
-        void flushSave(next).then(() => {
-          setMessage("Saved to engagement.json");
-          setTimeout(() => setMessage(""), 2500);
-        });
+        void flushSave(next).then(() => showToast("Users saved"));
       } else {
         scheduleSave(next);
       }
@@ -72,10 +80,17 @@ export function ProjectUsersView({ project }: ProjectUsersViewProps) {
     setSelectedId(member.id);
   };
 
-  const removeSelected = () => {
+  const removeSelected = async () => {
     if (!selected) return;
     if (selected.stakeholderId && selected.kind !== "team") {
-      if (!confirm("Remove this stakeholder from the user list? They remain on the stakeholder map.")) return;
+      const ok = await confirm({
+        title: "Remove user",
+        message:
+          "Remove this stakeholder from the user list? They remain on the stakeholder map.",
+        confirmLabel: "Remove",
+        destructive: true,
+      });
+      if (!ok) return;
     }
     const next = usersRef.current.filter((u) => u.id !== selected.id);
     applyUsers(next, true);
@@ -86,7 +101,7 @@ export function ProjectUsersView({ project }: ProjectUsersViewProps) {
   const stakeholderUsers = users.filter((u) => u.kind === "stakeholder" || u.kind === "both");
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="page-shell">
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -199,7 +214,6 @@ export function ProjectUsersView({ project }: ProjectUsersViewProps) {
           </div>
         </div>
 
-        {message && <p className="mt-4 text-sm text-brand-300">{message}</p>}
         {saving && <p className="mt-2 text-sm text-fg-muted">Saving…</p>}
       </div>
     </div>

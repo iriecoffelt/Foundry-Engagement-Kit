@@ -77,7 +77,7 @@ export function UatTrackerView({ projectPath }: UatTrackerViewProps) {
   const progress = uatProgress(scenarios);
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="page-shell">
       <div className="mx-auto max-w-4xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

@@ -2,6 +2,7 @@ import { Command, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import type { FileEntry, ProjectMeta, Section } from "../types";
+import { OverlayPortal } from "./OverlayPortal";
 
 export interface CommandAction {
   id: string;
@@ -131,8 +132,15 @@ export function CommandPalette({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 pt-[15vh]">
-      <div className="w-full max-w-lg rounded-xl border border-surface-border-strong bg-surface-raised shadow-2xl">
+    <OverlayPortal open={open}>
+      <div
+        className="fixed inset-0 z-[100] flex items-start justify-center bg-black/70 p-4 pt-[15vh]"
+        onClick={onClose}
+      >
+        <div
+          className="w-full max-w-lg rounded-xl border border-surface-border-strong bg-surface-raised shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
         <div className="flex items-center gap-3 border-b border-surface-border px-4">
           <Search size={18} className="text-fg-muted" />
           <input
@@ -173,7 +181,8 @@ export function CommandPalette({
             ))
           )}
         </ul>
+        </div>
       </div>
-    </div>
+    </OverlayPortal>
   );
 }

@@ -88,7 +88,7 @@ export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: Se
   };
 
   return (
-    <div className="h-full overflow-y-auto p-8">
+    <div className="hub-page-shell">
       <div className="mx-auto max-w-2xl space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-fg-primary">Settings</h2>

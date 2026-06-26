@@ -28,6 +28,7 @@ function formatStandupLabel(path: string): string {
 }
 
 export function DailyHub({ projects, onRefresh, startWizard, onWizardConsumed }: DailyHubProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [editPath, setEditPath] = useState<string | null>(null);
   const [editMarkdown, setEditMarkdown] = useState<string | undefined>();
@@ -75,6 +76,7 @@ export function DailyHub({ projects, onRefresh, startWizard, onWizardConsumed }:
     const text = await api.readFile(path);
     setSelected(path);
     setContent(text);
+    setSidebarOpen(false);
   };
 
   const startEdit = () => {
@@ -114,6 +116,8 @@ export function DailyHub({ projects, onRefresh, startWizard, onWizardConsumed }:
       <HubSidebar
         title="Daily"
         subtitle="Standups by project"
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
         actions={
           <PrimaryButton onClick={() => setShowWizard(true)}>
             <span className="flex w-full items-center justify-center gap-1.5">
@@ -158,6 +162,7 @@ export function DailyHub({ projects, onRefresh, startWizard, onWizardConsumed }:
       </HubSidebar>
 
       <HubMain
+        onOpenSidebar={() => setSidebarOpen(true)}
         header={
           selected ? (
             <HubMainTitle
