@@ -4,6 +4,7 @@ import { api } from "../../lib/api";
 import type { ProjectMeta } from "../../types";
 import { PrimaryButton } from "../forms/FormField";
 import { StatusBadge } from "../StatusBadge";
+import { Tooltip } from "../Tooltip";
 import { ProjectSetupWizard } from "../wizards/ProjectSetupWizard";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 import type { ProjectTab } from "./ProjectWorkspaceHeader";
@@ -143,13 +144,14 @@ export function ProjectsHub({
                     )}
                   </div>
                 </button>
-                <button
-                  onClick={(e) => cloneProject(p, e)}
-                  title="Clone engagement"
-                  className="absolute right-3 top-3 rounded-lg p-1.5 text-fg-muted opacity-0 transition hover:bg-surface-elevated hover:text-fg-primary group-hover:opacity-100"
-                >
-                  <Copy size={16} />
-                </button>
+                <Tooltip content="Clone this engagement as a new project" position="left">
+                  <button
+                    onClick={(e) => cloneProject(p, e)}
+                    className="absolute right-3 top-3 rounded-lg p-1.5 text-fg-muted opacity-0 transition hover:bg-surface-elevated hover:text-fg-primary group-hover:opacity-100"
+                  >
+                    <Copy size={16} />
+                  </button>
+                </Tooltip>
               </div>
             ))}
           </div>

@@ -14,6 +14,7 @@ import type { LucideIcon } from "lucide-react";
 import type { Section } from "../types";
 import { AppBrand } from "./AppBrand";
 import { ShortcutKbd } from "./ShortcutKbd";
+import { Tooltip } from "./Tooltip";
 
 interface SidebarProps {
   section: Section;
@@ -119,16 +120,18 @@ export function Sidebar({
       </nav>
 
       <div className="space-y-1 border-t border-surface-border p-3">
-        <button
-          onClick={onOpenCommandPalette}
-          className="nav-item nav-item-inactive justify-between"
-        >
-          <span className="flex items-center gap-3">
-            <Search size={18} />
-            Quick search
-          </span>
-          <ShortcutKbd keys="K" />
-        </button>
+        <Tooltip content="Search projects, files, and quick actions" position="right">
+          <button
+            onClick={onOpenCommandPalette}
+            className="nav-item nav-item-inactive justify-between"
+          >
+            <span className="flex items-center gap-3">
+              <Search size={18} />
+              Quick search
+            </span>
+            <ShortcutKbd keys="K" />
+          </button>
+        </Tooltip>
         <button
           onClick={() => onSectionChange("settings")}
           className={`nav-item ${section === "settings" ? "nav-item-active" : "nav-item-inactive"}`}
