@@ -249,7 +249,7 @@
   }
 
   .tab-segment-item {
-    @apply relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition duration-150;
+    @apply relative flex min-h-[44px] items-center gap-2 px-4 py-2.5 text-sm font-medium transition duration-150;
   }
 
   .tab-segment-active {

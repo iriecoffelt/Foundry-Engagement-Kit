@@ -5,6 +5,8 @@ export interface OnboardingState {
   workspaceConfigured: boolean;
   firstEngagementCreated: boolean;
   firstStandupDone: boolean;
+  foundryStackConfigured?: boolean;
+  libraryCustomized?: boolean;
 }
 
 const DEFAULT: OnboardingState = {
@@ -12,6 +14,8 @@ const DEFAULT: OnboardingState = {
   workspaceConfigured: false,
   firstEngagementCreated: false,
   firstStandupDone: false,
+  foundryStackConfigured: false,
+  libraryCustomized: false,
 };
 
 export function loadOnboarding(): OnboardingState {
