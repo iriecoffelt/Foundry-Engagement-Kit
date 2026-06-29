@@ -1,9 +1,10 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, Keyboard } from "lucide-react";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { pickDirectoryPath } from "../lib/path";
 import { BackupSection } from "./settings/BackupSection";
+import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { NotificationSettings } from "./settings/NotificationSettings";
 import { ThemeSelector } from "./settings/ThemeSelector";
 import { ShortcutKbd } from "./ShortcutKbd";
@@ -44,6 +45,7 @@ export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: Se
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [folderName, setFolderName] = useState("Foundry Engagement Kit");
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const pickExisting = async () => {
     setError("");
@@ -178,6 +180,24 @@ export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: Se
           </ol>
         </Section>
 
+        <Section
+          title="Keyboard shortcuts"
+          description="Navigate and work faster with keyboard shortcuts."
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShortcutsOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm text-fg-on-accent hover:bg-brand-500"
+            >
+              <Keyboard size={16} />
+              View all shortcuts
+            </button>
+            <span className="text-sm text-fg-muted">
+              Quick tip: Press <ShortcutKbd keys="K" /> to open the command palette
+            </span>
+          </div>
+        </Section>
+
         <Section title="Using the app">
           <ul className="space-y-2 text-sm text-fg-body">
             <li>
@@ -275,6 +295,11 @@ export function SettingsView({ workspaceRoot, onWorkspaceChange, onRefresh }: Se
           </ul>
         </Section>
       </div>
+
+      <KeyboardShortcutsModal
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
     </div>
   );
 }
