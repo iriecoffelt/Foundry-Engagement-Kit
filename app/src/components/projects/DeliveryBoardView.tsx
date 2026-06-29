@@ -33,6 +33,7 @@ import {
   TextArea,
   TextInput,
 } from "../forms/FormField";
+import { DeliveryBoardSkeleton } from "../Skeleton";
 import { UserPicker } from "./UserPicker";
 import { useEscapeKey } from "../../lib/useEscapeKey";
 
@@ -61,6 +62,7 @@ type PointerSession = {
 export function DeliveryBoardView({ projectPath, initialSelectedCardId }: DeliveryBoardViewProps) {
   const [board, setBoard] = useState<DeliveryBoard>({ cards: [] });
   const [deliveryTypes, setDeliveryTypes] = useState<DeliveryTypeDefinition[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const [newTitle, setNewTitle] = useState("");
@@ -74,14 +76,19 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   const suppressClickRef = useRef(false);
 
   const load = useCallback(async () => {
-    const [data, types] = await Promise.all([
-      loadDeliveryBoard(projectPath),
-      loadDeliveryTypes(),
-    ]);
-    setDeliveryTypes(types);
-    setBoard(data.cards.length ? data : await seedFromArchitecture(projectPath));
-    const register = await loadRegister(projectPath);
-    setBlockers(openBlockers(register));
+    setLoading(true);
+    try {
+      const [data, types] = await Promise.all([
+        loadDeliveryBoard(projectPath),
+        loadDeliveryTypes(),
+      ]);
+      setDeliveryTypes(types);
+      setBoard(data.cards.length ? data : await seedFromArchitecture(projectPath));
+      const register = await loadRegister(projectPath);
+      setBlockers(openBlockers(register));
+    } finally {
+      setLoading(false);
+    }
   }, [projectPath]);
 
   useEffect(() => {
@@ -257,6 +264,10 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   const grouped = boardByStatus(board);
 
   useEscapeKey(() => setSelectedId(null), Boolean(selectedId));
+
+  if (loading) {
+    return <DeliveryBoardSkeleton />;
+  }
 
   return (
     <div className={`flex h-full min-h-0 ${draggingId ? "select-none" : ""}`}>
