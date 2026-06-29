@@ -1,10 +1,11 @@
 import { Copy, FolderKanban, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
-import type { ProjectMeta } from "../../types";
+import type { EngagementType, ProjectMeta } from "../../types";
 import { PrimaryButton } from "../forms/FormField";
 import { StatusBadge } from "../StatusBadge";
 import { Tooltip } from "../Tooltip";
+import { EngagementTypeBadge } from "../EngagementTypeBadge";
 import { ProjectSetupWizard } from "../wizards/ProjectSetupWizard";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 import type { ProjectTab } from "./ProjectWorkspaceHeader";
@@ -31,11 +32,36 @@ export function ProjectsHub({
   onBack,
 }: ProjectsHubProps) {
   const [showWizard, setShowWizard] = useState(false);
+  const [engagementTypes, setEngagementTypes] = useState<Record<string, EngagementType>>({});
 
   const activeProject = useMemo(
     () => (activeProjectSlug ? projects.find((p) => p.slug === activeProjectSlug) ?? null : null),
     [activeProjectSlug, projects],
   );
+
+  const load = async () => {
+    const list = await api.listProjectsWithMeta();
+    setProjects(list);
+
+    const types: Record<string, EngagementType> = {};
+    for (const p of list) {
+      try {
+        const eng = await api.readJson<{ engagementType?: EngagementType }>(
+          `${p.path}/engagement.json`,
+        );
+        if (eng.engagementType) {
+          types[p.slug] = eng.engagementType;
+        }
+      } catch {
+        /* no engagement type set */
+      }
+    }
+    setEngagementTypes(types);
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
 
   useEffect(() => {
     if (startWizard) {
@@ -119,7 +145,12 @@ export function ProjectsHub({
                   onClick={() => onOpenProject(p.slug)}
                   className="w-full p-5 text-left"
                 >
-                  <p className="font-semibold text-fg-primary">{p.display_name}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-fg-primary">{p.display_name}</p>
+                    {engagementTypes[p.slug] && (
+                      <EngagementTypeBadge type={engagementTypes[p.slug]} size="sm" />
+                    )}
+                  </div>
                   <p className="mt-1 text-sm text-fg-secondary">{p.customer || "No customer set"}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <StatusBadge status={p.status} />

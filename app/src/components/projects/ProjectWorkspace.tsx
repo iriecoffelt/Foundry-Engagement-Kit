@@ -7,7 +7,7 @@ import { computePhaseProgress } from "../../lib/phaseChecklist";
 import { copyToClipboard, generateCustomerSummary } from "../../lib/customerSummary";
 import { buildWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
-import type { EngagementStatus, ProjectMeta } from "../../types";
+import type { EngagementStatus, EngagementType, FileEntry, ProjectMeta } from "../../types";
 import {
   engagementFromJson,
   generateProjectReadme,
@@ -103,6 +103,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
   const [checklistVersion, setChecklistVersion] = useState(0);
   const [deliveryCardId, setDeliveryCardId] = useState<string | null>(null);
   const [architectureNodeId, setArchitectureNodeId] = useState<string | null>(null);
+  const [engagementType, setEngagementType] = useState<EngagementType | undefined>(undefined);
   const hydrateGenRef = useRef(0);
 
   useEffect(() => {
@@ -195,6 +196,9 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
             targetGoLive: projectMeta.target_go_live,
           });
           overviewContent = generateProjectReadme(projectMeta.slug, data);
+          if (eng.engagementType) {
+            setEngagementType(eng.engagementType as EngagementType);
+          }
         } catch {
           overviewContent = unfilledTemplateNotice(projectMeta.display_name);
         }
@@ -203,6 +207,17 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
       trackRecent(`${projectMeta.path}/README.md`, projectMeta.display_name, "Overview");
     } catch {
       setOverview(unfilledTemplateNotice(projectMeta.display_name));
+    }
+
+    try {
+      const eng = await api.readJson<Record<string, unknown>>(
+        `${projectMeta.path}/engagement.json`,
+      );
+      if (eng.engagementType) {
+        setEngagementType(eng.engagementType as EngagementType);
+      }
+    } catch {
+      /* engagement type not set */
     }
   }, [
     projectMeta.path,
@@ -283,6 +298,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
         phaseProgress={phaseProgress}
         message={message}
         backLabel={tabBackLabel}
+        engagementType={engagementType}
         onBack={handleBack}
         onTabChange={changeTab}
         onCopySummary={copySummary}
@@ -299,13 +315,17 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
                 <PhaseStepper
                   projectPath={projectMeta.path}
                   currentStatus={projectMeta.status}
+                  engagementType={engagementType}
                   onProgressChange={handleProgressChange}
                   onStatusChange={handleStatusChange}
                   onChecklistSaved={bumpChecklist}
                 />
               </div>
               <div className="overview-section">
-                <MilestoneTracker projectPath={projectMeta.path} />
+                <MilestoneTracker
+                  projectPath={projectMeta.path}
+                  engagementType={engagementType}
+                />
               </div>
               <div className="overview-section">
                 <EngagementTimeline

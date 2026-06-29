@@ -1,7 +1,11 @@
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { loadEngagementJson, saveEngagementJson } from "../../lib/engagementData";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
+import {
+  getEngagementTypeConfig,
+  type EngagementType,
+} from "../../lib/engagementTypes";
 import type { Milestone } from "../../types";
 import { SelectInput, TextInput } from "../forms/FormField";
 
@@ -14,13 +18,26 @@ const DEFAULT_MILESTONES: Milestone[] = [
   { id: "m5", name: "Handoff complete", targetDate: "", status: "pending" },
 ];
 
-interface MilestoneTrackerProps {
-  projectPath: string;
+function buildSuggestedMilestones(engagementType: EngagementType | undefined): Milestone[] {
+  const config = getEngagementTypeConfig(engagementType);
+  return config.suggestedMilestones.map((m, i) => ({
+    id: `m${i}`,
+    name: m.name,
+    targetDate: "",
+    status: "pending" as const,
+  }));
 }
 
-export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
+interface MilestoneTrackerProps {
+  projectPath: string;
+  engagementType?: EngagementType;
+}
+
+export function MilestoneTracker({ projectPath, engagementType }: MilestoneTrackerProps) {
   const [milestones, setMilestones] = useState<Milestone[]>(DEFAULT_MILESTONES);
   const [saving, setSaving] = useState(false);
+<<<<<<< HEAD
+  const [hasLoaded, setHasLoaded] = useState(false);
   const milestonesRef = useRef(milestones);
   milestonesRef.current = milestones;
 
@@ -30,8 +47,13 @@ export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
     if (loaded.length) {
       milestonesRef.current = loaded;
       setMilestones(loaded);
+    } else if (engagementType) {
+      const suggested = buildSuggestedMilestones(engagementType);
+      milestonesRef.current = suggested;
+      setMilestones(suggested);
     }
-  }, [projectPath]);
+    setHasLoaded(true);
+  }, [projectPath, engagementType]);
 
   useEffect(() => {
     load();
@@ -74,6 +96,15 @@ export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
     );
   };
 
+  const useSuggestedMilestones = () => {
+    save(buildSuggestedMilestones(engagementType));
+  };
+
+  const allEmpty = milestones.every(
+    (m) => !m.name.trim() || m.name === "New milestone" || m.name === DEFAULT_MILESTONES.find((d) => d.id === m.id)?.name,
+  );
+  const showSuggestButton = hasLoaded && engagementType && (milestones.length === 0 || allEmpty);
+
   return (
     <div className="rounded-xl border border-surface-border bg-surface-raised/50 p-5">
       <div className="flex items-center justify-between">
@@ -81,10 +112,38 @@ export function MilestoneTracker({ projectPath }: MilestoneTrackerProps) {
           <h3 className="font-semibold text-fg-primary">Milestones</h3>
           <p className="mt-0.5 text-xs text-fg-muted">Dates and delivery gates — separate from checklist %</p>
         </div>
-        <button onClick={addCustom} className="text-xs text-brand-400 hover:text-brand-300">
-          <Plus size={14} className="inline" /> Add
-        </button>
+        <div className="flex items-center gap-2">
+          {engagementType && (
+            <button
+              onClick={useSuggestedMilestones}
+              className="text-xs text-amber-400 hover:text-amber-300"
+              title={`Use suggested milestones for ${getEngagementTypeConfig(engagementType).label}`}
+            >
+              <Sparkles size={14} className="inline" /> Use suggested
+            </button>
+          )}
+          <button onClick={addCustom} className="text-xs text-brand-400 hover:text-brand-300">
+            <Plus size={14} className="inline" /> Add
+          </button>
+        </div>
       </div>
+
+      {showSuggestButton && (
+        <div className="mt-3 rounded-lg border border-amber-900/30 bg-amber-950/20 px-4 py-3">
+          <p className="text-sm text-amber-200">
+            <Sparkles size={14} className="mr-1.5 inline text-amber-400" />
+            Suggested milestones available for{" "}
+            <span className="font-medium">{getEngagementTypeConfig(engagementType).label}</span>
+          </p>
+          <button
+            onClick={useSuggestedMilestones}
+            className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500"
+          >
+            Use suggested milestones
+          </button>
+        </div>
+      )}
+
       <div className="mt-4 space-y-3">
         {milestones.map((m) => (
           <div key={m.id} className="grid gap-2 sm:grid-cols-3">

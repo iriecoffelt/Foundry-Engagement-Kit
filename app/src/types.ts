@@ -37,6 +37,7 @@ export interface ProjectMeta {
   customer: string;
   status: string;
   target_go_live: string;
+  engagement_type?: EngagementType;
 }
 
 export type EngagementStatus =
@@ -74,6 +75,8 @@ export interface SuccessMetric {
   target: string;
 }
 
+export type EngagementType = 'greenfield' | 'migration' | 'enhancement' | 'enablement';
+
 export interface EngagementData {
   displayName: string;
   customer: string;
@@ -81,6 +84,7 @@ export interface EngagementData {
   startDate: string;
   targetGoLive: string;
   status: EngagementStatus;
+  engagementType?: EngagementType;
   description: string;
   asIs: string;
   pain: string;
