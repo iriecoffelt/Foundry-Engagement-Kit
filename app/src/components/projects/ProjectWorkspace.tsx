@@ -311,7 +311,10 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
                 />
               </div>
               <div className="overview-section">
-                <MilestoneTracker projectPath={projectMeta.path} />
+                <MilestoneTracker
+                  projectPath={projectMeta.path}
+                  engagementType={engagementType}
+                />
               </div>
               <div className="overview-section">
                 <EngagementTimeline
