@@ -72,6 +72,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [checklistVersion, setChecklistVersion] = useState(0);
   const [deliveryCardId, setDeliveryCardId] = useState<string | null>(null);
+  const [architectureNodeId, setArchitectureNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     setProjectMeta(project);
@@ -291,6 +292,12 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
           <DeliveryBoardView
             projectPath={projectMeta.path}
             initialSelectedCardId={deliveryCardId}
+            onNavigateToArchitecture={(nodeId) => {
+              setArchitectureNodeId(nodeId);
+              setDeliveryCardId(null);
+              changeTab("architecture");
+            }}
+            onOpenDocument={openDoc}
           />
         )}
 
@@ -319,8 +326,10 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
           <Suspense fallback={<SectionFallback />}>
             <ArchitectureEditor
               projectPath={projectMeta.path}
+              initialSelectedNodeId={architectureNodeId}
               onOpenDelivery={(cardId) => {
                 setDeliveryCardId(cardId);
+                setArchitectureNodeId(null);
                 changeTab("delivery");
               }}
             />
