@@ -1,1 +1,19 @@
 reference/uploads/
+
+# Local preferences and state (personal, not shared)
+.local/
+*.local
+*.local.json
+
+# Focus timer state
+focus-state.json
+
+# Editor temp files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# User-specific settings
+.user-prefs.json

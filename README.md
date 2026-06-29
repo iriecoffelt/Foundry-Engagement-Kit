@@ -108,6 +108,51 @@ foundry-engagement-kit/
     └── uploads/            # Library file uploads (created by app)
 ```
 
+## Collaboration
+
+For engagements with multiple FDEs, you can share the workspace via Git.
+
+### Setting up a shared workspace
+
+1. Initialize Git in your workspace folder (if not already done):
+   ```bash
+   cd your-workspace
+   git init
+   git remote add origin <your-repo-url>
+   ```
+
+2. The included `.gitignore` excludes personal files automatically:
+   - Focus timer state
+   - Local UI preferences (file tree expanded state, search history)
+   - Editor temp files
+   - Uploaded reference files (in `reference/uploads/`)
+
+### What's shared vs. personal
+
+| Shared (committed) | Personal (gitignored) |
+|-------------------|----------------------|
+| Project folders and documents | Focus timer sessions |
+| Daily standup notes | File tree expansion state |
+| Weekly reviews and customer syncs | Last search query |
+| Architecture diagrams | Library panel selection |
+| Reference guides | Editor swap files |
+| Engagement metadata | OS-specific files (.DS_Store) |
+
+### Recommended workflow
+
+1. **Pull before starting work**: `git pull --rebase` to get latest changes
+2. **Commit frequently**: Small, focused commits for each completed task
+3. **Use descriptive commit messages**: Include project name and what changed
+4. **Push at end of day**: Share your progress with teammates
+5. **Review conflicts carefully**: Engagement JSON and delivery boards may need manual merge
+
+### Tips for multiple FDEs
+
+- Coordinate on delivery board changes to avoid merge conflicts
+- Use separate daily standup files (each FDE's notes are date-stamped)
+- Assign clear ownership of architecture diagram sections
+- Add your name to decisions (ADRs) you author
+
 ## Principles
 
 1. **Write decisions, not just code** — Foundry engagements outlive individual contributors. ADRs and design docs are deliverables.
