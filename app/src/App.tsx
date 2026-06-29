@@ -14,6 +14,7 @@ import { trackRecent } from "./lib/recent";
 import type { OpenFile, ProjectMeta, Section } from "./types";
 import { Dashboard } from "./components/Dashboard";
 import { Editor } from "./components/Editor";
+import { ErrorBanner } from "./components/ErrorBanner";
 import { FocusFloatingPill } from "./components/focus/FocusFloatingPill";
 import { useFocusTimerContext } from "./context/FocusTimerContext";
 import { Modal } from "./components/Modal";
@@ -195,12 +196,12 @@ const AppMain = memo(function AppMain() {
         />
 
         {error && (
-          <div className="flex items-center justify-between border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-sm text-red-300">
-            <span>{error}</span>
-            <button onClick={() => setError("")} className="text-red-400 hover:text-red-200">
-              Dismiss
-            </button>
-          </div>
+          <ErrorBanner
+            message={error}
+            onDismiss={() => setError("")}
+            action={{ label: "Retry", onClick: refresh }}
+            helpText="Check your workspace configuration or try again"
+          />
         )}
 
         <div className="min-h-0 flex-1">
