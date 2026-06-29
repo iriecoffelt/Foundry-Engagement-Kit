@@ -50,8 +50,8 @@
     --fg-primary: 15 23 42;
     --fg-body: 51 65 85;
     --fg-secondary: 71 85 105;
-    --fg-muted: 100 116 139;
-    --fg-faint: 148 163 184;
+    --fg-muted: 71 85 105;
+    --fg-faint: 100 116 139;
     --fg-on-accent: 255 255 255;
     --ring-subtle: 0 0 0;
     --glow-strength: 0.05;
