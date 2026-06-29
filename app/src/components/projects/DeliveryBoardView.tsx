@@ -1,4 +1,4 @@
-import { ExternalLink, GripVertical, Layers, Plus, X } from "lucide-react";
+import { ArrowRight, ExternalLink, FileText, GripVertical, Layers, Plus, X } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import {
@@ -34,12 +34,15 @@ import {
   TextArea,
   TextInput,
 } from "../forms/FormField";
+import { DeliveryBoardSkeleton } from "../Skeleton";
 import { UserPicker } from "./UserPicker";
 import { useEscapeKey } from "../../lib/useEscapeKey";
 
 interface DeliveryBoardViewProps {
   projectPath: string;
   initialSelectedCardId?: string | null;
+  onNavigateToArchitecture?: (nodeId: string) => void;
+  onOpenDocument?: (path: string) => void;
 }
 
 const DRAG_THRESHOLD_PX = 8;
@@ -59,9 +62,15 @@ type PointerSession = {
   moved: boolean;
 };
 
-export function DeliveryBoardView({ projectPath, initialSelectedCardId }: DeliveryBoardViewProps) {
+export function DeliveryBoardView({
+  projectPath,
+  initialSelectedCardId,
+  onNavigateToArchitecture,
+  onOpenDocument,
+}: DeliveryBoardViewProps) {
   const [board, setBoard] = useState<DeliveryBoard>({ cards: [] });
   const [deliveryTypes, setDeliveryTypes] = useState<DeliveryTypeDefinition[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const [newTitle, setNewTitle] = useState("");
@@ -78,14 +87,19 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   const suppressClickRef = useRef(false);
 
   const load = useCallback(async () => {
-    const [data, types] = await Promise.all([
-      loadDeliveryBoard(projectPath),
-      loadDeliveryTypes(),
-    ]);
-    setDeliveryTypes(types);
-    setBoard(data.cards.length ? data : await seedFromArchitecture(projectPath));
-    const register = await loadRegister(projectPath);
-    setBlockers(openBlockers(register));
+    setLoading(true);
+    try {
+      const [data, types] = await Promise.all([
+        loadDeliveryBoard(projectPath),
+        loadDeliveryTypes(),
+      ]);
+      setDeliveryTypes(types);
+      setBoard(data.cards.length ? data : await seedFromArchitecture(projectPath));
+      const register = await loadRegister(projectPath);
+      setBlockers(openBlockers(register));
+    } finally {
+      setLoading(false);
+    }
   }, [projectPath]);
 
   useEffect(() => {
@@ -271,6 +285,10 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
 
   useEscapeKey(() => setSelectedId(null), Boolean(selectedId));
 
+  if (loading) {
+    return <DeliveryBoardSkeleton />;
+  }
+
   return (
     <div className={`flex h-full min-h-0 ${draggingId ? "select-none" : ""}`}>
       <div className="min-w-0 flex-1 overflow-y-auto overscroll-y-contain p-6">
@@ -378,6 +396,8 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
           onClose={() => setSelectedId(null)}
           onUpdate={(patch) => updateCard(selectedCard.id, patch)}
           onDelete={() => removeCard(selectedCard.id)}
+          onNavigateToArchitecture={onNavigateToArchitecture}
+          onOpenDocument={onOpenDocument}
         />
       )}
     </div>
@@ -468,6 +488,8 @@ function DeliveryCardDetail({
   onClose,
   onUpdate,
   onDelete,
+  onNavigateToArchitecture,
+  onOpenDocument,
 }: {
   projectPath: string;
   card: DeliveryCard;
@@ -475,9 +497,13 @@ function DeliveryCardDetail({
   onClose: () => void;
   onUpdate: (patch: Partial<DeliveryCard>) => void;
   onDelete: () => void;
+  onNavigateToArchitecture?: (nodeId: string) => void;
+  onOpenDocument?: (path: string) => void;
 }) {
   const resourceUrl = card.resourceId?.trim();
   const isUrl = resourceUrl?.startsWith("http://") || resourceUrl?.startsWith("https://");
+  const hasArchitectureLink = card.architectureNodeId && onNavigateToArchitecture;
+  const hasDesignDoc = card.designRef?.trim() && onOpenDocument;
 
   return (
     <aside className="flex w-[22rem] shrink-0 flex-col border-l border-surface-border bg-surface-raised/40">
@@ -578,6 +604,41 @@ function DeliveryCardDetail({
             placeholder="Implementation notes, dependencies, UAT context…"
           />
         </Field>
+
+        {(hasArchitectureLink || hasDesignDoc) && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-fg-muted">Related views</p>
+            <div className="flex flex-wrap gap-2">
+              {hasArchitectureLink && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToArchitecture!(card.architectureNodeId!)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border-strong bg-surface-base/60 px-3 py-1.5 text-xs text-fg-body transition hover:border-brand-500/50 hover:text-brand-400"
+                >
+                  <Layers size={12} />
+                  View in Architecture
+                  <ArrowRight size={10} className="opacity-50" />
+                </button>
+              )}
+              {hasDesignDoc && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const docPath = card.designRef!.startsWith("/")
+                      ? card.designRef!
+                      : `${projectPath}/${card.designRef}`;
+                    onOpenDocument!(docPath);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border-strong bg-surface-base/60 px-3 py-1.5 text-xs text-fg-body transition hover:border-brand-500/50 hover:text-brand-400"
+                >
+                  <FileText size={12} />
+                  Open design doc
+                  <ArrowRight size={10} className="opacity-50" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="rounded-lg bg-surface-base/60 px-3 py-2 text-[10px] text-fg-muted">
           <p>Created {formatDate(card.createdAt)}</p>

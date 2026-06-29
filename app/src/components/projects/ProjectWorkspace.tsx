@@ -78,6 +78,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [checklistVersion, setChecklistVersion] = useState(0);
   const [deliveryCardId, setDeliveryCardId] = useState<string | null>(null);
+  const [architectureNodeId, setArchitectureNodeId] = useState<string | null>(null);
   const hydrateGenRef = useRef(0);
 
   useEffect(() => {
@@ -302,6 +303,12 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
           <DeliveryBoardView
             projectPath={projectMeta.path}
             initialSelectedCardId={deliveryCardId}
+            onNavigateToArchitecture={(nodeId) => {
+              setArchitectureNodeId(nodeId);
+              setDeliveryCardId(null);
+              changeTab("architecture");
+            }}
+            onOpenDocument={openDoc}
           />
         )}
 
@@ -330,8 +337,10 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
           <Suspense fallback={<SectionFallback />}>
             <ArchitectureEditor
               projectPath={projectMeta.path}
+              initialSelectedNodeId={architectureNodeId}
               onOpenDelivery={(cardId) => {
                 setDeliveryCardId(cardId);
+                setArchitectureNodeId(null);
                 changeTab("delivery");
               }}
             />
