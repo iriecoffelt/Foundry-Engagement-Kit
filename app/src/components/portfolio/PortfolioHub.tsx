@@ -4,6 +4,7 @@ import { loadPortfolioSummary, type PortfolioSummary } from "../../lib/portfolio
 import { PHASE_LABELS, PHASE_ORDER } from "../../lib/phaseChecklist";
 import type { EngagementStatus, ProjectMeta } from "../../types";
 import type { ProjectTab } from "../projects/ProjectWorkspaceHeader";
+import { PortfolioSkeleton } from "../Skeleton";
 import { StatusBadge } from "../StatusBadge";
 
 interface PortfolioHubProps {
@@ -28,7 +29,7 @@ export function PortfolioHub({ projects, onOpenProject }: PortfolioHubProps) {
   }
 
   if (!summary) {
-    return <div className="p-8 text-fg-muted">Loading portfolio…</div>;
+    return <PortfolioSkeleton />;
   }
 
   return (
