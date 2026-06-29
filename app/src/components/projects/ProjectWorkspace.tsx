@@ -288,6 +288,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
         phaseProgress={phaseProgress}
         message={message}
         backLabel={tabBackLabel}
+        engagementType={engagementType}
         onBack={handleBack}
         onTabChange={changeTab}
         onCopySummary={copySummary}

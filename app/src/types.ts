@@ -37,6 +37,7 @@ export interface ProjectMeta {
   customer: string;
   status: string;
   target_go_live: string;
+  engagement_type?: EngagementType;
 }
 
 export type EngagementStatus =
