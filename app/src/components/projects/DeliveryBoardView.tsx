@@ -61,6 +61,10 @@ type PointerSession = {
   moved: boolean;
 };
 
+function getStorageKey(projectPath: string) {
+  return `delivery-selected-${projectPath.replace(/[^a-zA-Z0-9]/g, "-")}`;
+}
+
 export function DeliveryBoardView({
   projectPath,
   initialSelectedCardId,
@@ -74,13 +78,33 @@ export function DeliveryBoardView({
   const [syncMessage, setSyncMessage] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState("pipeline");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedIdInternal] = useState<string | null>(() => {
+    if (initialSelectedCardId) return initialSelectedCardId;
+    try {
+      return localStorage.getItem(getStorageKey(projectPath));
+    } catch {
+      return null;
+    }
+  });
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DeliveryStatus | null>(null);
   const [blockers, setBlockers] = useState<BlockerEntry[]>([]);
   const sessionRef = useRef<PointerSession | null>(null);
   const draggingIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef(false);
+
+  const setSelectedId = useCallback((id: string | null) => {
+    setSelectedIdInternal(id);
+    try {
+      if (id) {
+        localStorage.setItem(getStorageKey(projectPath), id);
+      } else {
+        localStorage.removeItem(getStorageKey(projectPath));
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, [projectPath]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,8 +129,10 @@ export function DeliveryBoardView({
   useEffect(() => {
     if (initialSelectedCardId && board.cards.some((c) => c.id === initialSelectedCardId)) {
       setSelectedId(initialSelectedCardId);
+    } else if (selectedId && board.cards.length > 0 && !board.cards.some((c) => c.id === selectedId)) {
+      setSelectedId(null);
     }
-  }, [initialSelectedCardId, board.cards]);
+  }, [initialSelectedCardId, board.cards, selectedId, setSelectedId]);
 
   const persist = useCallback(
     async (next: DeliveryBoard) => {

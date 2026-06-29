@@ -263,6 +263,10 @@ interface ArchitectureEditorProps {
   initialSelectedNodeId?: string | null;
 }
 
+function getArchNodeStorageKey(projectPath: string) {
+  return `arch-selected-node-${projectPath.replace(/[^a-zA-Z0-9]/g, "-")}`;
+}
+
 function ArchitectureEditorInner({ projectPath, onOpenDelivery, initialSelectedNodeId }: ArchitectureEditorProps) {
   const jsonPath = `${projectPath}/02-design/architecture.json`;
   const overviewPath = `${projectPath}/02-design/design-overview.md`;
@@ -271,9 +275,32 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery, initialSelectedN
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [selectedNodeId, setSelectedNodeIdInternal] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(getArchNodeStorageKey(projectPath));
+    } catch {
+      return null;
+    }
+  });
+  const [selectedNodeState, setSelectedNodeState] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [initialNodeHandled, setInitialNodeHandled] = useState(false);
+
+  const setSelectedNode = useCallback((node: Node | null) => {
+    setSelectedNodeState(node);
+    setSelectedNodeIdInternal(node?.id ?? null);
+    try {
+      if (node) {
+        localStorage.setItem(getArchNodeStorageKey(projectPath), node.id);
+      } else {
+        localStorage.removeItem(getArchNodeStorageKey(projectPath));
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, [projectPath]);
+
+  const selectedNode = selectedNodeState;
   const [resolvedTypes, setResolvedTypes] = useState<ResolvedArchNodeType[]>([]);
   const [deliveryByNodeId, setDeliveryByNodeId] = useState<Map<string, DeliveryCard>>(new Map());
   const [stackUrl, setStackUrl] = useState("");
@@ -302,8 +329,22 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery, initialSelectedN
     api
       .readJson<ArchitectureGraph>(jsonPath)
       .then((g) => {
-        setNodes(toFlowNodes(g));
+        const flowNodes = toFlowNodes(g);
+        setNodes(flowNodes);
         setEdges(toFlowEdges(g));
+        if (selectedNodeId) {
+          const restoredNode = flowNodes.find((n) => n.id === selectedNodeId);
+          if (restoredNode) {
+            setSelectedNodeState(restoredNode);
+          } else {
+            setSelectedNodeIdInternal(null);
+            try {
+              localStorage.removeItem(getArchNodeStorageKey(projectPath));
+            } catch {
+              // localStorage unavailable
+            }
+          }
+        }
       })
       .catch(() => {
         setNodes(toFlowNodes(defaultGraph));
@@ -346,7 +387,7 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery, initialSelectedN
       setSelectedNode(selNodes.length === 1 ? selNodes[0] : null);
       setSelectedEdge(selNodes.length === 0 && selEdges.length === 1 ? selEdges[0] : null);
     },
-    [],
+    [setSelectedNode],
   );
 
   useEscapeKey(() => {
@@ -359,11 +400,11 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery, initialSelectedN
       setNodes((nds) =>
         nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [field]: value } } : n)),
       );
-      setSelectedNode((current) =>
-        current?.id === nodeId ? { ...current, data: { ...current.data, [field]: value } } : current,
-      );
+      if (selectedNode?.id === nodeId) {
+        setSelectedNode({ ...selectedNode, data: { ...selectedNode.data, [field]: value } });
+      }
     },
-    [setNodes],
+    [setNodes, selectedNode, setSelectedNode],
   );
 
   const updateEdgeLabel = useCallback(
