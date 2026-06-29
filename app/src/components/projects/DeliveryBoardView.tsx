@@ -37,6 +37,7 @@ import {
 import { DeliveryBoardSkeleton } from "../Skeleton";
 import { UserPicker } from "./UserPicker";
 import { useEscapeKey } from "../../lib/useEscapeKey";
+import { FoundryHealthBadge } from "../foundry";
 
 interface DeliveryBoardViewProps {
   projectPath: string;
@@ -371,6 +372,7 @@ export function DeliveryBoardView({
                       key={card.id}
                       card={card}
                       deliveryTypes={deliveryTypes}
+                      projectPath={projectPath}
                       selected={selectedId === card.id}
                       dragging={draggingId === card.id}
                       onClick={() => onCardClick(card.id)}
@@ -433,6 +435,7 @@ export function DeliveryBoardView({
 const DeliveryCardItem = memo(function DeliveryCardItem({
   card,
   deliveryTypes,
+  projectPath,
   selected,
   dragging,
   onClick,
@@ -442,6 +445,7 @@ const DeliveryCardItem = memo(function DeliveryCardItem({
 }: {
   card: DeliveryCard;
   deliveryTypes: DeliveryTypeDefinition[];
+  projectPath: string;
   selected: boolean;
   dragging: boolean;
   onClick: () => void;
@@ -450,6 +454,9 @@ const DeliveryCardItem = memo(function DeliveryCardItem({
   onRemove: () => void;
 }) {
   const typeStyle = deliveryTypeStyles(deliveryTypes, card.type);
+  const datasetRid = card.resourceId?.startsWith("ri.foundry.main.dataset.")
+    ? card.resourceId
+    : undefined;
 
   return (
     <div
@@ -485,6 +492,14 @@ const DeliveryCardItem = memo(function DeliveryCardItem({
             </span>
             {card.owner && (
               <span className="truncate text-[10px] text-fg-secondary">{card.owner}</span>
+            )}
+            {datasetRid && (
+              <FoundryHealthBadge
+                projectPath={projectPath}
+                datasetRid={datasetRid}
+                showLabel={false}
+                size="sm"
+              />
             )}
           </div>
         </div>
@@ -598,15 +613,25 @@ function DeliveryCardDetail({
             onChange={(v) => onUpdate({ resourceId: v })}
             placeholder="ri.foundry.main.dataset.xxx or https://…"
           />
-          {isUrl && resourceUrl && (
-            <button
-              type="button"
-              onClick={() => api.openUrl(resourceUrl)}
-              className="mt-2 inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300"
-            >
-              <ExternalLink size={12} /> Open in browser
-            </button>
-          )}
+          <div className="mt-2 flex items-center gap-3">
+            {isUrl && resourceUrl && (
+              <button
+                type="button"
+                onClick={() => api.openUrl(resourceUrl)}
+                className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300"
+              >
+                <ExternalLink size={12} /> Open in browser
+              </button>
+            )}
+            {resourceUrl?.startsWith("ri.foundry.main.dataset.") && (
+              <FoundryHealthBadge
+                projectPath={projectPath}
+                datasetRid={resourceUrl}
+                showLabel={true}
+                size="sm"
+              />
+            )}
+          </div>
         </Field>
 
         {blockers.length > 0 && (

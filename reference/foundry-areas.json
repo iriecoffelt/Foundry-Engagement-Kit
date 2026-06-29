@@ -1,0 +1,15 @@
+{
+  "areas": [
+    "Ontology",
+    "Pipeline",
+    "Workshop",
+    "Functions",
+    "Actions",
+    "Data Health",
+    "Schedules",
+    "Data Connection",
+    "Code Repositories",
+    "Customer sync",
+    "Other"
+  ]
+}
