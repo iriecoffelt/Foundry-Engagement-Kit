@@ -18,6 +18,7 @@ import {
 import type { OntologyElement } from "../../types";
 import { OntologyElementTypeSelect } from "../OntologyElementTypeSelect";
 import { Field, FormCard, PrimaryButton, SecondaryButton, TextArea, TextInput } from "../forms/FormField";
+import { FoundryImportButton } from "../foundry";
 
 interface OntologyQuickAddProps {
   projectPath: string;
@@ -148,12 +149,36 @@ export function OntologyQuickAdd({ projectPath, onOpenArchitecture }: OntologyQu
     return map;
   }, [elements]);
 
+  const handleFoundryImport = async (imported: OntologyElement[]) => {
+    await saveAll(imported);
+    setMessage(`Synced ${imported.length} elements from Foundry`);
+    setTimeout(() => setMessage(""), 4000);
+  };
+
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto max-w-2xl space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-fg-primary">Ontology Elements</h2>
+            <p className="text-sm text-fg-secondary">
+              Model object types, links, actions, functions, and other Foundry ontology concepts.
+            </p>
+          </div>
+          <FoundryImportButton
+            projectPath={projectPath}
+            existingElements={elements}
+            onImport={handleFoundryImport}
+            onMessage={(msg) => {
+              setMessage(msg);
+              setTimeout(() => setMessage(""), 4000);
+            }}
+          />
+        </div>
+
         <FormCard
           title="Add ontology element"
-          description="Model object types, links, actions, functions, and other Foundry ontology concepts."
+          description="Define new elements manually or import from Foundry above."
         >
           <Field label="Element type">
             <OntologyElementTypeSelect value={kind} onChange={setKind} />
