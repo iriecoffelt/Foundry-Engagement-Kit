@@ -607,7 +607,7 @@ function DeliveryCardDetail({
           />
         </Field>
 
-        <Field label="Resource / RID" hint="Foundry resource ID or URL">
+        <Field label="Resource / RID" hint="Foundry resource ID or URL" classification="customer-specific">
           <TextInput
             value={card.resourceId || ""}
             onChange={(v) => onUpdate({ resourceId: v })}

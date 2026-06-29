@@ -8,12 +8,34 @@ interface SearchHubProps {
   onOpenPath: (path: string) => void;
 }
 
+const STORAGE_KEY = "search-hub-last-query";
+
+function loadLastQuery(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function saveLastQuery(query: string) {
+  try {
+    localStorage.setItem(STORAGE_KEY, query);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function SearchHub({ projects, onOpenPath }: SearchHubProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(loadLastQuery);
   const [projectFilter, setProjectFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    saveLastQuery(query);
+  }, [query]);
 
   const runSearch = useCallback(async () => {
     if (query.trim().length < 2) {

@@ -29,6 +29,40 @@ type LibraryPanel =
   | "ontology-element-types"
   | "guide";
 
+const PANEL_STORAGE_KEY = "library-hub-panel";
+const GUIDE_STORAGE_KEY = "library-hub-last-guide";
+
+function loadLastPanel(): LibraryPanel {
+  try {
+    const stored = localStorage.getItem(PANEL_STORAGE_KEY);
+    if (stored && stored !== "guide") {
+      return stored as LibraryPanel;
+    }
+  } catch {
+    // Ignore errors
+  }
+  return "none";
+}
+
+function loadLastGuide(): string | null {
+  try {
+    return localStorage.getItem(GUIDE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveSelectedPanel(panel: LibraryPanel, guidePath?: string) {
+  try {
+    localStorage.setItem(PANEL_STORAGE_KEY, panel);
+    if (guidePath) {
+      localStorage.setItem(GUIDE_STORAGE_KEY, guidePath);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function LibraryHub() {
   const [guides, setGuides] = useState<FileEntry[]>([]);
   const [uploads, setUploads] = useState<FileEntry[]>([]);
@@ -38,11 +72,13 @@ export function LibraryHub() {
     dirty: boolean;
   } | null>(null);
   const [status, setStatus] = useState("");
-  const [panel, setPanel] = useState<LibraryPanel>("none");
+  const [panel, setPanel] = useState<LibraryPanel>(loadLastPanel);
+  const [initialGuide] = useState(loadLastGuide);
 
   const refresh = useCallback(async () => {
     const ref = await api.listDirectory("reference", false);
-    setGuides(ref.filter((f) => f.name.endsWith(".md")));
+    const guideFiles = ref.filter((f) => f.name.endsWith(".md"));
+    setGuides(guideFiles);
     try {
       await api.createDirectory("reference/uploads");
       const up = await api.listDirectory("reference/uploads", false);
@@ -50,16 +86,28 @@ export function LibraryHub() {
     } catch {
       setUploads([]);
     }
+    return guideFiles;
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    refresh().then((guideFiles) => {
+      if (initialGuide && guideFiles.some((g) => g.path === initialGuide)) {
+        openGuide(initialGuide);
+      }
+    });
+  }, [refresh, initialGuide]);
 
   const openGuide = async (path: string) => {
     setPanel("guide");
+    saveSelectedPanel("guide", path);
     const content = await api.readFile(path);
     setOpenFile({ path, content, dirty: false });
+  };
+
+  const selectPanel = (newPanel: LibraryPanel) => {
+    setPanel(newPanel);
+    setOpenFile(null);
+    saveSelectedPanel(newPanel);
   };
 
   const upload = async () => {
@@ -81,55 +129,37 @@ export function LibraryHub() {
         <HubSection label="Reference lists" icon={Tags}>
           <HubItem
             selected={panel === "roles"}
-            onClick={() => {
-              setPanel("roles");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("roles")}
           >
             Engagement roles
           </HubItem>
           <HubItem
             selected={panel === "foundry-areas"}
-            onClick={() => {
-              setPanel("foundry-areas");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("foundry-areas")}
           >
             Foundry areas
           </HubItem>
           <HubItem
             selected={panel === "organizations"}
-            onClick={() => {
-              setPanel("organizations");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("organizations")}
           >
             Organizations
           </HubItem>
           <HubItem
             selected={panel === "delivery-types"}
-            onClick={() => {
-              setPanel("delivery-types");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("delivery-types")}
           >
             Delivery types
           </HubItem>
           <HubItem
             selected={panel === "architecture-node-types"}
-            onClick={() => {
-              setPanel("architecture-node-types");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("architecture-node-types")}
           >
             Architecture node types
           </HubItem>
           <HubItem
             selected={panel === "ontology-element-types"}
-            onClick={() => {
-              setPanel("ontology-element-types");
-              setOpenFile(null);
-            }}
+            onClick={() => selectPanel("ontology-element-types")}
           >
             Ontology element types
           </HubItem>

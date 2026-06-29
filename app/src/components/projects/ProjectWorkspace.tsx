@@ -400,6 +400,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
               <FileTree
                 entries={docTree}
                 selectedPath={openFile?.path}
+                storageKey={`project-docs-${project.slug}`}
                 onSelect={async (path) => {
                   const content = await api.readFile(path);
                   setOpenFile({ path, content, dirty: false });
