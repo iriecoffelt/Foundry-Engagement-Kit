@@ -62,13 +62,13 @@ function FileTreeNode({
         {entry.is_dir ? (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="rounded p-1 hover:bg-surface-subtle/50"
+            className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded hover:bg-surface-subtle/50"
             aria-label={expanded ? "Collapse folder" : "Expand folder"}
           >
             {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
         ) : (
-          <span className="inline-block w-6" />
+          <span className="inline-block w-11" />
         )}
 
         <button
@@ -79,7 +79,7 @@ function FileTreeNode({
               onSelect(entry.path);
             }
           }}
-          className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left text-sm"
+          className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 py-2 text-left text-sm"
         >
           {entry.is_dir ? (
             <Folder size={15} className="shrink-0 text-brand-400" />
@@ -95,7 +95,7 @@ function FileTreeNode({
               e.stopPropagation();
               onDelete(entry.path);
             }}
-            className="hidden rounded px-1.5 py-0.5 text-xs text-red-400 group-hover:block hover:bg-red-950/50"
+            className="hidden min-h-[44px] min-w-[44px] items-center justify-center rounded text-xs text-red-400 group-hover:flex hover:bg-red-950/50"
           >
             Delete
           </button>
