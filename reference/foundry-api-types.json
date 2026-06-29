@@ -1,0 +1,155 @@
+{
+  "apiCategories": [
+    {
+      "id": "ontologies",
+      "label": "Ontologies",
+      "description": "Object types, links, actions, interfaces, functions",
+      "sdkPackage": "@osdk/foundry.ontologies",
+      "engagementPhases": ["discovery", "design", "build", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/ontologies", "description": "List all ontologies" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/fullMetadata", "description": "Get complete ontology schema" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/objectTypes", "description": "List object types" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/linkTypes", "description": "List link types" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/actionTypes", "description": "List action types" },
+        { "method": "POST", "path": "/v2/ontologies/{ontology}/objects/{objectType}/search", "description": "Search objects" },
+        { "method": "POST", "path": "/v2/ontologies/{ontology}/actions/{actionType}/apply", "description": "Execute action" }
+      ]
+    },
+    {
+      "id": "datasets",
+      "label": "Datasets",
+      "description": "Dataset CRUD, files, transactions, health checks",
+      "sdkPackage": "@osdk/foundry.datasets",
+      "engagementPhases": ["discovery", "scoping", "build", "deploy"],
+      "endpoints": [
+        { "method": "POST", "path": "/v2/datasets", "description": "Create dataset" },
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}", "description": "Get dataset" },
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}/readTable", "description": "Read table content" },
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}/getHealthCheckReports", "description": "Get health reports" },
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}/getSchedules", "description": "Get schedules" }
+      ]
+    },
+    {
+      "id": "filesystem",
+      "label": "Filesystem",
+      "description": "Projects, folders, permissions, markings",
+      "sdkPackage": "@osdk/foundry.filesystem",
+      "engagementPhases": ["scoping", "deploy", "handoff"],
+      "endpoints": [
+        { "method": "POST", "path": "/v2/filesystem/projects/create", "description": "Create project" },
+        { "method": "GET", "path": "/v2/filesystem/resources/{resourceRid}", "description": "Get resource" },
+        { "method": "GET", "path": "/v2/filesystem/resources/{resourceRid}/roles", "description": "List roles" },
+        { "method": "POST", "path": "/v2/filesystem/resources/{resourceRid}/roles/add", "description": "Add roles" },
+        { "method": "POST", "path": "/v2/filesystem/resources/{resourceRid}/addMarkings", "description": "Add markings" }
+      ]
+    },
+    {
+      "id": "dataHealth",
+      "label": "Data Health",
+      "description": "Health checks, monitoring, alerts",
+      "sdkPackage": "@osdk/foundry.datahealth",
+      "engagementPhases": ["build", "deploy"],
+      "endpoints": [
+        { "method": "POST", "path": "/v2/dataHealth/checks", "description": "Create health check" },
+        { "method": "GET", "path": "/v2/dataHealth/checks/{checkRid}", "description": "Get check" },
+        { "method": "GET", "path": "/v2/dataHealth/checks/{checkRid}/checkReports/getLatest", "description": "Get latest report" }
+      ]
+    },
+    {
+      "id": "orchestration",
+      "label": "Orchestration",
+      "description": "Schedules, builds, pipeline execution",
+      "sdkPackage": "@osdk/foundry.orchestration",
+      "engagementPhases": ["build", "deploy"],
+      "endpoints": [
+        { "method": "POST", "path": "/v2/orchestration/schedules", "description": "Create schedule" },
+        { "method": "POST", "path": "/v2/orchestration/builds", "description": "Trigger build" },
+        { "method": "GET", "path": "/v2/orchestration/builds/{buildRid}", "description": "Get build status" }
+      ]
+    },
+    {
+      "id": "aipAgents",
+      "label": "AIP Chatbots",
+      "description": "AI assistants, LLM integration, RAG",
+      "sdkPackage": "@osdk/foundry.aipagents",
+      "engagementPhases": ["discovery", "design", "build", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/aipAgents/agents/{agentRid}", "description": "Get agent" },
+        { "method": "POST", "path": "/v2/aipAgents/agents/{agentRid}/sessions", "description": "Create session" },
+        { "method": "POST", "path": "/v2/aipAgents/agents/{agentRid}/sessions/{sessionRid}/blockingContinue", "description": "Send message" },
+        { "method": "POST", "path": "/v2/aipAgents/agents/{agentRid}/sessions/{sessionRid}/streamingContinue", "description": "Stream response" }
+      ]
+    },
+    {
+      "id": "functions",
+      "label": "Functions",
+      "description": "Ontology functions, queries, external functions",
+      "sdkPackage": "@osdk/foundry.functions",
+      "engagementPhases": ["build"],
+      "endpoints": [
+        { "method": "POST", "path": "/v2/ontologies/{ontology}/queries/{queryApiName}/execute", "description": "Execute query" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/queryTypes", "description": "List query types" }
+      ]
+    },
+    {
+      "id": "connectivity",
+      "label": "Data Connection",
+      "description": "Sources, webhooks, external transforms",
+      "sdkPackage": "@osdk/foundry.connectivity",
+      "engagementPhases": ["discovery", "design", "build"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/connectivity/sources", "description": "List sources" },
+        { "method": "POST", "path": "/v2/connectivity/webhooks", "description": "Create webhook" }
+      ]
+    },
+    {
+      "id": "admin",
+      "label": "Admin",
+      "description": "Users, groups, organizations, enrollments",
+      "sdkPackage": "@osdk/foundry.admin",
+      "engagementPhases": ["scoping", "deploy", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/admin/users", "description": "List users" },
+        { "method": "GET", "path": "/v2/admin/groups", "description": "List groups" }
+      ]
+    },
+    {
+      "id": "audit",
+      "label": "Audit",
+      "description": "Activity logs, compliance tracking",
+      "sdkPackage": "@osdk/foundry.audit",
+      "engagementPhases": ["deploy", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/audit/logs", "description": "Get audit logs" }
+      ]
+    }
+  ],
+  "sdkPackages": {
+    "core": "@osdk/client",
+    "oauth": "@osdk/oauth",
+    "react": "@osdk/react",
+    "foundry": "@osdk/foundry",
+    "generator": "@osdk/foundry-sdk-generator"
+  },
+  "authMethods": [
+    {
+      "id": "pat",
+      "label": "Personal Access Token",
+      "useCase": "Development, CLI scripts",
+      "scope": "User permissions"
+    },
+    {
+      "id": "publicOauth",
+      "label": "Public OAuth Client",
+      "useCase": "User-facing applications (browser)",
+      "scope": "Delegated user permissions"
+    },
+    {
+      "id": "confidentialOauth",
+      "label": "Confidential OAuth Client",
+      "useCase": "Server-to-server, service accounts",
+      "scope": "Application permissions"
+    }
+  ]
+}

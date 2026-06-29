@@ -1,0 +1,26 @@
+{
+  "areas": [
+    "Ontology",
+    "Pipeline",
+    "Workshop",
+    "Functions",
+    "Actions",
+    "Data Connection",
+    "Webhooks",
+    "AIP Chatbot",
+    "AIP Logic",
+    "Data Health",
+    "Schedules",
+    "Filesystem",
+    "Permissions",
+    "Datasets",
+    "Streaming",
+    "Quiver",
+    "Notepad",
+    "Slate",
+    "Code Repositories",
+    "Marketplace",
+    "Customer sync",
+    "Other"
+  ]
+}
