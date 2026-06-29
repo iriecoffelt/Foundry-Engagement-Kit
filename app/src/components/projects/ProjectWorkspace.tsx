@@ -11,7 +11,7 @@ import {
 import { copyToClipboard, generateCustomerSummary } from "../../lib/customerSummary";
 import { buildWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
-import type { EngagementStatus, FileEntry, ProjectMeta } from "../../types";
+import type { EngagementStatus, EngagementType, FileEntry, ProjectMeta } from "../../types";
 import {
   engagementFromJson,
   generateProjectReadme,
@@ -97,6 +97,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
   const [checklistVersion, setChecklistVersion] = useState(0);
   const [deliveryCardId, setDeliveryCardId] = useState<string | null>(null);
   const [architectureNodeId, setArchitectureNodeId] = useState<string | null>(null);
+  const [engagementType, setEngagementType] = useState<EngagementType | undefined>(undefined);
 
   useEffect(() => {
     setProjectMeta(project);
@@ -183,6 +184,9 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
             targetGoLive: projectMeta.target_go_live,
           });
           overviewContent = generateProjectReadme(projectMeta.slug, data);
+          if (eng.engagementType) {
+            setEngagementType(eng.engagementType as EngagementType);
+          }
         } catch {
           overviewContent = unfilledTemplateNotice(projectMeta.display_name);
         }
@@ -192,6 +196,18 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
     } catch {
       setOverview(unfilledTemplateNotice(projectMeta.display_name));
     }
+
+    try {
+      const eng = await api.readJson<Record<string, unknown>>(
+        `${projectMeta.path}/engagement.json`,
+      );
+      if (eng.engagementType) {
+        setEngagementType(eng.engagementType as EngagementType);
+      }
+    } catch {
+      /* engagement type not set */
+    }
+
     const tree = await api.listDirectory(projectMeta.path, true);
     setDocTree(tree);
     try {
@@ -272,6 +288,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
         phaseProgress={phaseProgress}
         message={message}
         backLabel={tabBackLabel}
+        engagementType={engagementType}
         onBack={handleBack}
         onTabChange={changeTab}
         onCopySummary={copySummary}
@@ -288,13 +305,17 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
                 <PhaseStepper
                   projectPath={projectMeta.path}
                   currentStatus={projectMeta.status}
+                  engagementType={engagementType}
                   onProgressChange={handleProgressChange}
                   onStatusChange={handleStatusChange}
                   onChecklistSaved={bumpChecklist}
                 />
               </div>
               <div className="overview-section">
-                <MilestoneTracker projectPath={projectMeta.path} />
+                <MilestoneTracker
+                  projectPath={projectMeta.path}
+                  engagementType={engagementType}
+                />
               </div>
               <div className="overview-section">
                 <EngagementTimeline

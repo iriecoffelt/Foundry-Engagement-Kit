@@ -16,7 +16,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ProjectMeta } from "../../types";
+import type { EngagementType, ProjectMeta } from "../../types";
 import {
   formatStatusLabel,
   normalizeStatus,
@@ -24,6 +24,7 @@ import {
 } from "../../lib/engagementStatus";
 import { PrimaryButton, SecondaryButton } from "../forms/FormField";
 import { StatusBadge } from "../StatusBadge";
+import { EngagementTypeBadge } from "../EngagementTypeBadge";
 
 export type ProjectTab =
   | "overview"
@@ -100,6 +101,7 @@ interface ProjectWorkspaceHeaderProps {
   phaseProgress: number;
   message: string;
   backLabel?: string;
+  engagementType?: EngagementType;
   onBack: () => void;
   onTabChange: (tab: ProjectTab) => void;
   onCopySummary: () => void;
@@ -114,6 +116,7 @@ export function ProjectWorkspaceHeader({
   phaseProgress,
   message,
   backLabel,
+  engagementType,
   onBack,
   onTabChange,
   onCopySummary,
@@ -137,7 +140,10 @@ export function ProjectWorkspaceHeader({
         <div className="flex items-start gap-4">
           <ProgressRing progress={phaseProgress} status={project.status} />
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-xl font-bold text-fg-primary">{project.display_name}</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="truncate text-xl font-bold text-fg-primary">{project.display_name}</h2>
+              {engagementType && <EngagementTypeBadge type={engagementType} size="md" />}
+            </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               {project.customer && (
                 <span className="rounded-lg bg-surface-elevated/80 px-2.5 py-0.5 text-xs font-medium text-fg-body ring-1 ring-white/5">
