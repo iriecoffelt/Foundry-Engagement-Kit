@@ -54,9 +54,33 @@ interface ProjectWorkspaceProps {
   onBack: () => void;
 }
 
+function getTabStorageKey(projectPath: string) {
+  return `project-tab-${projectPath.replace(/[^a-zA-Z0-9]/g, "-")}`;
+}
+
 export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspaceProps) {
-  const [tab, setTab] = useState<ProjectTab>(initialTab ?? "overview");
+  const [tab, setTabInternal] = useState<ProjectTab>(() => {
+    if (initialTab) return initialTab;
+    try {
+      const stored = localStorage.getItem(getTabStorageKey(project.path));
+      if (stored && Object.keys(PROJECT_TAB_LABELS).includes(stored)) {
+        return stored as ProjectTab;
+      }
+    } catch {
+      // localStorage unavailable
+    }
+    return "overview";
+  });
   const tabHistoryRef = useRef<ProjectTab[]>([]);
+
+  const setTab = useCallback((nextTab: ProjectTab) => {
+    setTabInternal(nextTab);
+    try {
+      localStorage.setItem(getTabStorageKey(project.path), nextTab);
+    } catch {
+      // localStorage unavailable
+    }
+  }, [project.path]);
   const [tabBackLabel, setTabBackLabel] = useState<string | undefined>();
   const [projectMeta, setProjectMeta] = useState(project);
   const [overview, setOverview] = useState("");
@@ -81,19 +105,29 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
   useEffect(() => {
     tabHistoryRef.current = [];
     setTabBackLabel(undefined);
-    if (initialTab) setTab(initialTab);
-    else setTab("overview");
-  }, [initialTab, project.path]);
+    if (initialTab) {
+      setTab(initialTab);
+    } else {
+      try {
+        const stored = localStorage.getItem(getTabStorageKey(project.path));
+        if (stored && Object.keys(PROJECT_TAB_LABELS).includes(stored)) {
+          setTab(stored as ProjectTab);
+          return;
+        }
+      } catch {
+        // localStorage unavailable
+      }
+      setTab("overview");
+    }
+  }, [initialTab, project.path, setTab]);
 
   const changeTab = useCallback((next: ProjectTab) => {
-    setTab((current) => {
-      if (current !== next) {
-        tabHistoryRef.current = pushNavHistory(tabHistoryRef.current, current);
-        setTabBackLabel(PROJECT_TAB_LABELS[current]);
-      }
-      return next;
-    });
-  }, []);
+    if (tab !== next) {
+      tabHistoryRef.current = pushNavHistory(tabHistoryRef.current, tab);
+      setTabBackLabel(PROJECT_TAB_LABELS[tab]);
+    }
+    setTab(next);
+  }, [tab, setTab]);
 
   const handleBack = useCallback(() => {
     const history = tabHistoryRef.current;
