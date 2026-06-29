@@ -124,7 +124,7 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
               placeholder="Acme Order Management"
             />
           </Field>
-          <Field label="Customer">
+          <Field label="Customer" classification="customer-specific">
             <TextInput
               value={data.customer}
               onChange={(v) => setData({ ...data, customer: v })}

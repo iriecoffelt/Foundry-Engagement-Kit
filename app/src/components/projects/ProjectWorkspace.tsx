@@ -389,6 +389,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
               <FileTree
                 entries={docTree}
                 selectedPath={openFile?.path}
+                storageKey={`project-docs-${project.slug}`}
                 onSelect={async (path) => {
                   const content = await api.readFile(path);
                   setOpenFile({ path, content, dirty: false });
