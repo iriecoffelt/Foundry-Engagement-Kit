@@ -1,6 +1,6 @@
 # Foundry API Integrations Guide
 
-Best APIs for each engagement phase, organized by use case. Use this reference when building integrations between your engagement workflows and Palantir Foundry.
+Safe APIs for FDEs working in customer Foundry environments. These APIs expose **metadata only** — no customer business data leaves the Foundry boundary.
 
 ---
 
@@ -8,10 +8,9 @@ Best APIs for each engagement phase, organized by use case. Use this reference w
 
 | SDK | Package | Use Case |
 |-----|---------|----------|
-| **TypeScript OSDK** | `@osdk/client`, `@osdk/oauth` | Frontend apps, React integration, type-safe ontology access |
-| **Platform TypeScript** | `@osdk/foundry` | Direct platform API access without generated SDK |
-| **Python SDK** | `foundry-platform-sdk` | Backend scripts, data pipelines, automation |
-| **Java SDK** | Maven artifact | Enterprise Java applications |
+| **TypeScript OSDK** | `@osdk/client`, `@osdk/oauth` | Frontend apps, type-safe ontology metadata access |
+| **Platform TypeScript** | `@osdk/foundry` | Direct platform API access |
+| **Python SDK** | `foundry-platform-sdk` | Backend scripts, automation |
 | **REST API** | Direct HTTP | Any language, custom integrations |
 
 ### Quick Setup (TypeScript)
@@ -28,263 +27,146 @@ const client = createClient(foundryUrl, ontologyRid, auth);
 
 ## Phase 0: Discovery
 
-### Data Source Inventory APIs
+### Ontology Schema Discovery
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **List Datasets** | `GET /v2/datasets` | Inventory existing datasets in Foundry |
-| **Get Dataset** | `GET /v2/datasets/{datasetRid}` | Get dataset metadata and schema |
-| **List Sources** | Data Connection API | Enumerate configured data sources |
-| **Get Schedules** | `GET /v2/datasets/{datasetRid}/getSchedules` | Check existing refresh schedules |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **List Ontologies** | `GET /v2/ontologies` | Ontology names and RIDs |
+| **Get Full Metadata** | `GET /v2/ontologies/{ontology}/fullMetadata` | Complete schema (types, links, actions) — no object instances |
+| **List Object Types** | `GET /v2/ontologies/{ontology}/objectTypes` | Object type definitions, properties, primary keys |
+| **List Link Types** | `GET /v2/ontologies/{ontology}/linkTypes` | Relationship definitions |
+| **List Action Types** | `GET /v2/ontologies/{ontology}/actionTypes` | Action configurations |
+| **List Interface Types** | `GET /v2/ontologies/{ontology}/interfaceTypes` | Interface definitions |
+| **List Query Types** | `GET /v2/ontologies/{ontology}/queryTypes` | Function signatures |
 
-### Ontology Discovery APIs
+### Project Structure Discovery
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **List Ontologies** | `GET /v2/ontologies` | Discover available ontologies |
-| **Get Full Metadata** | `GET /v2/ontologies/{ontology}/fullMetadata` | Get complete ontology schema (objects, links, actions) |
-| **List Object Types** | `GET /v2/ontologies/{ontology}/objectTypes` | Enumerate existing object types |
-| **List Link Types** | `GET /v2/ontologies/{ontology}/linkTypes` | Discover existing relationships |
-| **List Action Types** | `GET /v2/ontologies/{ontology}/actionTypes` | Review existing actions |
-
-### User & Access Discovery
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Get Access Requirements** | `GET /v2/filesystem/resources/{resourceRid}/getAccessRequirements` | Understand security requirements |
-| **List Resource Roles** | `GET /v2/filesystem/resources/{resourceRid}/roles` | Check current permissions |
-| **List Organizations** | `GET /v2/filesystem/projects/{projectRid}/organizations` | Review organizational access |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **Get Resource** | `GET /v2/filesystem/resources/{resourceRid}` | Resource name, type, path |
+| **Get Resource by Path** | `GET /v2/filesystem/resources/getByPath` | Resource metadata by path |
+| **List Folder Children** | `GET /v2/filesystem/folders/{folderRid}/children` | Folder contents (names, types) |
+| **Get Project** | `GET /v2/filesystem/projects/{projectRid}` | Project metadata |
 
 ---
 
 ## Phase 1: Scoping
 
-### Project & Filesystem APIs
+### Dataset Metadata (Schema Only)
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Create Project** | `POST /v2/filesystem/projects/create` | Provision Foundry project for engagement |
-| **Create Folder** | `POST /v2/filesystem/folders` | Structure project folders |
-| **Get Resource by Path** | `GET /v2/filesystem/resources/getByPath` | Locate resources by path |
-| **Add Organizations** | `POST /v2/filesystem/projects/{projectRid}/addOrganizations` | Configure project access |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **Get Dataset** | `GET /v2/datasets/{datasetRid}` | Dataset name, RID, branch info — no data |
+| **Get Schema** | `GET /v2/datasets/{datasetRid}/schema` | Column names and types — no row data |
+| **List Branches** | `GET /v2/datasets/{datasetRid}/branches` | Branch names |
 
-### Dataset Planning APIs
+### Schedule Discovery
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Create Dataset** | `POST /v2/datasets` | Provision placeholder datasets |
-| **Get Dataset Schema** | `GET /v2/datasets/{datasetRid}/schema` | Review source schemas |
-| **Read Table Sample** | `GET /v2/datasets/{datasetRid}/readTable` | Preview source data |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **Get Schedules** | `GET /v2/datasets/{datasetRid}/getSchedules` | Schedule RIDs targeting a dataset |
 
 ---
 
 ## Phase 2: Design
 
-### Ontology Design APIs (Read-Only)
+### Ontology Type Details
 
-> **Note:** As of 2026, ontology schema creation (object types, link types, action types) must be done in Ontology Manager UI. Read APIs help validate and document designs.
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Get Object Type** | `GET /v2/ontologies/{ontology}/objectTypes/{objectType}` | Document object type details |
-| **Get Link Type** | `GET /v2/ontologies/{ontology}/linkTypes/{linkType}` | Document link specifications |
-| **Get Action Type** | `GET /v2/ontologies/{ontology}/actionTypes/{actionType}` | Document action configurations |
-| **Get Interface Type** | `GET /v2/ontologies/{ontology}/interfaceTypes/{interfaceType}` | Document interfaces |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **Get Object Type** | `GET /v2/ontologies/{ontology}/objectTypes/{objectType}` | Full type definition (properties, icons, backing datasets) |
+| **Get Link Type** | `GET /v2/ontologies/{ontology}/linkTypes/{linkType}` | Link cardinality, endpoints |
+| **Get Action Type** | `GET /v2/ontologies/{ontology}/actionTypes/{actionType}` | Parameters, rules, side effects |
+| **Get Interface Type** | `GET /v2/ontologies/{ontology}/interfaceTypes/{interfaceType}` | Shared properties |
 | **Load Metadata** | `POST /v2/ontologies/{ontology}/metadata` | Bulk fetch specific type definitions |
-
-### Dataset Design APIs
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Create Branch** | `POST /v2/datasets/{datasetRid}/branches` | Create dev/staging branches |
-| **Get Branch** | `GET /v2/datasets/{datasetRid}/branches/{branchId}` | Check branch status |
-| **List Files** | `GET /v2/datasets/{datasetRid}/files` | Review dataset structure |
-
-### Webhook Design APIs
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Data Connection REST Source** | Data Connection API | Configure external API connections |
-| **Create Webhook** | Data Connection UI + API | Define outbound webhooks |
-| **Outbound Application** | OAuth 2.0 config | Configure OAuth for webhooks |
 
 ---
 
 ## Phase 3: Build
 
-### Object Operations APIs
+### Health Check Status
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Search Objects** | `POST /v2/ontologies/{ontology}/objects/{objectType}/search` | Query objects with filters |
-| **Get Object** | `GET /v2/ontologies/{ontology}/objects/{objectType}/{primaryKey}` | Fetch specific object |
-| **List Objects** | `GET /v2/ontologies/{ontology}/objects/{objectType}` | Paginated object listing |
-| **Aggregate Objects** | `POST /v2/ontologies/{ontology}/objects/{objectType}/aggregate` | Compute aggregations |
-| **Count Objects** | `POST /v2/ontologies/{ontology}/objects/{objectType}/count` | Get object counts |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **Get Health Checks** | `GET /v2/datasets/{datasetRid}/getHealthChecks` | Check RIDs configured on dataset |
+| **Get Health Reports** | `GET /v2/datasets/{datasetRid}/getHealthCheckReports` | Pass/fail status per check — no data content |
+| **Get Check** | `GET /v2/dataHealth/checks/{checkRid}` | Check configuration |
+| **Get Latest Report** | `GET /v2/dataHealth/checks/{checkRid}/checkReports/getLatest` | Latest status |
 
-### Action Execution APIs
+### Build Status
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Apply Action** | `POST /v2/ontologies/{ontology}/actions/{actionType}/apply` | Execute ontology actions |
-| **Validate Action** | `POST /v2/ontologies/{ontology}/actions/{actionType}/validate` | Pre-validate action parameters |
-| **Apply Batch Action** | `POST /v2/ontologies/{ontology}/actions/{actionType}/applyBatch` | Bulk action execution |
-
-### Function Execution APIs
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Execute Query** | `POST /v2/ontologies/{ontology}/queries/{queryApiName}/execute` | Run ontology functions |
-| **List Query Types** | `GET /v2/ontologies/{ontology}/queryTypes` | Discover available functions |
-
-### Dataset Operations APIs
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Upload File** | `POST /v2/datasets/{datasetRid}/files:upload` | Upload data files |
-| **Create Transaction** | `POST /v2/datasets/{datasetRid}/transactions` | Start data transaction |
-| **Commit Transaction** | `POST /v2/datasets/{datasetRid}/transactions/{transactionRid}/commit` | Commit changes |
-| **Read Table** | `GET /v2/datasets/{datasetRid}/readTable` | Read dataset content |
-
-### Pipeline APIs
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Create Schedule** | `POST /v2/orchestration/schedules` | Schedule pipeline builds |
-| **Trigger Build** | `POST /v2/orchestration/builds` | Manual build trigger |
-| **Get Build Status** | `GET /v2/orchestration/builds/{buildRid}` | Check build progress |
-
-### External Functions APIs
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Call Webhook** | External Functions in code | Execute webhooks from Functions |
-| **Writeback Webhook** | Action side effect | Write to external systems |
-| **Side Effect Webhook** | Action notification | Non-blocking external calls |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **Get Build Status** | `GET /v2/orchestration/builds/{buildRid}` | Build state, duration, success/failure |
 
 ---
 
 ## Phase 4: Deploy
 
-### Health Check APIs
+### Pipeline Monitoring
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Create Check** | `POST /v2/dataHealth/checks` | Configure health checks |
-| **Get Check** | `GET /v2/dataHealth/checks/{checkRid}` | Review check configuration |
-| **Get Health Reports** | `GET /v2/datasets/{datasetRid}/getHealthCheckReports` | Get dataset health status |
-| **Get Latest Report** | `GET /v2/dataHealth/checks/{checkRid}/checkReports/getLatest` | Latest check result |
-| **Replace Check** | `PUT /v2/dataHealth/checks/{checkRid}` | Update check configuration |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **Get Schedules** | `GET /v2/datasets/{datasetRid}/getSchedules` | Schedule configurations |
+| **Get Health Reports** | `GET /v2/datasets/{datasetRid}/getHealthCheckReports` | Current health status |
 
-### Schedule Management APIs
+### Permission Documentation (Read-Only)
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Get Schedules** | `GET /v2/datasets/{datasetRid}/getSchedules` | List dataset schedules |
-| **Update Schedule** | `PUT /v2/orchestration/schedules/{scheduleRid}` | Modify schedule |
-| **Pause Schedule** | Schedule API | Pause pipeline runs |
-| **Resume Schedule** | Schedule API | Resume pipeline runs |
-
-### Permissions APIs
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Add Roles** | `POST /v2/filesystem/resources/{resourceRid}/roles/add` | Grant access |
-| **Remove Roles** | `POST /v2/filesystem/resources/{resourceRid}/roles/remove` | Revoke access |
-| **Add Markings** | `POST /v2/filesystem/resources/{resourceRid}/addMarkings` | Apply security markings |
-| **Remove Markings** | `POST /v2/filesystem/resources/{resourceRid}/removeMarkings` | Remove markings |
-| **List Roles** | `GET /v2/filesystem/resources/{resourceRid}/roles` | Audit permissions |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **List Roles** | `GET /v2/filesystem/resources/{resourceRid}/roles` | Who has access (for documentation) |
+| **Get Access Requirements** | `GET /v2/filesystem/resources/{resourceRid}/getAccessRequirements` | Required orgs/markings |
+| **List Organizations** | `GET /v2/filesystem/projects/{projectRid}/organizations` | Org associations |
 
 ---
 
 ## Phase 5: Handoff
 
-### Documentation & Audit APIs
+### Documentation Export
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Get Full Metadata** | `GET /v2/ontologies/{ontology}/fullMetadata` | Export complete ontology spec |
-| **List Object Types** | `GET /v2/ontologies/{ontology}/objectTypes` | Generate ontology inventory |
-| **Get Health Checks** | `GET /v2/datasets/{datasetRid}/getHealthChecks` | Document monitoring setup |
-| **Get Schedules** | `GET /v2/datasets/{datasetRid}/getSchedules` | Document automation |
-| **Audit Logs** | Audit API | Export activity history |
-
-### Knowledge Transfer APIs
-
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Export Dataset** | `GET /v2/datasets/{datasetRid}/readTable` | Export data samples |
-| **List Resources** | `GET /v2/filesystem/folders/{folderRid}/children` | Generate resource inventory |
-| **Get Resource** | `GET /v2/filesystem/resources/{resourceRid}` | Get resource metadata |
+| API | Endpoint | What It Returns |
+|-----|----------|-----------------|
+| **Get Full Metadata** | `GET /v2/ontologies/{ontology}/fullMetadata` | Complete ontology schema for documentation |
+| **List Object Types** | `GET /v2/ontologies/{ontology}/objectTypes` | Object inventory |
+| **Get Health Checks** | `GET /v2/datasets/{datasetRid}/getHealthChecks` | Monitoring configuration |
+| **Get Schedules** | `GET /v2/datasets/{datasetRid}/getSchedules` | Automation setup |
+| **List Folder Children** | `GET /v2/filesystem/folders/{folderRid}/children` | Project structure |
 
 ---
 
-## AIP Integration APIs
+## What These APIs Do NOT Include
 
-### AIP Chatbot (Agent) APIs
+The following are intentionally excluded — they expose customer business data or require elevated privileges:
 
-| API | Endpoint | Purpose |
-|-----|----------|---------|
-| **Create Session** | `POST /v2/aipAgents/agents/{agentRid}/sessions` | Start chatbot conversation |
-| **Blocking Continue** | `POST /v2/aipAgents/agents/{agentRid}/sessions/{sessionRid}/blockingContinue` | Send message, get response |
-| **Streaming Continue** | `POST /v2/aipAgents/agents/{agentRid}/sessions/{sessionRid}/streamingContinue` | Stream response |
-| **Get RAG Context** | `PUT /v2/aipAgents/agents/{agentRid}/sessions/{sessionRid}/ragContext` | Get relevant context |
-| **List Sessions** | `GET /v2/aipAgents/agents/{agentRid}/sessions` | List conversation sessions |
-| **Get Agent** | `GET /v2/aipAgents/agents/{agentRid}` | Get agent configuration |
-
-### Use Cases by Phase
-
-| Phase | AIP Use Case |
-|-------|--------------|
-| Discovery | Use chatbot to query existing ontology documentation |
-| Design | Generate ontology design suggestions |
-| Build | Code generation assistance for Functions |
-| Deploy | Automated runbook generation |
-| Handoff | Generate training materials |
-
----
-
-## Supported LLMs (as of June 2026)
-
-| Provider | Models |
+| Excluded | Reason |
 |----------|--------|
-| **xAI** | Grok-4, Grok 4.1 Fast |
-| **OpenAI/Azure** | GPT-5.1, GPT-5.1 Codex, GPT-5, GPT-4.1, GPT-4o |
-| **Anthropic** | Claude Opus 4.7, Claude Sonnet |
-| **Google** | Gemini models |
-| **Meta** | Llama models (Palantir-hosted) |
+| Object search/list/get | Returns actual customer data |
+| `readTable` / dataset export | Pulls row-level data out of Foundry |
+| Action execution | Modifies customer data |
+| Audit logs | Sensitive access patterns |
+| Permission modifications | Customer admin domain |
+| User/group management | Customer admin domain |
+| AIP with customer context | Data flows to LLM providers |
+
+**Rule of thumb:** If it returns business entities (customers, orders, cases, etc.) or modifies data, don't use it from external tools.
 
 ---
 
-## Integration Patterns
+## Integration Patterns for the Engagement Kit
 
-### Pattern 1: Sync Engagement Data to Foundry
+### Pattern 1: Populate Ontology Tab from Foundry Schema
 
-Sync stakeholder, milestone, and risk data from engagement.json to Foundry objects.
-
-```typescript
-// Pseudo-code for syncing engagement data
-const engagement = await readEngagementJson(projectPath);
-await client(Stakeholder).create({
-  name: engagement.stakeholders[0].name,
-  role: engagement.stakeholders[0].role,
-  influence: engagement.stakeholders[0].influence
-});
-```
-
-### Pattern 2: Pull Ontology Schema into App
-
-Populate the Ontology tab with live data from Foundry.
+Pull object type and link type definitions to auto-fill the design documentation.
 
 ```typescript
 const objectTypes = await client.ontologies.ObjectType.list(ontologyRid);
-const linkTypes = await client.ontologies.LinkType.list(ontologyRid);
-// Map to app's OntologyElement format
+// Returns: { apiName, displayName, primaryKey, properties: [...] }
+// Does NOT return: actual object instances
 ```
 
-### Pattern 3: Link Architecture Nodes to Foundry Resources
+### Pattern 2: Link Architecture Nodes to Foundry Resources
 
-Store Foundry RIDs in architecture.json nodes for deep linking.
+Store Foundry RIDs in architecture.json for reference links (opens in browser).
 
 ```json
 {
@@ -299,58 +181,54 @@ Store Foundry RIDs in architecture.json nodes for deep linking.
 }
 ```
 
-### Pattern 4: Monitor Pipeline Health in Dashboard
+### Pattern 3: Display Pipeline Health Status
 
-Display real-time health status for engagement pipelines.
+Show pass/fail badges for engagement pipelines without exposing data.
 
 ```typescript
 const healthReports = await client.datasets.Dataset.getHealthCheckReports(datasetRid);
-// Display status badges in delivery board
+// Returns: [{ checkRid, status: "PASSING" | "FAILING", ... }]
+// Does NOT return: the actual data being checked
 ```
 
-### Pattern 5: Trigger Actions from Delivery Board
+### Pattern 4: Generate Project Structure Documentation
 
-Execute Foundry actions when delivery cards change status.
+List resources for handoff documentation.
 
 ```typescript
-await client(UpdateDeliveryStatus).apply({
-  deliveryId: card.resourceId,
-  newStatus: "deployed"
-});
+const children = await client.filesystem.Folder.children(folderRid);
+// Returns: [{ rid, name, type: "dataset" | "folder" | ... }]
+// Does NOT return: dataset contents
 ```
 
 ---
 
-## Authentication Best Practices
+## Authentication
 
-1. **Development:** Use personal access tokens for local testing
-2. **Production apps:** Use OAuth 2.0 client credentials flow
-3. **User-facing apps:** Use OAuth 2.0 authorization code flow with PKCE
-4. **Service accounts:** Use confidential OAuth clients
+| Method | Use Case | Notes |
+|--------|----------|-------|
+| **Personal Access Token** | Development, testing | Your permissions, short-lived |
+| **Public OAuth** | Desktop app integration | User grants access, scoped |
 
-### Token Scopes
+### Required Scopes (Minimal)
 
-| Scope | APIs |
-|-------|------|
-| `api:ontologies-read` | Read ontology objects, types |
-| `api:ontologies-write` | Execute actions |
-| `api:datasets-read` | Read dataset content |
-| `api:datasets-write` | Upload/modify datasets |
-| `api:filesystem-read` | Read project structure |
-| `api:filesystem-write` | Modify permissions |
-| `api:aip-agents-read` | Query AIP chatbots |
-| `api:aip-agents-write` | Create sessions, send messages |
+```
+api:ontologies-read      # Schema metadata
+api:filesystem-read      # Project structure
+api:datasets-read        # Dataset metadata (not content)
+api:orchestration-read   # Build/schedule status
+api:data-health-read     # Health check status
+```
 
 ---
 
-## Rate Limits & Best Practices
+## Best Practices for FDEs
 
-- Default rate limit: ~100 requests/second per token
-- Use pagination for large result sets
-- Implement exponential backoff for retries
-- Cache ontology metadata (changes infrequently)
-- Batch operations where possible (applyBatch)
-- Use streaming for AIP chatbot responses
+1. **Never sync customer data to local tools** — metadata only
+2. **Use read-only scopes** — don't request write permissions you don't need
+3. **Document what you access** — customer security teams may review
+4. **Prefer in-Foundry tools** — Workshop, Slate, Notepad for anything involving data
+5. **Ask before automating** — get customer approval for any API integrations
 
 ---
 
