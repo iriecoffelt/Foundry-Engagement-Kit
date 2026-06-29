@@ -260,9 +260,10 @@ const defaultGraph: ArchitectureGraph = {
 interface ArchitectureEditorProps {
   projectPath: string;
   onOpenDelivery?: (cardId: string) => void;
+  initialSelectedNodeId?: string | null;
 }
 
-function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEditorProps) {
+function ArchitectureEditorInner({ projectPath, onOpenDelivery, initialSelectedNodeId }: ArchitectureEditorProps) {
   const jsonPath = `${projectPath}/02-design/architecture.json`;
   const overviewPath = `${projectPath}/02-design/design-overview.md`;
   const pngPath = `${projectPath}/02-design/architecture.png`;
@@ -272,6 +273,7 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  const [initialNodeHandled, setInitialNodeHandled] = useState(false);
   const [resolvedTypes, setResolvedTypes] = useState<ResolvedArchNodeType[]>([]);
   const [deliveryByNodeId, setDeliveryByNodeId] = useState<Map<string, DeliveryCard>>(new Map());
   const [stackUrl, setStackUrl] = useState("");
@@ -308,6 +310,16 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
         setEdges(toFlowEdges(defaultGraph));
       });
   }, [projectPath, jsonPath, setNodes, setEdges]);
+
+  useEffect(() => {
+    if (initialSelectedNodeId && nodes.length > 0 && !initialNodeHandled) {
+      const node = nodes.find((n) => n.id === initialSelectedNodeId);
+      if (node) {
+        setSelectedNode(node);
+        setInitialNodeHandled(true);
+      }
+    }
+  }, [initialSelectedNodeId, nodes, initialNodeHandled]);
 
   const onConnect = useCallback(
     (connection: Connection) =>
