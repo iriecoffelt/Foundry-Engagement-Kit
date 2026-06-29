@@ -1,4 +1,4 @@
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/api";
 import { updateEngagementStatus } from "../../lib/engagementMeta";
@@ -13,12 +13,18 @@ import {
   type PhaseChecklist,
 } from "../../lib/phaseChecklist";
 import { statusBarClass } from "../../lib/engagementStatus";
+import {
+  isEmphasizedPhase,
+  isOptionalPhase,
+  type EngagementType,
+} from "../../lib/engagementTypes";
 import type { EngagementStatus } from "../../types";
 import { SelectInput, TextInput } from "../forms/FormField";
 
 interface PhaseStepperProps {
   projectPath: string;
   currentStatus: string;
+  engagementType?: EngagementType;
   onProgressChange?: (overall: number) => void;
   onStatusChange?: (status: EngagementStatus) => void;
   onChecklistSaved?: () => void;
@@ -27,6 +33,7 @@ interface PhaseStepperProps {
 export function PhaseStepper({
   projectPath,
   currentStatus,
+  engagementType,
   onProgressChange,
   onStatusChange,
   onChecklistSaved,
@@ -48,6 +55,7 @@ export function PhaseStepper({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [newTaskLabel, setNewTaskLabel] = useState("");
+  const [showOptionalPhases, setShowOptionalPhases] = useState(false);
 
   const notifyProgress = useCallback((data: PhaseChecklist) => {
     onProgressChangeRef.current?.(computePhaseProgress(data).overall);
@@ -203,19 +211,34 @@ export function PhaseStepper({
           const isPast = i < activeIndex;
           const isCurrent = i === activeIndex;
           const filled = isPast || isCurrent;
+          const emphasized = isEmphasizedPhase(engagementType, phase);
+          const optional = isOptionalPhase(engagementType, phase);
+
+          if (optional && !showOptionalPhases && !isCurrent && !isPast) {
+            return null;
+          }
+
           return (
             <button
               key={phase}
               type="button"
               onClick={() => setActivePhase(phase)}
-              className="flex flex-1 flex-col items-center gap-1"
-              title={`${PHASE_LABELS[phase]}: ${progress.byPhase[phase]}%`}
+              className={`flex flex-1 flex-col items-center gap-1 ${optional ? "opacity-60" : ""}`}
+              title={`${PHASE_LABELS[phase]}: ${progress.byPhase[phase]}%${emphasized ? " (emphasized)" : ""}${optional ? " (optional)" : ""}`}
             >
-              <div
-                className={`h-2 w-full rounded-full transition-colors ${
-                  filled ? statusBarClass(phase) : "bg-surface-elevated"
-                } ${isPast ? "opacity-70" : isCurrent ? "ring-1 ring-white/20" : ""}`}
-              />
+              <div className="relative w-full">
+                <div
+                  className={`h-2 w-full rounded-full transition-colors ${
+                    filled ? statusBarClass(phase) : "bg-surface-elevated"
+                  } ${isPast ? "opacity-70" : isCurrent ? "ring-1 ring-white/20" : ""}`}
+                />
+                {emphasized && (
+                  <Sparkles
+                    size={10}
+                    className="absolute -right-0.5 -top-1 text-amber-400"
+                  />
+                )}
+              </div>
               <span
                 className={`text-[10px] font-medium ${
                   isCurrent ? "text-fg-primary" : isPast ? "text-fg-secondary" : "text-fg-faint"
@@ -227,6 +250,24 @@ export function PhaseStepper({
           );
         })}
       </div>
+
+      {engagementType && PHASE_ORDER.some((p) => isOptionalPhase(engagementType, p)) && (
+        <button
+          type="button"
+          onClick={() => setShowOptionalPhases(!showOptionalPhases)}
+          className="mt-2 flex items-center gap-1 text-xs text-fg-muted hover:text-fg-secondary"
+        >
+          {showOptionalPhases ? (
+            <>
+              <ChevronUp size={12} /> Hide optional phases
+            </>
+          ) : (
+            <>
+              <ChevronDown size={12} /> Show optional phases
+            </>
+          )}
+        </button>
+      )}
 
       <div className="mt-5 space-y-1">
         {phaseItems.map((item) => (
