@@ -158,6 +158,10 @@ export interface OntologyElement {
   linkFrom?: string;
   linkTo?: string;
   targetObject?: string;
+  /** Foundry resource RID from ontology import (object type, action, etc.) */
+  foundryRid?: string;
+  /** Foundry API name — used to wire ontology link types to object type nodes */
+  foundryApiName?: string;
 }
 
 /** @deprecated Use OntologyElement */

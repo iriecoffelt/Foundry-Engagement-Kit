@@ -22,7 +22,7 @@ export interface FoundryObjectType {
   apiName: string;
   displayName: string;
   description?: string;
-  primaryKey: string;
+  primaryKey: string | string[];
   status: "ACTIVE" | "DEPRECATED" | "EXPERIMENTAL";
   properties: Record<string, FoundryObjectTypeProperty>;
   rid: string;

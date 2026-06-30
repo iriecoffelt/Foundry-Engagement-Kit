@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { FileEntry } from "../types";
 
 interface FileTreeProps {

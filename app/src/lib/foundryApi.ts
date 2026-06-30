@@ -4,6 +4,7 @@
  * No customer business data is exposed through these endpoints
  */
 
+import { invoke } from "@tauri-apps/api/core";
 import type {
   FoundryConnection,
   FoundryFullMetadata,
@@ -14,8 +15,36 @@ import type {
   FoundryDatasetMetadata,
   FoundryResource,
   FoundryOntologyMetadata,
+  FoundryInterfaceType,
+  FoundryQueryType,
   FoundryApiError,
 } from "./foundryTypes";
+
+function isTauriApp(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+interface FoundryProxyResponse {
+  status: number;
+  body: unknown;
+}
+
+function parseFoundryError(body: unknown, status: number): string {
+  if (body && typeof body === "object" && "errorName" in body) {
+    const errorName = (body as FoundryApiError).errorName;
+    if (errorName) return errorName;
+  }
+  return `HTTP ${status}`;
+}
+
+function wrapNetworkError(e: unknown): Error {
+  if (e instanceof TypeError && e.message === "Load failed") {
+    return new Error(
+      "Could not reach your Foundry stack from the browser. Restart with npm run tauri dev so requests go through the desktop app.",
+    );
+  }
+  return e instanceof Error ? e : new Error("Connection failed");
+}
 
 export class FoundryApiClient {
   private stackUrl: string;
@@ -31,17 +60,38 @@ export class FoundryApiClient {
     path: string,
     body?: unknown,
   ): Promise<T> {
+    if (isTauriApp()) {
+      const result = await invoke<FoundryProxyResponse>("foundry_api_request", {
+        stackUrl: this.stackUrl,
+        token: this.token,
+        method,
+        path,
+        body: body ?? null,
+      });
+
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(`Foundry API error: ${parseFoundryError(result.body, result.status)}`);
+      }
+
+      return result.body as T;
+    }
+
     const url = `${this.stackUrl}/api${path}`;
     const headers: HeadersInit = {
       Authorization: `Bearer ${this.token}`,
       "Content-Type": "application/json",
     };
 
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) {
+      throw wrapNetworkError(e);
+    }
 
     if (!response.ok) {
       let errorData: FoundryApiError | undefined;
@@ -72,8 +122,29 @@ export class FoundryApiClient {
   async getFullMetadata(ontologyRid: string): Promise<FoundryFullMetadata> {
     return this.request(
       "GET",
-      `/v2/ontologies/${encodeURIComponent(ontologyRid)}/fullMetadata`,
+      `/v2/ontologies/${encodeURIComponent(ontologyRid)}/fullMetadata?preview=true`,
     );
+  }
+
+  /** Stable list endpoints — used when fullMetadata is empty or unavailable. */
+  async loadOntologySchema(ontologyRid: string): Promise<FoundryFullMetadata> {
+    const [objectTypes, linkTypes, actionTypes, interfaceTypes, queryTypes] =
+      await Promise.all([
+        this.listObjectTypes(ontologyRid),
+        this.listLinkTypes(ontologyRid),
+        this.listActionTypes(ontologyRid),
+        this.listInterfaceTypes(ontologyRid).catch(() => ({ data: [] as FoundryInterfaceType[] })),
+        this.listQueryTypes(ontologyRid).catch(() => ({ data: [] as FoundryQueryType[] })),
+      ]);
+
+    return {
+      ontology: { apiName: "", displayName: "", rid: ontologyRid },
+      objectTypes: Object.fromEntries(objectTypes.data.map((o) => [o.apiName, o])),
+      linkTypes: Object.fromEntries(linkTypes.data.map((l) => [l.apiName, l])),
+      actionTypes: Object.fromEntries(actionTypes.data.map((a) => [a.apiName, a])),
+      interfaceTypes: Object.fromEntries(interfaceTypes.data.map((i) => [i.apiName, i])),
+      queryTypes: Object.fromEntries(queryTypes.data.map((q) => [q.apiName, q])),
+    };
   }
 
   async listObjectTypes(
@@ -104,12 +175,79 @@ export class FoundryApiClient {
     );
   }
 
+  /** Batch fetch outgoing link sides for many object types (one request per chunk). */
+  async getOutgoingLinkTypesByRidBatch(
+    ontologyRid: string,
+    objectTypeRids: string[],
+  ): Promise<{ data: Record<string, unknown[]> }> {
+    if (objectTypeRids.length === 0) return { data: {} };
+
+    return this.request(
+      "POST",
+      `/v2/ontologies/${encodeURIComponent(ontologyRid)}/outgoingLinkTypes/getByRidBatch?preview=true`,
+      {
+        requests: objectTypeRids.map((objectTypeRid) => ({ objectTypeRid })),
+        filterLinkTypeRids: [],
+      },
+    );
+  }
+
+  async listOutgoingLinkTypes(
+    ontologyRid: string,
+    objectTypeApiName: string,
+  ): Promise<{ data: unknown[]; nextPageToken?: string }> {
+    return this.request(
+      "GET",
+      `/v2/ontologies/${encodeURIComponent(ontologyRid)}/objectTypes/${encodeURIComponent(objectTypeApiName)}/outgoingLinkTypes`,
+    );
+  }
+
+  async listAllOutgoingLinkTypes(
+    ontologyRid: string,
+    objectTypeApiName: string,
+  ): Promise<unknown[]> {
+    const all: unknown[] = [];
+    let pageToken: string | undefined;
+
+    do {
+      const path = pageToken
+        ? `/v2/ontologies/${encodeURIComponent(ontologyRid)}/objectTypes/${encodeURIComponent(objectTypeApiName)}/outgoingLinkTypes?pageToken=${encodeURIComponent(pageToken)}`
+        : `/v2/ontologies/${encodeURIComponent(ontologyRid)}/objectTypes/${encodeURIComponent(objectTypeApiName)}/outgoingLinkTypes`;
+      const page = await this.request<{ data: unknown[]; nextPageToken?: string }>(
+        "GET",
+        path,
+      );
+      all.push(...(page.data || []));
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+
+    return all;
+  }
+
   async listActionTypes(
     ontologyRid: string,
   ): Promise<{ data: FoundryActionType[] }> {
     return this.request(
       "GET",
       `/v2/ontologies/${encodeURIComponent(ontologyRid)}/actionTypes`,
+    );
+  }
+
+  async listInterfaceTypes(
+    ontologyRid: string,
+  ): Promise<{ data: FoundryInterfaceType[] }> {
+    return this.request(
+      "GET",
+      `/v2/ontologies/${encodeURIComponent(ontologyRid)}/interfaceTypes`,
+    );
+  }
+
+  async listQueryTypes(
+    ontologyRid: string,
+  ): Promise<{ data: FoundryQueryType[] }> {
+    return this.request(
+      "GET",
+      `/v2/ontologies/${encodeURIComponent(ontologyRid)}/queryTypes`,
     );
   }
 

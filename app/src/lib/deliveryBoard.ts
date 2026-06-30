@@ -80,4 +80,5 @@ export {
   removeArchitectureNodes,
   removeArchitectureForDeliveryCard,
   removeDeliveryCardsForArchitectureNodes,
+  pruneOrphanDeliveryArchitectureNodes,
 } from "./architectureSync";

@@ -67,6 +67,18 @@ export function foundryLinkPlaceholder(nodeType: FoundryLinkableNodeType): strin
  * Resolve a pasted Foundry URL, RID, or workspace path into a browser-openable URL.
  * Uses Foundry's navigation resolver for RIDs when a stack base is configured.
  */
+const DATASET_RID_PATTERN = /ri\.foundry\.main\.dataset\.[^\s?#]+/i;
+
+/** Extract a Foundry dataset RID from a raw RID or browser URL. */
+export function extractDatasetRid(value: string | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+  const trimmed = value.trim();
+  if (trimmed.startsWith("ri.foundry.main.dataset.")) {
+    return trimmed.split(/[?#\s]/)[0];
+  }
+  return trimmed.match(DATASET_RID_PATTERN)?.[0];
+}
+
 export function resolveFoundryUrl(stackUrl: string, linkOrRid: string): string {
   const value = linkOrRid.trim();
   if (!value) return "";

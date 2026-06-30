@@ -1,11 +1,18 @@
 import type { ArchitectureGraph, DeliveryBoard, DeliveryCard, OntologyElement } from "../types";
 import { api } from "./api";
 import {
+  type ArchitectureViewId,
+  architectureRelativePath,
+} from "./architectureViews";
+import {
   archNodeTypeIdForDeliveryType,
   deliveryTypeIdForArchNode,
   loadArchitectureNodeTypes,
 } from "./architectureNodeTypes";
 import { findOntologyElementType, loadOntologyElementTypes } from "./ontologyTypes";
+import type { FoundryFullMetadata } from "./foundryTypes";
+import { extractOntologyLinkEdges } from "./foundrySync";
+import { layoutOntologyGraph } from "./ontologyGraphLayout";
 import {
   loadDeliveryBoard,
   newDeliveryId,
@@ -18,15 +25,16 @@ export interface SyncFromArchitectureResult {
   updated: number;
 }
 
-function architecturePath(projectPath: string) {
-  return `${projectPath}/02-design/architecture.json`;
+function architecturePath(projectPath: string, viewId: ArchitectureViewId = "working"): string {
+  return architectureRelativePath(projectPath, viewId);
 }
 
 export async function loadArchitectureGraph(
   projectPath: string,
+  viewId: ArchitectureViewId = "working",
 ): Promise<ArchitectureGraph | null> {
   try {
-    return await api.readJson<ArchitectureGraph>(architecturePath(projectPath));
+    return await api.readJson<ArchitectureGraph>(architecturePath(projectPath, viewId));
   } catch {
     return null;
   }
@@ -35,8 +43,9 @@ export async function loadArchitectureGraph(
 export async function saveArchitectureGraph(
   projectPath: string,
   graph: ArchitectureGraph,
+  viewId: ArchitectureViewId = "working",
 ): Promise<void> {
-  await api.writeJson(architecturePath(projectPath), graph);
+  await api.writeJson(architecturePath(projectPath, viewId), graph);
 }
 
 function cardFromArchNode(
@@ -84,6 +93,7 @@ export interface SyncBidirectionalResult {
   deliveryUpdated: number;
   archAdded: number;
   archLinked: number;
+  archPruned: number;
 }
 
 function defaultNodePosition(index: number): { x: number; y: number } {
@@ -139,7 +149,7 @@ export async function removeArchitectureNodes(
   const ids = new Set(nodeIds.filter(Boolean));
   if (!ids.size) return 0;
 
-  const graph = await loadArchitectureGraph(projectPath);
+  const graph = await loadArchitectureGraph(projectPath, "working");
   if (!graph) return 0;
 
   const before = graph.nodes.length;
@@ -147,7 +157,7 @@ export async function removeArchitectureNodes(
   graph.edges = pruneEdgesForNodes(graph, ids);
   const removed = before - graph.nodes.length;
   if (removed > 0) {
-    await saveArchitectureGraph(projectPath, graph);
+    await saveArchitectureGraph(projectPath, graph, "working");
   }
   return removed;
 }
@@ -180,12 +190,47 @@ export async function removeArchitectureForDeliveryCard(
   return removeArchitectureNodes(projectPath, nodeIds);
 }
 
+/**
+ * Remove diagram nodes left behind when delivery cards were deleted outside the app
+ * (e.g. editing delivery-board.json). Keeps ontology nodes and unsynced manual nodes.
+ */
+export async function pruneOrphanDeliveryArchitectureNodes(
+  projectPath: string,
+): Promise<number> {
+  const board = await loadDeliveryBoard(projectPath);
+  const graph = await loadArchitectureGraph(projectPath, "working");
+  if (!graph?.nodes.length) return 0;
+
+  const cardIds = new Set(board.cards.map((c) => c.id));
+  const linkedArchIds = new Set(
+    board.cards
+      .map((c) => c.architectureNodeId)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  const removeIds: string[] = [];
+  for (const node of graph.nodes) {
+    if (node.data.ontologyElementId || node.data.ontologyObjectId) continue;
+    if (node.id.startsWith("ont-")) continue;
+
+    if (node.id.startsWith("del-")) {
+      const cardId = node.id.slice("del-".length);
+      if (!cardIds.has(cardId)) removeIds.push(node.id);
+      continue;
+    }
+
+    if (linkedArchIds.has(node.id)) continue;
+  }
+
+  return removeArchitectureNodes(projectPath, removeIds);
+}
+
 /** Create or link architecture nodes for delivery cards missing a diagram node. */
 export async function syncToArchitecture(
   projectPath: string,
 ): Promise<SyncToArchitectureResult> {
   const board = await loadDeliveryBoard(projectPath);
-  const graph = (await loadArchitectureGraph(projectPath)) ?? { nodes: [], edges: [] };
+  const graph = (await loadArchitectureGraph(projectPath, "working")) ?? { nodes: [], edges: [] };
   const archTypes = await loadArchitectureNodeTypes();
   const cards = [...board.cards];
 
@@ -227,7 +272,7 @@ export async function syncToArchitecture(
   }
 
   if (added > 0 || linked > 0) {
-    await saveArchitectureGraph(projectPath, graph);
+    await saveArchitectureGraph(projectPath, graph, "working");
     await saveDeliveryBoard(projectPath, { cards });
   }
 
@@ -237,9 +282,10 @@ export async function syncToArchitecture(
 export async function syncArchitectureAndDelivery(
   projectPath: string,
 ): Promise<SyncBidirectionalResult> {
+  const archPruned = await pruneOrphanDeliveryArchitectureNodes(projectPath);
   const toArch = await syncToArchitecture(projectPath);
   const fromArch = await syncFromArchitecture(projectPath);
-  const graph = (await loadArchitectureGraph(projectPath)) ?? toArch.graph;
+  const graph = (await loadArchitectureGraph(projectPath, "working")) ?? toArch.graph;
   return {
     board: fromArch.board,
     graph,
@@ -247,6 +293,7 @@ export async function syncArchitectureAndDelivery(
     deliveryUpdated: fromArch.updated,
     archAdded: toArch.added,
     archLinked: toArch.linked,
+    archPruned,
   };
 }
 
@@ -254,7 +301,7 @@ export async function syncFromArchitecture(
   projectPath: string,
 ): Promise<SyncFromArchitectureResult> {
   const board = await loadDeliveryBoard(projectPath);
-  const graph = await loadArchitectureGraph(projectPath);
+  const graph = await loadArchitectureGraph(projectPath, "working");
   if (!graph?.nodes?.length) {
     return { board, added: 0, updated: 0 };
   }
@@ -327,7 +374,7 @@ export async function seedFromArchitecture(projectPath: string): Promise<Deliver
 export async function addOntologyElementToDiagram(
   projectPath: string,
   element: OntologyElement,
-): Promise<{ nodeId: string; created: boolean; skipped?: boolean }> {
+): Promise<{ nodeId: string; created: boolean; updated?: boolean; skipped?: boolean }> {
   const elementTypes = await loadOntologyElementTypes();
   const typeDef = findOntologyElementType(elementTypes, element.kind);
   const archNodeType = typeDef?.architectureNodeTypeId;
@@ -336,38 +383,292 @@ export async function addOntologyElementToDiagram(
     return { nodeId: "", created: false, skipped: true };
   }
 
-  const graph = (await loadArchitectureGraph(projectPath)) ?? { nodes: [], edges: [] };
-
+  const graph = (await loadArchitectureGraph(projectPath, "working")) ?? { nodes: [], edges: [] };
+  const notes = buildOntologyElementNotes(element, typeDef);
+  const foundryLink = element.foundryRid?.trim() || undefined;
+  const nameKey = element.name.trim().toLowerCase();
   const existing = graph.nodes.find(
     (n) =>
       n.data.ontologyElementId === element.id ||
-      n.data.ontologyObjectId === element.id,
+      n.data.ontologyObjectId === element.id ||
+      (n.type === archNodeType && n.data.label.trim().toLowerCase() === nameKey),
   );
+
   if (existing) {
-    return { nodeId: existing.id, created: false };
+    let changed = false;
+    if (!existing.data.ontologyElementId) {
+      existing.data.ontologyElementId = element.id;
+      changed = true;
+    }
+    if (foundryLink && existing.data.foundryLink !== foundryLink) {
+      existing.data.foundryLink = foundryLink;
+      changed = true;
+    }
+    if (changed) {
+      await saveArchitectureGraph(projectPath, graph, "working");
+    }
+    return { nodeId: existing.id, created: false, updated: changed };
   }
 
   const nodeId = `ont-${element.id}`;
-  const yOffset = graph.nodes.length * 40;
-  const notes = buildOntologyElementNotes(element, typeDef);
-
   graph.nodes.push({
     id: nodeId,
     type: archNodeType,
-    position: { x: 120 + graph.nodes.length * 24, y: 200 + yOffset },
+    position: defaultNodePosition(graph.nodes.length),
     data: {
       label: element.name,
       notes: notes || undefined,
       ontologyElementId: element.id,
+      ...(foundryLink ? { foundryLink } : {}),
     },
   });
 
-  await saveArchitectureGraph(projectPath, graph);
+  await saveArchitectureGraph(projectPath, graph, "working");
   return { nodeId, created: true };
+}
+
+/** Rebuild the Foundry ontology reference diagram (separate from the working delivery diagram). */
+export async function rebuildOntologyArchitecture(
+  projectPath: string,
+  elements: OntologyElement[],
+  metadata?: FoundryFullMetadata,
+): Promise<{ nodesAdded: number; edgesAdded: number }> {
+  const graph = buildOntologyArchitectureGraph(elements);
+  let edgesAdded = 0;
+
+  if (metadata) {
+    edgesAdded = syncOntologyLinkEdgesFromMetadata(graph, elements, metadata);
+  }
+  edgesAdded += syncOntologyLinkEdges(graph, elements);
+
+  const laidOut = layoutOntologyGraph(graph);
+  await saveArchitectureGraph(projectPath, laidOut, "ontology");
+  return { nodesAdded: laidOut.nodes.length, edgesAdded: laidOut.edges.length };
+}
+
+/** Re-fetch link metadata from Foundry and rebuild the ontology reference graph. */
+export async function refreshOntologyArchitectureGraph(
+  projectPath: string,
+  elements: OntologyElement[],
+  fetchMetadata: () => Promise<FoundryFullMetadata | undefined>,
+): Promise<{ nodesAdded: number; edgesAdded: number }> {
+  const metadata = await fetchMetadata();
+  return rebuildOntologyArchitecture(projectPath, elements, metadata);
+}
+
+function buildOntologyArchitectureGraph(elements: OntologyElement[]): ArchitectureGraph {
+  const objectTypes = elements.filter((el) => el.kind === "objectType");
+  const nodesById = new Map<string, ArchitectureGraph["nodes"][0]>();
+
+  for (const el of objectTypes) {
+    const apiName = objectTypeApiName(el);
+    const id = apiName ? ontologyObjectNodeId(apiName) : `ont-${el.id}`;
+    const next = {
+      id,
+      type: "objectType" as const,
+      position: { x: 0, y: 0 },
+      data: {
+        label: el.name,
+        ontologyElementId: el.id,
+        ...(el.foundryRid ? { foundryLink: el.foundryRid } : {}),
+      },
+    };
+
+    const existing = nodesById.get(id);
+    if (!existing) {
+      nodesById.set(id, next);
+      continue;
+    }
+    if (!existing.data.foundryLink && next.data.foundryLink) {
+      existing.data.foundryLink = next.data.foundryLink;
+    }
+  }
+
+  return { nodes: [...nodesById.values()], edges: [] };
+}
+
+/** @deprecated Use rebuildOntologyArchitecture for Foundry imports */
+export async function syncOntologyElementsToArchitecture(
+  projectPath: string,
+  elements: OntologyElement[],
+): Promise<{ added: number; updated: number; skipped: number; edgesAdded: number }> {
+  const result = await rebuildOntologyArchitecture(projectPath, elements);
+  return {
+    added: result.nodesAdded,
+    updated: 0,
+    skipped: 0,
+    edgesAdded: result.edgesAdded,
+  };
 }
 
 /** @deprecated Use addOntologyElementToDiagram */
 export const addOntologyObjectToDiagram = addOntologyElementToDiagram;
+
+function normalizeApiKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function isResourceId(value: string): boolean {
+  return value.trim().startsWith("ri.");
+}
+
+/** Canonical graph node id for a Foundry object type API name. */
+export function ontologyObjectNodeId(apiName: string): string {
+  return `ont-foundry-obj-${apiName.trim()}`;
+}
+
+function objectTypeApiName(element: OntologyElement): string | undefined {
+  if (element.foundryApiName?.trim()) return element.foundryApiName.trim();
+  if (element.id.startsWith("foundry-obj-")) {
+    return element.id.slice("foundry-obj-".length);
+  }
+  return undefined;
+}
+
+function buildObjectTypeNodeIndex(
+  graph: ArchitectureGraph,
+  elements: OntologyElement[],
+): { apiIndex: Map<string, string>; displayIndex: Map<string, string> } {
+  const apiIndex = new Map<string, string>();
+  const displayIndex = new Map<string, string>();
+
+  for (const node of graph.nodes) {
+    if (node.type !== "objectType") continue;
+
+    const elId = node.data.ontologyElementId || node.data.ontologyObjectId;
+    if (typeof elId === "string" && elId.startsWith("foundry-obj-")) {
+      const api = elId.slice("foundry-obj-".length);
+      apiIndex.set(api.toLowerCase(), node.id);
+      apiIndex.set(normalizeApiKey(api), node.id);
+    }
+
+    const label = node.data.label.trim().toLowerCase();
+    if (label) displayIndex.set(label, node.id);
+    displayIndex.set(normalizeApiKey(node.data.label), node.id);
+  }
+
+  for (const element of elements.filter((el) => el.kind === "objectType")) {
+    const apiName = objectTypeApiName(element);
+    const node = graph.nodes.find(
+      (n) =>
+        n.data.ontologyElementId === element.id ||
+        n.data.ontologyObjectId === element.id ||
+        (apiName && n.id === ontologyObjectNodeId(apiName)),
+    );
+    if (apiName && node) {
+      apiIndex.set(apiName.toLowerCase(), node.id);
+      apiIndex.set(normalizeApiKey(apiName), node.id);
+    }
+    if (node && element.name.trim()) {
+      displayIndex.set(element.name.trim().toLowerCase(), node.id);
+      displayIndex.set(normalizeApiKey(element.name), node.id);
+    }
+  }
+
+  return { apiIndex, displayIndex };
+}
+
+function resolveObjectTypeNode(
+  endpoint: string,
+  apiIndex: Map<string, string>,
+  displayIndex: Map<string, string>,
+): string | undefined {
+  const key = endpoint.trim();
+  if (!key || isResourceId(key)) return undefined;
+  const lower = key.toLowerCase();
+  const compact = normalizeApiKey(key);
+  return (
+    apiIndex.get(lower) ??
+    apiIndex.get(compact) ??
+    displayIndex.get(lower) ??
+    displayIndex.get(compact)
+  );
+}
+
+/** Create architecture edges from Foundry ontology link types. */
+function syncOntologyLinkEdges(
+  graph: ArchitectureGraph,
+  elements: OntologyElement[],
+): number {
+  const { apiIndex, displayIndex } = buildObjectTypeNodeIndex(graph, elements);
+  const nodeIds = new Set(graph.nodes.map((n) => n.id));
+  let edgesAdded = 0;
+  const seen = new Set<string>();
+
+  const resolveEndpoint = (endpoint: string): string | undefined => {
+    const resolved = resolveObjectTypeNode(endpoint, apiIndex, displayIndex);
+    if (resolved) return resolved;
+    const directId = ontologyObjectNodeId(endpoint);
+    return nodeIds.has(directId) ? directId : undefined;
+  };
+
+  for (const link of elements.filter((el) => el.kind === "linkType")) {
+    const fromApi = link.linkFrom?.trim();
+    const toApi = link.linkTo?.trim();
+    if (!fromApi || !toApi) continue;
+
+    const source = resolveEndpoint(fromApi);
+    const target = resolveEndpoint(toApi);
+    if (!source || !target || source === target) continue;
+
+    const edgeKey = `${source}->${target}:${link.foundryApiName || link.id}`;
+    if (seen.has(edgeKey)) continue;
+    seen.add(edgeKey);
+
+    const edgeId = link.id.startsWith("foundry-link-")
+      ? `edge-${link.id}`
+      : `edge-foundry-link-${link.id}`;
+    const label = link.name.trim() || undefined;
+
+    graph.edges.push({ id: edgeId, source, target, label });
+    edgesAdded += 1;
+  }
+
+  return edgesAdded;
+}
+
+function syncOntologyLinkEdgesFromMetadata(
+  graph: ArchitectureGraph,
+  elements: OntologyElement[],
+  metadata: FoundryFullMetadata,
+): number {
+  const { apiIndex, displayIndex } = buildObjectTypeNodeIndex(graph, elements);
+  const nodeIds = new Set(graph.nodes.map((n) => n.id));
+  let edgesAdded = 0;
+  const seen = new Set<string>();
+
+  const resolveEndpoint = (endpoint: string): string | undefined => {
+    const resolved = resolveObjectTypeNode(endpoint, apiIndex, displayIndex);
+    if (resolved) return resolved;
+    const directId = ontologyObjectNodeId(endpoint);
+    return nodeIds.has(directId) ? directId : undefined;
+  };
+
+  for (const spec of extractOntologyLinkEdges(metadata)) {
+    const source = resolveEndpoint(spec.fromApi);
+    const target = resolveEndpoint(spec.toApi);
+    if (!source || !target || source === target) continue;
+
+    const edgeKey = `${source}->${target}:${spec.linkApi}`;
+    if (seen.has(edgeKey)) continue;
+    seen.add(edgeKey);
+
+    const edgeId = `edge-${spec.fromApi}-${spec.linkApi}-${spec.toApi}`.replace(
+      /[^a-zA-Z0-9_-]+/g,
+      "-",
+    );
+
+    graph.edges.push({
+      id: edgeId,
+      source,
+      target,
+      label: spec.label?.trim() || undefined,
+    });
+    edgesAdded += 1;
+  }
+
+  return edgesAdded;
+}
 
 function buildOntologyElementNotes(
   element: OntologyElement,

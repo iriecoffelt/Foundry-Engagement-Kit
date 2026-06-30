@@ -10,6 +10,8 @@ interface EngagementJson {
   foundry?: {
     stackUrl?: string;
     ontologyRid?: string;
+    /** Ontology RID last used for a successful import (elements + graph). */
+    importedOntologyRid?: string;
   };
   foundryStackUrl?: string;
   [key: string]: unknown;
@@ -133,4 +135,45 @@ export async function hasFoundryConnection(
 ): Promise<boolean> {
   const conn = await loadFoundryConnection(projectPath);
   return Boolean(conn?.stackUrl && conn?.token);
+}
+
+/** RID of the ontology whose elements/graph were last imported. */
+export async function loadImportedOntologyRid(
+  projectPath: string,
+): Promise<string | undefined> {
+  try {
+    const eng = await api.readJson<EngagementJson>(`${projectPath}/engagement.json`);
+    return eng.foundry?.importedOntologyRid || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function saveImportedOntologyRid(
+  projectPath: string,
+  ontologyRid: string,
+): Promise<void> {
+  try {
+    const eng = await api.readJson<EngagementJson>(`${projectPath}/engagement.json`);
+    await api.writeJson(`${projectPath}/engagement.json`, {
+      ...eng,
+      foundry: {
+        ...(eng.foundry || {}),
+        importedOntologyRid: ontologyRid,
+      },
+    });
+  } catch {
+    await api.writeJson(`${projectPath}/engagement.json`, {
+      foundry: { importedOntologyRid: ontologyRid },
+    });
+  }
+}
+
+/** True when the selected ontology differs from the last imported one. */
+export async function isOntologyImportStale(projectPath: string): Promise<boolean> {
+  const conn = await loadFoundryConnection(projectPath);
+  if (!conn?.ontologyRid) return false;
+  const imported = await loadImportedOntologyRid(projectPath);
+  if (!imported) return true;
+  return conn.ontologyRid !== imported;
 }
