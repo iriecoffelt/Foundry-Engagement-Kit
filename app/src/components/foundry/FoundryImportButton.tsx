@@ -16,6 +16,7 @@ import {
 import type { OntologyElement } from "../../types";
 import { SecondaryButton } from "../forms/FormField";
 import { FoundryConnectionModal } from "./FoundryConnectionModal";
+import { FoundryImportDiffModal, computeImportDiff, type ImportDiffSummary } from "./FoundryImportDiffModal";
 
 interface FoundryImportButtonProps {
   projectPath: string;
@@ -27,6 +28,12 @@ interface FoundryImportButtonProps {
   onMessage?: (msg: string) => void;
 }
 
+interface PendingImport {
+  fromFoundry: OntologyElement[];
+  metadata: FoundryFullMetadata;
+  diff: ImportDiffSummary;
+}
+
 export function FoundryImportButton({
   projectPath,
   existingElements,
@@ -36,6 +43,8 @@ export function FoundryImportButton({
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showDiffModal, setShowDiffModal] = useState(false);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
 
   const checkConnection = useCallback(async () => {
     const hasConn = await hasFoundryConnection(projectPath);
@@ -65,6 +74,31 @@ export function FoundryImportButton({
         return;
       }
 
+      const diff = computeImportDiff(existingElements, fromFoundry);
+      
+      setPendingImport({ fromFoundry, metadata, diff });
+      setShowDiffModal(true);
+    } catch (e) {
+      onMessage?.(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImport) return;
+    
+    setShowDiffModal(false);
+    setLoading(true);
+    
+    try {
+      const { fromFoundry, metadata, diff } = pendingImport;
+      
+      if (diff.added.length === 0 && diff.updated.length === 0) {
+        onMessage?.("Ontology is already in sync with Foundry.");
+        return;
+      }
+
       const merged = mergeElements(existingElements, fromFoundry);
       const importResult = await onImport(merged, metadata);
       const ridCount = fromFoundry.filter((el) => el.foundryRid).length;
@@ -86,7 +120,13 @@ export function FoundryImportButton({
       onMessage?.(e instanceof Error ? e.message : "Import failed");
     } finally {
       setLoading(false);
+      setPendingImport(null);
     }
+  };
+
+  const handleCloseDiffModal = () => {
+    setShowDiffModal(false);
+    setPendingImport(null);
   };
 
   if (!connected) {
@@ -141,6 +181,14 @@ export function FoundryImportButton({
         onClose={() => setShowModal(false)}
         onConnected={() => checkConnection()}
       />
+      {pendingImport && (
+        <FoundryImportDiffModal
+          open={showDiffModal}
+          onClose={handleCloseDiffModal}
+          onConfirm={handleConfirmImport}
+          diff={pendingImport.diff}
+        />
+      )}
     </>
   );
 }
