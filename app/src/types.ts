@@ -197,6 +197,10 @@ export interface DeliveryCard {
   /** Stable link to architecture.json node id */
   architectureNodeId?: string;
   blockerId?: string;
+  /** Reference to an ADR file path (e.g. 02-design/adrs/adr-001-*.md) */
+  adrRef?: string;
+  /** Link to an ontology element from ontology-elements.json */
+  ontologyElementId?: string;
   createdAt: string;
   updatedAt: string;
 }
