@@ -1,4 +1,5 @@
-import { ArrowLeft, Download, ImageDown, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, Download, ImageDown, RefreshCw, Save, Search } from "lucide-react";
+import type { ReactNode } from "react";
 import type { ResolvedArchNodeType } from "../../lib/architectureNodeTypes";
 import {
   ARCHITECTURE_VIEWS,
@@ -9,6 +10,70 @@ import type { ArchitectureGraph } from "../../types";
 import { SecondaryButton } from "../forms/FormField";
 import { FoundryOntologySelect } from "../foundry/FoundryOntologySelect";
 import { ProjectFoundryStackField } from "../projects/ProjectFoundryStackField";
+
+/**
+ * Standardized toolbar layout wrapper.
+ * Layout pattern: [View Switcher / Left actions] | [View-specific actions] | [Common actions]
+ */
+interface ToolbarLayoutProps {
+  left?: ReactNode;
+  center?: ReactNode;
+  right?: ReactNode;
+}
+
+function ToolbarLayout({ left, center, right }: ToolbarLayoutProps) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
+      {left && <div className="flex flex-wrap items-center gap-2">{left}</div>}
+      {center && (
+        <div className="flex flex-1 flex-wrap items-center justify-center gap-2">{center}</div>
+      )}
+      {right && (
+        <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Common save and export actions, always positioned on the right side of toolbars.
+ */
+interface CommonActionsProps {
+  onSave: () => void;
+  saving: boolean;
+  saveLabel?: string;
+  onExportPng?: () => void;
+  exporting?: boolean;
+  disableExport?: boolean;
+}
+
+function CommonActions({
+  onSave,
+  saving,
+  saveLabel = "Save",
+  onExportPng,
+  exporting = false,
+  disableExport = false,
+}: CommonActionsProps) {
+  return (
+    <>
+      {onExportPng && (
+        <SecondaryButton onClick={onExportPng} disabled={exporting || disableExport}>
+          <span className="inline-flex items-center gap-1.5">
+            <ImageDown size={14} />
+            {exporting ? "Exporting…" : "Export PNG…"}
+          </span>
+        </SecondaryButton>
+      )}
+      <SecondaryButton onClick={onSave} disabled={saving}>
+        <span className="inline-flex items-center gap-1.5">
+          <Save size={14} />
+          {saving ? "Saving…" : saveLabel}
+        </span>
+      </SecondaryButton>
+    </>
+  );
+}
 
 interface ViewSwitcherProps {
   architectureView: ArchitectureViewId;
@@ -58,22 +123,26 @@ export function TopToolbar({
   onOntologyChange,
 }: TopToolbarProps) {
   return (
-    <div className="flex flex-wrap items-end gap-3 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
-      <ViewSwitcher architectureView={architectureView} onViewChange={onViewChange} />
-      {!deliveryLinked && (
-        <FoundryOntologySelect
+    <ToolbarLayout
+      left={<ViewSwitcher architectureView={architectureView} onViewChange={onViewChange} />}
+      center={
+        !deliveryLinked ? (
+          <FoundryOntologySelect
+            projectPath={projectPath}
+            onChange={onOntologyChange}
+            className="min-w-[12rem]"
+          />
+        ) : undefined
+      }
+      right={
+        <ProjectFoundryStackField
           projectPath={projectPath}
-          onChange={onOntologyChange}
-          className="min-w-[12rem]"
+          value={stackUrl}
+          onChange={onStackUrlChange}
+          compact
         />
-      )}
-      <ProjectFoundryStackField
-        projectPath={projectPath}
-        value={stackUrl}
-        onChange={onStackUrlChange}
-        compact
-      />
-    </div>
+      }
+    />
   );
 }
 
@@ -102,9 +171,9 @@ export function WorkingDiagramToolbar({
   saving,
   nodesCount,
 }: WorkingDiagramToolbarProps) {
-  return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
-      <span className="mr-2 text-sm text-fg-secondary">Add:</span>
+  const addNodeButtons = (
+    <>
+      <span className="text-sm text-fg-secondary">Add:</span>
       {resolvedTypes.map((n) => (
         <button
           key={n.id}
@@ -116,30 +185,41 @@ export function WorkingDiagramToolbar({
           {n.label}
         </button>
       ))}
-      <div className="ml-auto flex flex-wrap gap-2">
-        <SecondaryButton onClick={onSync} disabled={syncing}>
-          <span className="inline-flex items-center gap-1.5">
-            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Syncing…" : "Sync with delivery board"}
-          </span>
-        </SecondaryButton>
-        <SecondaryButton onClick={onSavePng} disabled={exporting || nodesCount === 0}>
-          <span className="inline-flex items-center gap-1.5">
-            <ImageDown size={14} />
-            {exporting ? "Exporting…" : "Save PNG to project"}
-          </span>
-        </SecondaryButton>
-        <SecondaryButton onClick={onExportPng} disabled={exporting || nodesCount === 0}>
-          <span className="inline-flex items-center gap-1.5">
-            <ImageDown size={14} />
-            Export PNG…
-          </span>
-        </SecondaryButton>
-        <SecondaryButton onClick={onSave} disabled={saving}>
-          {saving ? "Saving…" : "Save diagram"}
-        </SecondaryButton>
-      </div>
-    </div>
+    </>
+  );
+
+  const viewSpecificActions = (
+    <>
+      <SecondaryButton onClick={onSync} disabled={syncing}>
+        <span className="inline-flex items-center gap-1.5">
+          <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+          {syncing ? "Syncing…" : "Sync with delivery board"}
+        </span>
+      </SecondaryButton>
+      <SecondaryButton onClick={onSavePng} disabled={exporting || nodesCount === 0}>
+        <span className="inline-flex items-center gap-1.5">
+          <ImageDown size={14} />
+          {exporting ? "Exporting…" : "Save PNG to project"}
+        </span>
+      </SecondaryButton>
+    </>
+  );
+
+  return (
+    <ToolbarLayout
+      left={addNodeButtons}
+      center={viewSpecificActions}
+      right={
+        <CommonActions
+          onSave={onSave}
+          saving={saving}
+          saveLabel="Save diagram"
+          onExportPng={onExportPng}
+          exporting={exporting}
+          disableExport={nodesCount === 0}
+        />
+      }
+    />
   );
 }
 
@@ -182,42 +262,51 @@ export function OntologyToolbar({
   saving,
   nodesCount,
 }: OntologyToolbarProps) {
-  return (
-    <div className="flex flex-wrap items-center justify-end gap-2 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
-      {ontologyCanvasMode === "preview" && overviewGraph && (
-        <div className="mr-auto">
-          <SecondaryButton onClick={onBackToOverview}>
+  const leftContent = (() => {
+    if (ontologyCanvasMode === "preview" && overviewGraph) {
+      return (
+        <SecondaryButton onClick={onBackToOverview}>
+          <span className="inline-flex items-center gap-1.5">
+            <ArrowLeft size={14} /> Back to index
+          </span>
+        </SecondaryButton>
+      );
+    }
+    if (ontologyCanvasMode === "full") {
+      if (ontologyBrowseMode === "focus") {
+        return (
+          <SecondaryButton onClick={onBackToAllTypes}>
             <span className="inline-flex items-center gap-1.5">
-              <ArrowLeft size={14} /> Back to index
+              <ArrowLeft size={14} /> Back to all types
             </span>
           </SecondaryButton>
+        );
+      }
+      return (
+        <div className="relative w-full max-w-xs sm:w-64">
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted"
+          />
+          <input
+            type="search"
+            value={ontologySearch}
+            onChange={(e) => onOntologySearchChange(e.target.value)}
+            placeholder="Filter object types…"
+            className="w-full rounded-lg border border-surface-border bg-surface-base py-1.5 pl-8 pr-3 text-sm text-fg-primary"
+          />
         </div>
-      )}
+      );
+    }
+    return null;
+  })();
+
+  const viewSpecificActions = (
+    <>
       {ontologyCanvasMode === "full" && (
-        <>
-          {ontologyBrowseMode === "focus" ? (
-            <SecondaryButton onClick={onBackToAllTypes}>
-              Back to all types
-            </SecondaryButton>
-          ) : (
-            <div className="relative mr-auto w-full max-w-xs sm:w-64">
-              <Search
-                size={14}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted"
-              />
-              <input
-                type="search"
-                value={ontologySearch}
-                onChange={(e) => onOntologySearchChange(e.target.value)}
-                placeholder="Filter object types…"
-                className="w-full rounded-lg border border-surface-border bg-surface-base py-1.5 pl-8 pr-3 text-sm text-fg-primary"
-              />
-            </div>
-          )}
-          <SecondaryButton onClick={onOpenGraphExplorer} disabled={!overviewGraph}>
-            Graph explorer
-          </SecondaryButton>
-        </>
+        <SecondaryButton onClick={onOpenGraphExplorer} disabled={!overviewGraph}>
+          Graph explorer
+        </SecondaryButton>
       )}
       <SecondaryButton onClick={onRefreshOntology} disabled={refreshingOntology}>
         <span className="inline-flex items-center gap-1.5">
@@ -231,16 +320,24 @@ export function OntologyToolbar({
           {exportingGexf ? "Exporting…" : "Export GEXF…"}
         </span>
       </SecondaryButton>
-      <SecondaryButton onClick={onExportPng} disabled={exporting || nodesCount === 0}>
-        <span className="inline-flex items-center gap-1.5">
-          <ImageDown size={14} />
-          Export PNG…
-        </span>
-      </SecondaryButton>
-      <SecondaryButton onClick={onSave} disabled={saving}>
-        {saving ? "Saving…" : "Save layout"}
-      </SecondaryButton>
-    </div>
+    </>
+  );
+
+  return (
+    <ToolbarLayout
+      left={leftContent}
+      center={viewSpecificActions}
+      right={
+        <CommonActions
+          onSave={onSave}
+          saving={saving}
+          saveLabel="Save layout"
+          onExportPng={onExportPng}
+          exporting={exporting}
+          disableExport={nodesCount === 0}
+        />
+      }
+    />
   );
 }
 

@@ -275,7 +275,7 @@ export function OntologySigmaExplorer({
         )
       )}
 
-      <div className="relative min-h-0 flex-1 bg-[#0f172a]">
+      <div className="relative min-h-0 flex-1 bg-surface-base">
         {loading || !sigmaGraph ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
             {error ? (
