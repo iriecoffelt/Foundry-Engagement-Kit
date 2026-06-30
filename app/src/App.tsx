@@ -207,6 +207,11 @@ const AppMain = memo(function AppMain() {
           setProjectsAutoWizard(false);
         }}
         workspaceRoot={workspaceRoot}
+        projectPath={
+          current.projectSlug && workspaceRoot
+            ? `${workspaceRoot}/${current.projectSlug}`
+            : undefined
+        }
         onRefresh={bump}
         onOpenCommandPalette={() => setCommandOpen(true)}
       />
