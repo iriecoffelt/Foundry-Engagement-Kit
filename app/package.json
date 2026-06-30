@@ -17,16 +17,22 @@
     "tauri:install:mac": "npm run tauri:build && bash scripts/open-installer.sh"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.0.0",
+    "@react-sigma/core": "^5.0.6",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@xyflow/react": "^12.3.6",
+    "graphology": "^0.26.0",
+    "graphology-layout-force": "^0.2.4",
+    "graphology-layout-forceatlas2": "^0.10.1",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0"
+    "remark-gfm": "^4.0.0",
+    "sigma": "^3.0.3"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

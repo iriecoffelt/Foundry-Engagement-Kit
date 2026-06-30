@@ -82,6 +82,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
     }
   }, [project.path]);
   const [tabBackLabel, setTabBackLabel] = useState<string | undefined>();
+  const [architectureMounted, setArchitectureMounted] = useState(initialTab === "architecture");
   const [projectMeta, setProjectMeta] = useState(project);
   const [overview, setOverview] = useState("");
   const [uploads, setUploads] = useState<FileEntry[]>([]);
@@ -123,6 +124,9 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
   }, [initialTab, project.path, setTab]);
 
   const changeTab = useCallback((next: ProjectTab) => {
+    if (next === "architecture") {
+      setArchitectureMounted(true);
+    }
     if (tab !== next) {
       tabHistoryRef.current = pushNavHistory(tabHistoryRef.current, tab);
       setTabBackLabel(PROJECT_TAB_LABELS[tab]);
@@ -377,10 +381,12 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
           />
         )}
 
-        {tab === "architecture" && (
+        {architectureMounted && (
+        <div className={tab === "architecture" ? "h-full min-h-0" : "hidden"}>
           <Suspense fallback={<SectionFallback />}>
             <ArchitectureEditor
               projectPath={projectMeta.path}
+              visible={tab === "architecture"}
               initialSelectedNodeId={architectureNodeId}
               onOpenDelivery={(cardId) => {
                 setDeliveryCardId(cardId);
@@ -389,6 +395,7 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
               }}
             />
           </Suspense>
+        </div>
         )}
 
         {tab === "documents" && (

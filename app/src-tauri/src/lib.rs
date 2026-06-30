@@ -5,6 +5,7 @@ use std::path::{Component, Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use walkdir::WalkDir;
 
+mod foundry_api;
 mod handoff_pack;
 mod report_export;
 mod workspace_backup;
@@ -758,6 +759,7 @@ pub fn run() {
             export_workspace_archive,
             import_workspace_archive,
             search_workspace,
+            foundry_api::foundry_api_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

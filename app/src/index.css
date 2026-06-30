@@ -485,3 +485,16 @@
     opacity: 0.5;
   }
 }
+
+/* Sigma.js graph explorer — match app dark theme */
+.ontology-sigma-explorer {
+  --sigma-background-color: #0f172a;
+  --sigma-controls-background-color: #1e293b;
+  --sigma-controls-background-color-hover: #334155;
+  --sigma-controls-border-color: #475569;
+  --sigma-controls-color: #e2e8f0;
+}
+
+.ontology-sigma-explorer .react-sigma-controls button {
+  color: #e2e8f0;
+}

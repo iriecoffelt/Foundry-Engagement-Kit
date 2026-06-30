@@ -1,5 +1,5 @@
 import { ArrowRight, ExternalLink, FileText, GripVertical, Layers, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   boardByStatus,
   DELIVERY_STATUSES,
@@ -10,6 +10,7 @@ import {
   seedFromArchitecture,
   syncArchitectureAndDelivery,
   removeArchitectureForDeliveryCard,
+  pruneOrphanDeliveryArchitectureNodes,
 } from "../../lib/deliveryBoard";
 import {
   deliveryTypeLabel,
@@ -18,6 +19,8 @@ import {
   type DeliveryTypeDefinition,
 } from "../../lib/deliveryTypes";
 import { loadRegister, openBlockers } from "../../lib/engagementRegister";
+import { hasFoundryConnection } from "../../lib/foundryConnection";
+import { extractDatasetRid } from "../../lib/foundryLinks";
 import { api } from "../../lib/api";
 import type {
   BlockerEntry,
@@ -36,7 +39,7 @@ import {
 import { DeliveryBoardSkeleton } from "../Skeleton";
 import { UserPicker } from "./UserPicker";
 import { useEscapeKey } from "../../lib/useEscapeKey";
-import { FoundryHealthBadge } from "../foundry";
+import { FoundryHealthBadge, FoundryHealthSummary } from "../foundry";
 
 interface DeliveryBoardViewProps {
   projectPath: string;
@@ -90,6 +93,7 @@ export function DeliveryBoardView({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DeliveryStatus | null>(null);
   const [blockers, setBlockers] = useState<BlockerEntry[]>([]);
+  const [foundryConnected, setFoundryConnected] = useState(false);
   const sessionRef = useRef<PointerSession | null>(null);
   const draggingIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef(false);
@@ -110,12 +114,14 @@ export function DeliveryBoardView({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, types] = await Promise.all([
+      const [, types] = await Promise.all([
         loadDeliveryBoard(projectPath),
         loadDeliveryTypes(),
       ]);
       setDeliveryTypes(types);
-      setBoard(data.cards.length ? data : await seedFromArchitecture(projectPath));
+      await pruneOrphanDeliveryArchitectureNodes(projectPath);
+      const boardAfterPrune = await loadDeliveryBoard(projectPath);
+      setBoard(boardAfterPrune.cards.length ? boardAfterPrune : await seedFromArchitecture(projectPath));
       const register = await loadRegister(projectPath);
       setBlockers(openBlockers(register));
     } finally {
@@ -126,6 +132,22 @@ export function DeliveryBoardView({
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    hasFoundryConnection(projectPath).then(setFoundryConnected);
+  }, [projectPath, board.cards]);
+
+  const datasetRids = useMemo(
+    () =>
+      [
+        ...new Set(
+          board.cards
+            .map((card) => extractDatasetRid(card.resourceId))
+            .filter((rid): rid is string => Boolean(rid)),
+        ),
+      ],
+    [board.cards],
+  );
 
   useEffect(() => {
     if (initialSelectedCardId && board.cards.some((c) => c.id === initialSelectedCardId)) {
@@ -313,6 +335,18 @@ export function DeliveryBoardView({
               <p className="mt-1 text-sm text-fg-secondary">
                 Click a card to edit details. Drag a card (or its grip) between columns to change status.
               </p>
+              {datasetRids.length > 0 ? (
+                <div className="mt-2">
+                  <FoundryHealthSummary projectPath={projectPath} datasetRids={datasetRids} />
+                </div>
+              ) : foundryConnected ? (
+                <p className="mt-2 text-xs text-fg-muted">
+                  Foundry health checks appear when a card has a dataset RID in{" "}
+                  <span className="text-fg-secondary">Resource / RID</span> (e.g.{" "}
+                  <code className="text-brand-300">ri.foundry.main.dataset.…</code>) or when a linked
+                  architecture node points at a dataset.
+                </p>
+              ) : null}
             </div>
             <button
               type="button"
@@ -320,6 +354,7 @@ export function DeliveryBoardView({
                 const result = await syncArchitectureAndDelivery(projectPath);
                 setBoard(result.board);
                 const parts: string[] = [];
+                if (result.archPruned) parts.push(`${result.archPruned} removed from diagram`);
                 if (result.archAdded) parts.push(`${result.archAdded} added to diagram`);
                 if (result.deliveryAdded) parts.push(`${result.deliveryAdded} added to board`);
                 if (result.deliveryUpdated) parts.push(`${result.deliveryUpdated} board cards updated`);
@@ -441,9 +476,7 @@ function DeliveryCardItem({
   onRemove: () => void;
 }) {
   const typeStyle = deliveryTypeStyles(deliveryTypes, card.type);
-  const datasetRid = card.resourceId?.startsWith("ri.foundry.main.dataset.")
-    ? card.resourceId
-    : undefined;
+  const datasetRid = extractDatasetRid(card.resourceId);
 
   return (
     <div
@@ -484,7 +517,7 @@ function DeliveryCardItem({
               <FoundryHealthBadge
                 projectPath={projectPath}
                 datasetRid={datasetRid}
-                showLabel={false}
+                showLabel={true}
                 size="sm"
               />
             )}
@@ -529,6 +562,7 @@ function DeliveryCardDetail({
   onOpenDocument?: (path: string) => void;
 }) {
   const resourceUrl = card.resourceId?.trim();
+  const datasetRid = extractDatasetRid(resourceUrl);
   const isUrl = resourceUrl?.startsWith("http://") || resourceUrl?.startsWith("https://");
   const hasArchitectureLink = card.architectureNodeId && onNavigateToArchitecture;
   const hasDesignDoc = card.designRef?.trim() && onOpenDocument;
@@ -594,7 +628,11 @@ function DeliveryCardDetail({
           />
         </Field>
 
-        <Field label="Resource / RID" hint="Foundry resource ID or URL" classification="customer-specific">
+        <Field
+          label="Resource / RID"
+          hint="Dataset RID enables Foundry health checks on this card (requires api:data-health-read)"
+          classification="customer-specific"
+        >
           <TextInput
             value={card.resourceId || ""}
             onChange={(v) => onUpdate({ resourceId: v })}
@@ -610,10 +648,10 @@ function DeliveryCardDetail({
                 <ExternalLink size={12} /> Open in browser
               </button>
             )}
-            {resourceUrl?.startsWith("ri.foundry.main.dataset.") && (
+            {datasetRid && (
               <FoundryHealthBadge
                 projectPath={projectPath}
-                datasetRid={resourceUrl}
+                datasetRid={datasetRid}
                 showLabel={true}
                 size="sm"
               />

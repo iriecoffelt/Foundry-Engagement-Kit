@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { isOntologyImportStale } from "./foundryConnection";
 import type { OntologyElement } from "../types";
 
 export const ONTOLOGY_ELEMENTS_PATH = "02-design/ontology-elements.json";
@@ -12,13 +13,30 @@ export function ontologyElementsPath(projectPath: string) {
   return `${projectPath}/${ONTOLOGY_ELEMENTS_PATH}`;
 }
 
+export function normalizeElementKind(raw: string | undefined): string {
+  const kind = raw?.trim() || "objectType";
+  const aliases: Record<string, string> = {
+    objecttype: "objectType",
+    "object-type": "objectType",
+    linktype: "linkType",
+    "link-type": "linkType",
+    actiontype: "actionType",
+    "action-type": "actionType",
+    function: "function",
+    interface: "interface",
+    sharedproperty: "sharedProperty",
+    "shared-property": "sharedProperty",
+  };
+  return aliases[kind.toLowerCase()] || kind;
+}
+
 function normalizeElement(raw: Partial<OntologyElement>): OntologyElement | null {
   const name = raw.name?.trim();
   if (!name) return null;
   const id = raw.id?.trim() || `ont-el-${Date.now()}`;
   return {
     id,
-    kind: raw.kind?.trim() || "objectType",
+    kind: normalizeElementKind(raw.kind),
     name,
     description: raw.description?.trim() || "",
     primaryKey: raw.primaryKey?.trim() || undefined,
@@ -26,6 +44,8 @@ function normalizeElement(raw: Partial<OntologyElement>): OntologyElement | null
     linkFrom: raw.linkFrom?.trim() || undefined,
     linkTo: raw.linkTo?.trim() || undefined,
     targetObject: raw.targetObject?.trim() || undefined,
+    foundryRid: raw.foundryRid?.trim() || undefined,
+    foundryApiName: raw.foundryApiName?.trim() || undefined,
   };
 }
 
@@ -54,6 +74,14 @@ async function loadLegacyObjects(projectPath: string): Promise<OntologyElement[]
 }
 
 export async function loadOntologyElements(projectPath: string): Promise<OntologyElement[]> {
+  if (await isOntologyImportStale(projectPath)) {
+    return [];
+  }
+  return loadRawOntologyElements(projectPath);
+}
+
+/** Load elements from disk without checking whether the selected ontology matches. */
+export async function loadRawOntologyElements(projectPath: string): Promise<OntologyElement[]> {
   try {
     const data = await api.readJson<OntologyElementsFile>(ontologyElementsPath(projectPath));
     const elements = (data.elements ?? [])
