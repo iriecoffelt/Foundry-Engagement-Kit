@@ -1,27 +1,18 @@
 import {
-  ReactFlow,
   ReactFlowProvider,
-  Background,
-  Controls,
-  MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
-  useReactFlow,
   getNodesBounds,
   getViewportForBounds,
-  Handle,
-  Position,
   type Connection,
   type Edge,
   type Node,
-  type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { toPng } from "html-to-image";
-import { Download, ArrowLeft, ExternalLink, ImageDown, Link2, RefreshCw, Search } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import {
   deliveryStatusByArchNodeId,
@@ -33,7 +24,6 @@ import {
   refreshOntologyArchitectureGraph,
 } from "../../lib/architectureSync";
 import {
-  ARCHITECTURE_VIEWS,
   architectureRelativePath,
   architectureViewById,
   loadStoredArchitectureView,
@@ -76,148 +66,26 @@ import {
   layoutOntologyBrowseGrid,
 } from "../../lib/ontologyGraphBrowse";
 import { gexfToBytes, serializeOntologyGexf } from "../../lib/ontologyGraphGexf";
-import { FoundryOntologySelect } from "../foundry/FoundryOntologySelect";
-import { OntologyGraphOverview } from "./OntologyGraphOverview";
-import { OntologyLiteNode } from "./OntologyLiteNode";
-import { OntologySigmaExplorer } from "./OntologySigmaExplorer";
-import {
-  DELIVERY_STATUS_BADGE,
-  DELIVERY_STATUS_LABELS,
-  loadDeliveryBoard,
-} from "../../lib/deliveryBoard";
+import { loadDeliveryBoard } from "../../lib/deliveryBoard";
 import type { ArchitectureGraph, DeliveryCard } from "../../types";
-import { SecondaryButton } from "../forms/FormField";
 import { useEscapeKey } from "../../lib/useEscapeKey";
+
+import { ArchEditorContext, type ArchEditorContextValue } from "./ArchitectureEditorContext";
+import { ArchNode } from "./ArchNode";
+import { OntologyLiteNode } from "./OntologyLiteNode";
+import { OntologyGraphOverview } from "./OntologyGraphOverview";
+import { OntologySigmaExplorer } from "./OntologySigmaExplorer";
 import { ArchNodeDetailsPanel, EdgeDetailsPanel } from "./ArchNodeDetailsPanel";
-import { ProjectFoundryStackField } from "../projects/ProjectFoundryStackField";
+import {
+  TopToolbar,
+  WorkingDiagramToolbar,
+  OntologyToolbar,
+  MessageBar,
+} from "./ArchitectureEditorToolbar";
+import { ArchitectureCanvas, FooterHint } from "./ArchitectureEditorCanvas";
 
 const IMAGE_WIDTH = 1920;
 const IMAGE_HEIGHT = 1080;
-
-interface ArchEditorContextValue {
-  stackUrl: string;
-  typeById: Map<string, ResolvedArchNodeType>;
-  deliveryByNodeId: Map<string, DeliveryCard>;
-  onOpenDelivery?: (cardId: string) => void;
-}
-
-const ArchEditorContext = createContext<ArchEditorContextValue>({
-  stackUrl: "",
-  typeById: new Map(),
-  deliveryByNodeId: new Map(),
-});
-
-function ArchNode({ id, data, selected }: NodeProps) {
-  const { setNodes } = useReactFlow();
-  const { stackUrl, typeById, deliveryByNodeId, onOpenDelivery } = useContext(ArchEditorContext);
-  const nodeType = String(data.nodeType || "dataset");
-  const meta = typeById.get(nodeType) ?? typeById.values().next().value;
-  const Icon = meta?.Icon;
-  const hexColor = meta?.hexColor ?? "#94a3b8";
-  const labelFallback = meta?.label ?? nodeType;
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(data.label || labelFallback));
-  const foundryLink = String(data.foundryLink || "");
-  const hasLink = foundryLink.trim().length > 0;
-  const linkable = meta?.linkable ?? false;
-  const deliveryCard = deliveryByNodeId.get(id);
-
-  const commitLabel = () => {
-    const label = draft.trim() || labelFallback;
-    setNodes((nds) =>
-      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, label } } : n)),
-    );
-    setDraft(label);
-    setEditing(false);
-  };
-
-  const startEditing = () => {
-    setDraft(String(data.label || labelFallback));
-    setEditing(true);
-  };
-
-  const jumpToFoundry = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await openFoundryLink(stackUrl, foundryLink, api.openUrl);
-    } catch (err) {
-      alert(String(err));
-    }
-  };
-
-  const openDelivery = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (deliveryCard && onOpenDelivery) onOpenDelivery(deliveryCard.id);
-  };
-
-  return (
-    <div
-      className={`relative min-w-[140px] rounded-xl border-2 bg-surface-raised px-3 py-2 shadow-lg ${
-        selected ? "ring-2 ring-brand-400/60" : ""
-      }`}
-      style={{ borderColor: hexColor }}
-      onDoubleClick={(e) => {
-        e.stopPropagation();
-        startEditing();
-      }}
-    >
-      <Handle type="target" position={Position.Left} className="!bg-surface-subtle" />
-      {linkable && hasLink && (
-        <button
-          type="button"
-          onClick={jumpToFoundry}
-          title="Open in Foundry"
-          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-surface-border bg-brand-600 text-fg-on-accent shadow hover:bg-brand-500"
-        >
-          <ExternalLink size={12} />
-        </button>
-      )}
-      {editing ? (
-        <input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commitLabel}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitLabel();
-            if (e.key === "Escape") {
-              setDraft(String(data.label || labelFallback));
-              setEditing(false);
-            }
-          }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full rounded border border-surface-border-strong bg-surface-base px-2 py-1 text-sm text-fg-primary outline-none focus:border-brand-500"
-        />
-      ) : (
-        <div>
-          <div className="flex items-center gap-2">
-            {Icon && <Icon size={16} style={{ color: hexColor }} />}
-            <span className="text-sm font-medium text-fg-primary">{data.label as string}</span>
-          </div>
-          {linkable && hasLink && (
-            <p className="mt-1 flex items-center gap-1 truncate text-[10px] text-brand-400">
-              <Link2 size={10} className="shrink-0" />
-              <span className="truncate">
-                {foundryLink.length > 36 ? `${foundryLink.slice(0, 36)}…` : foundryLink}
-              </span>
-            </p>
-          )}
-          {deliveryCard && (
-            <button
-              type="button"
-              onClick={openDelivery}
-              className={`mt-1.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ${DELIVERY_STATUS_BADGE[deliveryCard.status]}`}
-              title="Open on delivery board"
-            >
-              {DELIVERY_STATUS_LABELS[deliveryCard.status]}
-            </button>
-          )}
-        </div>
-      )}
-      <Handle type="source" position={Position.Right} className="!bg-surface-subtle" />
-    </div>
-  );
-}
 
 const nodeTypes = { arch: ArchNode, ontologyLite: OntologyLiteNode };
 
@@ -268,33 +136,6 @@ function toFlowEdges(graph: ArchitectureGraph, lite = false) {
       labelBgBorderRadius: 4,
     };
   });
-}
-
-const LARGE_GRAPH_NODES = 80;
-
-function FitViewOnce({
-  nodeCount,
-  wideOverview,
-}: {
-  nodeCount: number;
-  wideOverview?: boolean;
-}) {
-  const { fitView } = useReactFlow();
-
-  useEffect(() => {
-    if (nodeCount === 0) return;
-    const frame = requestAnimationFrame(() => {
-      void fitView({
-        padding: wideOverview ? 0.06 : 0.18,
-        minZoom: wideOverview ? 0.03 : 0.35,
-        maxZoom: wideOverview ? 0.45 : nodeCount > 30 ? 0.75 : 1,
-        duration: wideOverview ? 0 : 300,
-      });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [nodeCount, wideOverview, fitView]);
-
-  return null;
 }
 
 function fromFlow(nodes: Node[], edges: Edge[]): ArchitectureGraph {
@@ -351,7 +192,6 @@ interface ArchitectureEditorProps {
   projectPath: string;
   onOpenDelivery?: (cardId: string) => void;
   initialSelectedNodeId?: string | null;
-  /** When false, defer graph load and skip React Flow (tab not visible). */
   visible?: boolean;
 }
 
@@ -758,7 +598,7 @@ function ArchitectureEditorInner({
     return () => {
       cancelled = true;
     };
-  }, [visible, projectPath, jsonPath, deliveryLinked, applyGraphToCanvas]);
+  }, [visible, projectPath, jsonPath, deliveryLinked, applyGraphToCanvas, selectedNodeId, setNodes, setEdges]);
 
   const changeArchitectureView = useCallback(
     (viewId: ArchitectureViewId) => {
@@ -782,7 +622,7 @@ function ArchitectureEditorInner({
         setInitialNodeHandled(true);
       }
     }
-  }, [initialSelectedNodeId, nodes, initialNodeHandled]);
+  }, [initialSelectedNodeId, nodes, initialNodeHandled, setSelectedNode]);
 
   const onConnect = useCallback(
     (connection: Connection) =>
@@ -1004,155 +844,65 @@ function ArchitectureEditorInner({
     onOpenDelivery,
   };
 
+  const handleOntologyChange = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+    setGraphReady(false);
+    setMessage("Ontology changed — import on the Ontology tab, then use Refresh graph links.");
+  }, [setNodes, setEdges]);
+
   return (
     <ArchEditorContext.Provider value={contextValue}>
       <div className="flex h-full flex-col">
-        <div className="flex flex-wrap items-end gap-3 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
-          <div className="min-w-[12rem]">
-            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-fg-muted">
-              Diagram
-            </label>
-            <select
-              value={architectureView}
-              onChange={(e) => changeArchitectureView(e.target.value as ArchitectureViewId)}
-              className="w-full rounded-lg border border-surface-border bg-surface-base px-3 py-2 text-sm text-fg-primary"
-            >
-              {ARCHITECTURE_VIEWS.map((view) => (
-                <option key={view.id} value={view.id}>
-                  {view.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-fg-muted">{viewDef.description}</p>
-          </div>
-          {!deliveryLinked && (
-            <FoundryOntologySelect
-              projectPath={projectPath}
-              onChange={() => {
-                setNodes([]);
-                setEdges([]);
-                setGraphReady(false);
-                setMessage(
-                  "Ontology changed — import on the Ontology tab, then use Refresh graph links.",
-                );
-              }}
-              className="min-w-[12rem]"
-            />
-          )}
-          <ProjectFoundryStackField
-            projectPath={projectPath}
-            value={stackUrl}
-            onChange={setStackUrl}
-            compact
-          />
-        </div>
+        <TopToolbar
+          architectureView={architectureView}
+          onViewChange={changeArchitectureView}
+          projectPath={projectPath}
+          stackUrl={stackUrl}
+          onStackUrlChange={setStackUrl}
+          deliveryLinked={deliveryLinked}
+          onOntologyChange={handleOntologyChange}
+        />
+
         {deliveryLinked && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
-          <span className="mr-2 text-sm text-fg-secondary">Add:</span>
-          {resolvedTypes.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              onClick={() => addNode(n.id)}
-              className="rounded-lg border border-surface-border-strong px-3 py-1.5 text-xs text-fg-body hover:border-surface-border-strong hover:text-fg-primary"
-              style={{ borderLeftWidth: 3, borderLeftColor: n.hexColor }}
-            >
-              {n.label}
-            </button>
-          ))}
-          <div className="ml-auto flex flex-wrap gap-2">
-            <SecondaryButton onClick={syncDelivery} disabled={syncing}>
-              <span className="inline-flex items-center gap-1.5">
-                <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-                {syncing ? "Syncing…" : "Sync with delivery board"}
-              </span>
-            </SecondaryButton>
-            <SecondaryButton onClick={savePngToProject} disabled={exporting || nodes.length === 0}>
-              <span className="inline-flex items-center gap-1.5">
-                <ImageDown size={14} />
-                {exporting ? "Exporting…" : "Save PNG to project"}
-              </span>
-            </SecondaryButton>
-            <SecondaryButton onClick={exportPng} disabled={exporting || nodes.length === 0}>
-              <span className="inline-flex items-center gap-1.5">
-                <ImageDown size={14} />
-                Export PNG…
-              </span>
-            </SecondaryButton>
-            <SecondaryButton onClick={save} disabled={saving}>
-              {saving ? "Saving…" : "Save diagram"}
-            </SecondaryButton>
-          </div>
-        </div>
+          <WorkingDiagramToolbar
+            resolvedTypes={resolvedTypes}
+            onAddNode={addNode}
+            onSync={syncDelivery}
+            syncing={syncing}
+            onSavePng={savePngToProject}
+            onExportPng={exportPng}
+            exporting={exporting}
+            onSave={save}
+            saving={saving}
+            nodesCount={nodes.length}
+          />
         )}
+
         {!deliveryLinked && (
-        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
-          {ontologyCanvasMode === "preview" && overviewGraph && (
-            <div className="mr-auto">
-              <SecondaryButton onClick={returnToOntologyOverview}>
-                <span className="inline-flex items-center gap-1.5">
-                  <ArrowLeft size={14} /> Back to index
-                </span>
-              </SecondaryButton>
-            </div>
-          )}
-          {ontologyCanvasMode === "full" && (
-            <>
-              {ontologyBrowseMode === "focus" ? (
-                <SecondaryButton onClick={returnToOntologyBrowse}>
-                  Back to all types
-                </SecondaryButton>
-              ) : (
-                <div className="relative mr-auto w-full max-w-xs sm:w-64">
-                  <Search
-                    size={14}
-                    className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted"
-                  />
-                  <input
-                    type="search"
-                    value={ontologySearch}
-                    onChange={(e) => setOntologySearch(e.target.value)}
-                    placeholder="Filter object types…"
-                    className="w-full rounded-lg border border-surface-border bg-surface-base py-1.5 pl-8 pr-3 text-sm text-fg-primary"
-                  />
-                </div>
-              )}
-              <SecondaryButton onClick={openGraphExplorer} disabled={!overviewGraph}>
-                Graph explorer
-              </SecondaryButton>
-            </>
-          )}
-          <SecondaryButton onClick={refreshOntologyGraph} disabled={refreshingOntology}>
-            <span className="inline-flex items-center gap-1.5">
-              <RefreshCw size={14} className={refreshingOntology ? "animate-spin" : ""} />
-              {refreshingOntology ? "Refreshing…" : "Refresh graph links"}
-            </span>
-          </SecondaryButton>
-          <SecondaryButton
-            onClick={() => overviewGraph && void exportOntologyGexf(overviewGraph)}
-            disabled={exportingGexf || !overviewGraph}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Download size={14} />
-              {exportingGexf ? "Exporting…" : "Export GEXF…"}
-            </span>
-          </SecondaryButton>
-          <SecondaryButton onClick={exportPng} disabled={exporting || nodes.length === 0}>
-            <span className="inline-flex items-center gap-1.5">
-              <ImageDown size={14} />
-              Export PNG…
-            </span>
-          </SecondaryButton>
-          <SecondaryButton onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save layout"}
-          </SecondaryButton>
-        </div>
+          <OntologyToolbar
+            ontologyCanvasMode={ontologyCanvasMode}
+            ontologyBrowseMode={ontologyBrowseMode}
+            ontologySearch={ontologySearch}
+            onOntologySearchChange={setOntologySearch}
+            overviewGraph={overviewGraph}
+            onBackToOverview={returnToOntologyOverview}
+            onBackToAllTypes={returnToOntologyBrowse}
+            onOpenGraphExplorer={openGraphExplorer}
+            onRefreshOntology={refreshOntologyGraph}
+            refreshingOntology={refreshingOntology}
+            onExportGexf={() => overviewGraph && void exportOntologyGexf(overviewGraph)}
+            exportingGexf={exportingGexf}
+            onExportPng={exportPng}
+            exporting={exporting}
+            onSave={save}
+            saving={saving}
+            nodesCount={nodes.length}
+          />
         )}
-        {message && (
-          <div className="border-b border-surface-border bg-surface-raised/30 px-4 py-2 text-sm text-brand-300">
-            {message}
-          </div>
-        )}
+
+        <MessageBar message={message} />
+
         <div className="flex min-h-0 flex-1">
           <div className="min-h-0 min-w-0 flex-1">
             {!visible ? null : graphLoading ? (
@@ -1178,80 +928,21 @@ function ArchitectureEditorInner({
                 exportingGexf={exportingGexf}
               />
             ) : (
-              <div className="relative h-full min-h-0">
-                {ontologyPrepareProgress && (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface-base/90 backdrop-blur-sm">
-                    <div className="w-full max-w-md rounded-xl border border-surface-border bg-surface-raised p-6 shadow-xl">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-fg-primary">Loading ontology browser</p>
-                        <span className="rounded-full bg-brand-900/50 px-2 py-0.5 text-xs font-medium text-brand-300">
-                          {ontologyPrepareProgress.phaseLabel}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-fg-secondary">{ontologyPrepareProgress.detail}</p>
-                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-base">
-                        <div
-                          className="h-full rounded-full bg-brand-500 transition-all duration-200"
-                          style={{
-                            width: `${
-                              ontologyPrepareProgress.total > 0
-                                ? Math.round(
-                                    (ontologyPrepareProgress.current / ontologyPrepareProgress.total) *
-                                      100,
-                                  )
-                                : ontologyPrepareProgress.phase === "layout"
-                                  ? 25
-                                  : 100
-                            }%`,
-                          }}
-                        />
-                      </div>
-                      <p className="mt-3 text-xs text-fg-muted">
-                        Types load in stages so the app stays responsive. Links are shown when you
-                        focus on a type.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              <ReactFlow
+              <ArchitectureCanvas
                 nodes={nodes}
                 edges={edges}
+                nodeTypes={nodeTypes}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onSelectionChange={onSelectionChange}
                 onNodeDoubleClick={onNodeDoubleClick}
-                nodeTypes={nodeTypes}
-                onlyRenderVisibleElements={
-                  ontologyCanvasMode === "full" || nodes.length > LARGE_GRAPH_NODES
-                }
-                nodesDraggable={ontologyCanvasMode !== "full"}
-                nodesConnectable={deliveryLinked}
-                elementsSelectable
-                minZoom={0.02}
-                maxZoom={1.5}
-                zoomOnScroll={false}
-                panOnScroll
-                proOptions={{ hideAttribution: true }}
-                className="bg-surface-base"
-              >
-                {graphReady && nodes.length > 0 && (
-                  <FitViewOnce
-                    nodeCount={nodes.length}
-                    wideOverview={
-                      ontologyCanvasMode === "full" && ontologyBrowseMode === "all"
-                    }
-                  />
-                )}
-                <Background color="#334155" gap={20} />
-                <Controls className="!bg-surface-raised !border-surface-border-strong" />
-                {ontologyCanvasMode !== "full" &&
-                  nodes.length <= LARGE_GRAPH_NODES &&
-                  nodes.length > 0 && (
-                  <MiniMap className="!bg-surface-raised" />
-                )}
-              </ReactFlow>
-              </div>
+                graphReady={graphReady}
+                ontologyCanvasMode={ontologyCanvasMode}
+                ontologyBrowseMode={ontologyBrowseMode}
+                deliveryLinked={deliveryLinked}
+                ontologyPrepareProgress={ontologyPrepareProgress}
+              />
             )}
           </div>
           {canvasMode === "canvas" && selectedNode ? (
@@ -1289,17 +980,12 @@ function ArchitectureEditorInner({
             />
           ) : null}
         </div>
-        <p className="border-t border-surface-border px-4 py-2 text-xs text-fg-muted">
-          {deliveryLinked
-            ? "Drag nodes to arrange. Double-click to rename. Select a node for notes and Foundry links, or an edge to add a label. Use Sync to keep the diagram and delivery board aligned both ways."
-            : ontologyCanvasMode === "full"
-              ? ontologyBrowseMode === "focus"
-                ? "Focused link view — use Back to all types to return to the full browse grid."
-                : "Browse all object types — double-click a type (or use Show links in the panel) to see its connections."
-              : ontologyCanvasMode === "preview"
-                ? "Preview of the most connected object types — use Back to index for the full list or Graph explorer."
-                : "Foundry ontology reference — object types and their links. Functions and actions stay on the Ontology tab only."}
-        </p>
+
+        <FooterHint
+          deliveryLinked={deliveryLinked}
+          ontologyCanvasMode={ontologyCanvasMode}
+          ontologyBrowseMode={ontologyBrowseMode}
+        />
       </div>
     </ArchEditorContext.Provider>
   );
