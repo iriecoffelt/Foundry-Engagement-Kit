@@ -2,14 +2,23 @@ import type { Node } from "@xyflow/react";
 import type { ArchitectureGraph } from "../types";
 import { layoutOntologyBrowseGrid } from "./ontologyGraphBrowse";
 
-export type OntologyGraphPreparePhase = "layout" | "nodes" | "done";
+export type OntologyGraphPreparePhase = "fetching" | "processing" | "layout" | "nodes" | "done";
 
 export interface OntologyGraphPrepareProgress {
   phase: OntologyGraphPreparePhase;
   current: number;
   total: number;
   detail: string;
+  phaseLabel: string;
 }
+
+const PHASE_LABELS: Record<OntologyGraphPreparePhase, string> = {
+  fetching: "Fetching metadata",
+  processing: "Processing types",
+  layout: "Building graph",
+  nodes: "Loading types",
+  done: "Ready",
+};
 
 function yieldToMain(): Promise<void> {
   return new Promise((resolve) => {
@@ -30,7 +39,8 @@ export async function prepareOntologyBrowseGraph(
     phase: "layout",
     current: 0,
     total: graph.nodes.length,
-    detail: `Arranging ${graph.nodes.length} object types…`,
+    detail: `Building graph layout (0/${graph.nodes.length})…`,
+    phaseLabel: PHASE_LABELS.layout,
   });
   await yieldToMain();
   const laidOut = layoutOntologyBrowseGrid(graph);
@@ -38,7 +48,8 @@ export async function prepareOntologyBrowseGraph(
     phase: "layout",
     current: graph.nodes.length,
     total: graph.nodes.length,
-    detail: "Layout complete",
+    detail: `Building graph layout (${graph.nodes.length}/${graph.nodes.length})…`,
+    phaseLabel: PHASE_LABELS.layout,
   });
   return laidOut;
 }
@@ -61,7 +72,8 @@ export async function hydrateOntologyNodesInChunks(
       phase: "nodes",
       current: end,
       total: flowNodes.length,
-      detail: `Loading types (${end}/${flowNodes.length})…`,
+      detail: `Loading object types (${end}/${flowNodes.length})…`,
+      phaseLabel: PHASE_LABELS.nodes,
     });
   }
 
@@ -70,5 +82,36 @@ export async function hydrateOntologyNodesInChunks(
     current: flowNodes.length,
     total: flowNodes.length,
     detail: "Ready — select a type to see its links",
+    phaseLabel: PHASE_LABELS.done,
   });
+}
+
+/** Create progress for the fetching phase */
+export function createFetchingProgress(
+  current: number,
+  total: number,
+): OntologyGraphPrepareProgress {
+  return {
+    phase: "fetching",
+    current,
+    total,
+    detail: total > 0 
+      ? `Fetching metadata (${current}/${total})…`
+      : "Fetching metadata…",
+    phaseLabel: PHASE_LABELS.fetching,
+  };
+}
+
+/** Create progress for the processing phase */
+export function createProcessingProgress(
+  current: number,
+  total: number,
+): OntologyGraphPrepareProgress {
+  return {
+    phase: "processing",
+    current,
+    total,
+    detail: `Processing types (${current}/${total})…`,
+    phaseLabel: PHASE_LABELS.processing,
+  };
 }

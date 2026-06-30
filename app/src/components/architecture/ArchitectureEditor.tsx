@@ -66,6 +66,7 @@ import { layoutOntologyGraph } from "../../lib/ontologyGraphLayout";
 import {
   hydrateOntologyNodesInChunks,
   prepareOntologyBrowseGraph,
+  createFetchingProgress,
   type OntologyGraphPrepareProgress,
 } from "../../lib/ontologyGraphPrepare";
 import {
@@ -459,12 +460,7 @@ function ArchitectureEditorInner({
     async (graph: ArchitectureGraph) => {
       const loadId = ++fullGraphLoadRef.current;
       fullOntologyGraphRef.current = graph;
-      setOntologyPrepareProgress({
-        phase: "layout",
-        current: 0,
-        total: graph.nodes.length,
-        detail: `Preparing ${graph.nodes.length} object types…`,
-      });
+      setOntologyPrepareProgress(createFetchingProgress(0, graph.nodes.length));
       setOntologyCanvasMode("full");
       setOntologyBrowseMode("all");
       setOntologySearch("");
@@ -1186,8 +1182,13 @@ function ArchitectureEditorInner({
                 {ontologyPrepareProgress && (
                   <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface-base/90 backdrop-blur-sm">
                     <div className="w-full max-w-md rounded-xl border border-surface-border bg-surface-raised p-6 shadow-xl">
-                      <p className="text-sm font-medium text-fg-primary">Loading ontology browser</p>
-                      <p className="mt-1 text-sm text-fg-secondary">{ontologyPrepareProgress.detail}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-fg-primary">Loading ontology browser</p>
+                        <span className="rounded-full bg-brand-900/50 px-2 py-0.5 text-xs font-medium text-brand-300">
+                          {ontologyPrepareProgress.phaseLabel}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-fg-secondary">{ontologyPrepareProgress.detail}</p>
                       <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-base">
                         <div
                           className="h-full rounded-full bg-brand-500 transition-all duration-200"
@@ -1205,7 +1206,7 @@ function ArchitectureEditorInner({
                           }}
                         />
                       </div>
-                      <p className="mt-2 text-xs text-fg-muted">
+                      <p className="mt-3 text-xs text-fg-muted">
                         Types load in stages so the app stays responsive. Links are shown when you
                         focus on a type.
                       </p>
