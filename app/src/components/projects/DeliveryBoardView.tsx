@@ -1,4 +1,4 @@
-import { ArrowRight, ExternalLink, FileText, GripVertical, Layers, Plus, X } from "lucide-react";
+import { ArrowRight, BookOpen, ExternalLink, FileText, GripVertical, Layers, Network, Plus, X } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import {
@@ -22,12 +22,17 @@ import {
 import { loadRegister, openBlockers } from "../../lib/engagementRegister";
 import { hasFoundryConnection } from "../../lib/foundryConnection";
 import { extractDatasetRid } from "../../lib/foundryLinks";
+import { loadDecisions } from "../../lib/decisions";
+import { loadOntologyElements } from "../../lib/ontologyElements";
+import { loadOntologyElementTypes, ontologyElementTypeLabel } from "../../lib/ontologyTypes";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
 import type {
   BlockerEntry,
+  DecisionSummary,
   DeliveryBoard,
   DeliveryCard,
   DeliveryStatus,
+  OntologyElement,
 } from "../../types";
 import { DeliveryTypeSelect } from "../DeliveryTypeSelect";
 import {
@@ -47,6 +52,7 @@ interface DeliveryBoardViewProps {
   initialSelectedCardId?: string | null;
   onNavigateToArchitecture?: (nodeId: string) => void;
   onOpenDocument?: (path: string) => void;
+  onNavigateToOntology?: (elementId: string) => void;
 }
 
 const DRAG_THRESHOLD_PX = 8;
@@ -75,6 +81,7 @@ export function DeliveryBoardView({
   initialSelectedCardId,
   onNavigateToArchitecture,
   onOpenDocument,
+  onNavigateToOntology,
 }: DeliveryBoardViewProps) {
   const [board, setBoard] = useState<DeliveryBoard>({ cards: [] });
   const [deliveryTypes, setDeliveryTypes] = useState<DeliveryTypeDefinition[]>([]);
@@ -95,6 +102,8 @@ export function DeliveryBoardView({
   const [dropTarget, setDropTarget] = useState<DeliveryStatus | null>(null);
   const [blockers, setBlockers] = useState<BlockerEntry[]>([]);
   const [foundryConnected, setFoundryConnected] = useState(false);
+  const [adrs, setAdrs] = useState<DecisionSummary[]>([]);
+  const [ontologyElements, setOntologyElements] = useState<OntologyElement[]>([]);
   const boardRef = useRef(board);
   boardRef.current = board;
   const dropTargetRef = useRef<DeliveryStatus | null>(null);
@@ -118,11 +127,15 @@ export function DeliveryBoardView({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [, types] = await Promise.all([
+      const [, types, decisions, elements] = await Promise.all([
         loadDeliveryBoard(projectPath),
         loadDeliveryTypes(),
+        loadDecisions(projectPath),
+        loadOntologyElements(projectPath),
       ]);
       setDeliveryTypes(types);
+      setAdrs(decisions);
+      setOntologyElements(elements);
       await pruneOrphanDeliveryArchitectureNodes(projectPath);
       const boardAfterPrune = await loadDeliveryBoard(projectPath);
       setBoard(boardAfterPrune.cards.length ? boardAfterPrune : await seedFromArchitecture(projectPath));
@@ -456,11 +469,14 @@ export function DeliveryBoardView({
           projectPath={projectPath}
           card={selectedCard}
           blockers={blockers}
+          adrs={adrs}
+          ontologyElements={ontologyElements}
           onClose={() => setSelectedId(null)}
           onUpdate={(patch) => updateCard(selectedCard.id, patch)}
           onDelete={() => removeCard(selectedCard.id)}
           onNavigateToArchitecture={onNavigateToArchitecture}
           onOpenDocument={onOpenDocument}
+          onNavigateToOntology={onNavigateToOntology}
         />
       )}
     </div>
@@ -559,26 +575,37 @@ function DeliveryCardDetail({
   projectPath,
   card,
   blockers,
+  adrs,
+  ontologyElements,
   onClose,
   onUpdate,
   onDelete,
   onNavigateToArchitecture,
   onOpenDocument,
+  onNavigateToOntology,
 }: {
   projectPath: string;
   card: DeliveryCard;
   blockers: BlockerEntry[];
+  adrs: DecisionSummary[];
+  ontologyElements: OntologyElement[];
   onClose: () => void;
   onUpdate: (patch: Partial<DeliveryCard>) => void;
   onDelete: () => void;
   onNavigateToArchitecture?: (nodeId: string) => void;
   onOpenDocument?: (path: string) => void;
+  onNavigateToOntology?: (elementId: string) => void;
 }) {
   const resourceUrl = card.resourceId?.trim();
   const datasetRid = extractDatasetRid(resourceUrl);
   const isUrl = resourceUrl?.startsWith("http://") || resourceUrl?.startsWith("https://");
   const hasArchitectureLink = card.architectureNodeId && onNavigateToArchitecture;
   const hasDesignDoc = card.designRef?.trim() && onOpenDocument;
+  const linkedAdr = card.adrRef ? adrs.find((a) => a.path === card.adrRef) : null;
+  const linkedOntologyElement = card.ontologyElementId
+    ? ontologyElements.find((e) => e.id === card.ontologyElementId)
+    : null;
+  const hasOntologyLink = linkedOntologyElement && onNavigateToOntology;
 
   return (
     <aside className="flex w-[22rem] shrink-0 flex-col border-l border-surface-border bg-surface-raised/40">
@@ -685,6 +712,58 @@ function DeliveryCardDetail({
           </Field>
         )}
 
+        {adrs.length > 0 && (
+          <Field label="ADR reference" hint="Link this component to an architecture decision">
+            <SelectInput
+              value={card.adrRef || ""}
+              onChange={(v) => onUpdate({ adrRef: v || undefined })}
+              options={[
+                { value: "", label: "None" },
+                ...adrs.map((a) => ({
+                  value: a.path,
+                  label: `ADR-${String(a.number).padStart(3, "0")}: ${a.title}`,
+                })),
+              ]}
+            />
+            {linkedAdr && onOpenDocument && (
+              <button
+                type="button"
+                onClick={() => onOpenDocument(linkedAdr.path)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300"
+              >
+                <BookOpen size={12} />
+                View ADR
+              </button>
+            )}
+          </Field>
+        )}
+
+        {ontologyElements.length > 0 && (
+          <Field label="Ontology element" hint="Link to an ontology object type, action, or link type">
+            <SelectInput
+              value={card.ontologyElementId || ""}
+              onChange={(v) => onUpdate({ ontologyElementId: v || undefined })}
+              options={[
+                { value: "", label: "None" },
+                ...ontologyElements.map((e) => ({
+                  value: e.id,
+                  label: `${e.name} (${e.kind})`,
+                })),
+              ]}
+            />
+            {hasOntologyLink && (
+              <button
+                type="button"
+                onClick={() => onNavigateToOntology!(linkedOntologyElement.id)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300"
+              >
+                <Network size={12} />
+                View in Ontology
+              </button>
+            )}
+          </Field>
+        )}
+
         <Field label="Notes">
           <TextArea
             value={card.notes || ""}
@@ -694,7 +773,7 @@ function DeliveryCardDetail({
           />
         </Field>
 
-        {(hasArchitectureLink || hasDesignDoc) && (
+        {(hasArchitectureLink || hasDesignDoc || hasOntologyLink) && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-fg-muted">Related views</p>
             <div className="flex flex-wrap gap-2">
@@ -722,6 +801,17 @@ function DeliveryCardDetail({
                 >
                   <FileText size={12} />
                   Open design doc
+                  <ArrowRight size={10} className="opacity-50" />
+                </button>
+              )}
+              {hasOntologyLink && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToOntology!(linkedOntologyElement!.id)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border-strong bg-surface-base/60 px-3 py-1.5 text-xs text-fg-body transition hover:border-brand-500/50 hover:text-brand-400"
+                >
+                  <Network size={12} />
+                  View in Ontology
                   <ArrowRight size={10} className="opacity-50" />
                 </button>
               )}

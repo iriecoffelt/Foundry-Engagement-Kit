@@ -1,7 +1,8 @@
-import { Network, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowRight, Network, Plus, Search, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addOntologyElementToDiagram,
+  loadArchitectureGraph,
   rebuildOntologyArchitecture,
   syncFromArchitecture,
 } from "../../lib/architectureSync";
@@ -28,7 +29,7 @@ import {
   type OntologyElementTypeDefinition,
 } from "../../lib/ontologyTypes";
 import type { FoundryFullMetadata } from "../../lib/foundryTypes";
-import type { OntologyElement } from "../../types";
+import type { ArchitectureGraph, OntologyElement } from "../../types";
 import { OntologyElementTypeSelect } from "../OntologyElementTypeSelect";
 import { Field, FormCard, PrimaryButton, SecondaryButton, TextArea, TextInput } from "../forms/FormField";
 import { FoundryImportButton, FoundryOntologySelect } from "../foundry";
@@ -60,21 +61,36 @@ function elementMatchesSearch(el: OntologyElement, query: string): boolean {
   );
 }
 
+function isElementOnDiagram(el: OntologyElement, graph: ArchitectureGraph | null): boolean {
+  if (!graph?.nodes?.length) return false;
+  return graph.nodes.some(
+    (n) =>
+      n.data.ontologyElementId === el.id ||
+      n.data.ontologyObjectId === el.id ||
+      n.id === `ont-${el.id}`,
+  );
+}
+
 function OntologyElementCard({
   el,
   elementTypes,
   diagramBusy,
+  workingGraph,
   onRemove,
   onAddToDiagram,
+  onOpenArchitecture,
 }: {
   el: OntologyElement;
   elementTypes: OntologyElementTypeDefinition[];
   diagramBusy: string | null;
+  workingGraph: ArchitectureGraph | null;
   onRemove: (id: string) => void;
   onAddToDiagram: (el: OntologyElement) => void;
+  onOpenArchitecture?: () => void;
 }) {
   const typeDef = findOntologyElementType(elementTypes, el.kind);
   const styles = ontologyElementTypeStyles(elementTypes, el.kind);
+  const isOnDiagram = isElementOnDiagram(el, workingGraph);
 
   return (
     <div
@@ -89,6 +105,12 @@ function OntologyElementCard({
           >
             {ontologyElementTypeLabel(elementTypes, el.kind)}
           </span>
+          {isOnDiagram && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300 ring-1 ring-emerald-500/25">
+              <Network size={10} />
+              On diagram
+            </span>
+          )}
         </div>
         {el.foundryRid && (
           <p className="mt-1 truncate font-mono text-[11px] text-fg-muted">{el.foundryRid}</p>
@@ -106,13 +128,27 @@ function OntologyElementCard({
           {el.properties.length > 0 && <p>Properties: {el.properties.join(", ")}</p>}
         </div>
         {typeDef?.architectureNodeTypeId && (
-          <div className="mt-3">
-            <SecondaryButton onClick={() => onAddToDiagram(el)} disabled={diagramBusy === el.id}>
-              <span className="inline-flex items-center gap-1.5">
-                <Network size={14} />
-                {diagramBusy === el.id ? "Adding…" : "Add to working diagram"}
-              </span>
-            </SecondaryButton>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {isOnDiagram ? (
+              onOpenArchitecture && (
+                <button
+                  type="button"
+                  onClick={onOpenArchitecture}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border-strong bg-surface-base/60 px-3 py-1.5 text-xs text-fg-body transition hover:border-brand-500/50 hover:text-brand-400"
+                >
+                  <Network size={12} />
+                  View in Architecture
+                  <ArrowRight size={10} className="opacity-50" />
+                </button>
+              )
+            ) : (
+              <SecondaryButton onClick={() => onAddToDiagram(el)} disabled={diagramBusy === el.id}>
+                <span className="inline-flex items-center gap-1.5">
+                  <Network size={14} />
+                  {diagramBusy === el.id ? "Adding…" : "Add to working diagram"}
+                </span>
+              </SecondaryButton>
+            )}
           </div>
         )}
       </div>
@@ -130,6 +166,7 @@ function OntologyElementCard({
 export function OntologyQuickAdd({ projectPath, onOpenArchitecture }: OntologyQuickAddProps) {
   const [elements, setElements] = useState<OntologyElement[]>([]);
   const [elementTypes, setElementTypes] = useState<OntologyElementTypeDefinition[]>([]);
+  const [workingGraph, setWorkingGraph] = useState<ArchitectureGraph | null>(null);
   const [activeTab, setActiveTab] = useState<OntologyPageTab>("add");
   const [searchQuery, setSearchQuery] = useState("");
   const [kind, setKind] = useState("objectType");
@@ -159,10 +196,11 @@ export function OntologyQuickAdd({ projectPath, onOpenArchitecture }: OntologyQu
   }, [elements]);
 
   const load = useCallback(async () => {
-    const [types, conn, importedRid] = await Promise.all([
+    const [types, conn, importedRid, graph] = await Promise.all([
       loadOntologyElementTypes(),
       loadFoundryConnection(projectPath),
       loadImportedOntologyRid(projectPath),
+      loadArchitectureGraph(projectPath, "working"),
     ]);
     const activeRid = conn?.ontologyRid || "";
     let resolvedImportedRid = importedRid;
@@ -176,6 +214,7 @@ export function OntologyQuickAdd({ projectPath, onOpenArchitecture }: OntologyQu
     const els = await loadOntologyElements(projectPath);
     setElements(els);
     setElementTypes(types);
+    setWorkingGraph(graph);
     setImportStale(Boolean(activeRid && resolvedImportedRid && activeRid !== resolvedImportedRid));
   }, [projectPath]);
 
@@ -254,6 +293,8 @@ export function OntologyQuickAdd({ projectPath, onOpenArchitecture }: OntologyQu
       }
       const { created } = await addOntologyElementToDiagram(projectPath, el);
       await syncFromArchitecture(projectPath);
+      const updatedGraph = await loadArchitectureGraph(projectPath, "working");
+      setWorkingGraph(updatedGraph);
       setMessage(
         created
           ? `Added ${el.name} to working diagram and delivery board`
@@ -467,8 +508,10 @@ export function OntologyQuickAdd({ projectPath, onOpenArchitecture }: OntologyQu
                     el={el}
                     elementTypes={elementTypes}
                     diagramBusy={diagramBusy}
+                    workingGraph={workingGraph}
                     onRemove={remove}
                     onAddToDiagram={addToDiagram}
+                    onOpenArchitecture={onOpenArchitecture}
                   />
                 ))
               )}
