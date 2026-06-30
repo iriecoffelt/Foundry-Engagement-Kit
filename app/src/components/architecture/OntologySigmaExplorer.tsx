@@ -7,7 +7,7 @@ import {
   ZoomControl,
 } from "@react-sigma/core";
 import Graph from "graphology";
-import { ArrowLeft, Download, Search, X } from "lucide-react";
+import { ArrowLeft, Download, HelpCircle, MousePointer2, RotateCcw, Search, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Settings } from "sigma/settings";
 import type { ArchitectureGraph } from "../../types";
@@ -21,6 +21,68 @@ import {
   SIGMA_EDGE_COLOR,
 } from "../../lib/ontologyGraphSigma";
 import { SecondaryButton } from "../forms/FormField";
+
+const ONBOARDING_DISMISSED_KEY = "sigma-explorer-onboarding-dismissed";
+
+function hasSeenOnboarding(): boolean {
+  try {
+    return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function dismissOnboarding(): void {
+  try {
+    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+interface OnboardingBannerProps {
+  onDismiss: () => void;
+}
+
+function OnboardingBanner({ onDismiss }: OnboardingBannerProps) {
+  return (
+    <div className="border-b border-brand-800/50 bg-brand-950/40 px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <HelpCircle size={18} className="mt-0.5 shrink-0 text-brand-400" />
+          <div className="space-y-2 text-sm">
+            <p className="font-medium text-brand-200">Welcome to the Graph Explorer</p>
+            <ul className="space-y-1.5 text-brand-300/90">
+              <li className="flex items-center gap-2">
+                <MousePointer2 size={14} className="shrink-0 text-brand-400" />
+                <span><strong>Click</strong> a node to focus and see its connections</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <RotateCcw size={14} className="shrink-0 text-brand-400" />
+                <span><strong>Double-click</strong> the background to reset the view</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Search size={14} className="shrink-0 text-brand-400" />
+                <span>Use the <strong>search bar</strong> to filter types by name</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <Download size={14} className="shrink-0 text-brand-400" />
+                <span><strong>Export GEXF</strong> to open in Gephi or Cytoscape</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="shrink-0 rounded-md p-1 text-brand-400 transition hover:bg-brand-900/50 hover:text-brand-200"
+          title="Dismiss"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const SIGMA_SETTINGS: Partial<Settings> = {
   renderEdgeLabels: false,
@@ -103,7 +165,13 @@ export function OntologySigmaExplorer({
   const [searchQuery, setSearchQuery] = useState("");
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [focusLabel, setFocusLabel] = useState("");
+  const [showOnboarding, setShowOnboarding] = useState(() => !hasSeenOnboarding());
   const activeRef = useRef(true);
+
+  const handleDismissOnboarding = useCallback(() => {
+    dismissOnboarding();
+    setShowOnboarding(false);
+  }, []);
 
   useEffect(() => {
     activeRef.current = true;
@@ -188,6 +256,10 @@ export function OntologySigmaExplorer({
         )}
       </div>
 
+      {!loading && !error && showOnboarding && !focusLabel && (
+        <OnboardingBanner onDismiss={handleDismissOnboarding} />
+      )}
+
       {focusLabel ? (
         <div className="border-b border-surface-border bg-brand-950/20 px-4 py-2 text-sm text-brand-200">
           Focused on <span className="font-medium">{focusLabel}</span> — showing its links. Double-click
@@ -195,7 +267,8 @@ export function OntologySigmaExplorer({
         </div>
       ) : (
         !loading &&
-        !error && (
+        !error &&
+        !showOnboarding && (
           <div className="border-b border-surface-border bg-surface-raised/30 px-4 py-2 text-sm text-fg-secondary">
             Click a type to see its connections — edges are hidden until you focus one.
           </div>
