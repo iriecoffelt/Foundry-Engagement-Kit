@@ -68,16 +68,15 @@ mod macos {
     use super::*;
     use block2::RcBlock;
     use chrono::{Local, NaiveDate, TimeZone};
-    use objc2::rc::Retained;
     use objc2::runtime::Bool;
     use objc2_event_kit::{
-        EKAuthorizationStatus, EKCalendar, EKEntityType, EKEvent, EKEventStore, EKParticipant,
+        EKAuthorizationStatus, EKCalendar, EKEntityType, EKEvent, EKEventStore,
     };
     use objc2_foundation::{NSArray, NSDate, NSString};
     use std::sync::mpsc;
 
     fn nsdate_to_iso(date: &NSDate) -> String {
-        let interval = unsafe { date.timeIntervalSince1970() };
+        let interval = date.timeIntervalSince1970();
         let secs = interval as i64;
         let nsecs = ((interval - secs as f64) * 1_000_000_000.0) as u32;
         if let Some(dt) = chrono::DateTime::from_timestamp(secs, nsecs) {
@@ -148,13 +147,10 @@ mod macos {
         unsafe {
             let mut attendees = Vec::new();
             if let Some(participants) = event.attendees() {
-                for i in 0..participants.count() {
-                    if let Some(participant) = participants.objectAtIndex(i) {
-                        let participant: &EKParticipant =
-                            &*(participant as *const _ as *const EKParticipant);
-                        if let Some(name) = participant.name() {
-                            attendees.push(name.to_string());
-                        }
+                for i in 0..participants.len() {
+                    let participant = participants.objectAtIndex(i);
+                    if let Some(name) = participant.name() {
+                        attendees.push(name.to_string());
                     }
                 }
             }
@@ -167,9 +163,9 @@ mod macos {
     }
 
     pub fn get_authorization_status() -> CalendarAccessStatus {
-        let status = EKEventStore::authorizationStatusForEntityType(EKEntityType::Event);
+        let status = unsafe { EKEventStore::authorizationStatusForEntityType(EKEntityType::Event) };
         match status {
-            EKAuthorizationStatus::Authorized | EKAuthorizationStatus::FullAccess => {
+            EKAuthorizationStatus::FullAccess => {
                 CalendarAccessStatus {
                     has_access: true,
                     status: "authorized".to_string(),
@@ -213,7 +209,7 @@ mod macos {
         });
 
         unsafe {
-            store.requestFullAccessToEventsWithCompletion(&callback);
+            store.requestFullAccessToEventsWithCompletion(&*callback);
         }
 
         rx.recv()
@@ -230,28 +226,26 @@ mod macos {
         }
 
         let store = unsafe { EKEventStore::new() };
-        let calendars =
-            unsafe { store.calendarsForEntityType(EKEntityType::Event) };
+        let calendars = unsafe { store.calendarsForEntityType(EKEntityType::Event) };
 
         let mut result = Vec::new();
         for i in 0..calendars.len() {
-            if let Some(cal) = calendars.get(i) {
-                let source_name = unsafe {
-                    cal.source()
-                        .and_then(|s| s.title().map(|t| t.to_string()))
-                        .unwrap_or_default()
-                };
+            let cal = unsafe { calendars.objectAtIndex(i) };
+            let source_name = unsafe {
+                cal.source()
+                    .and_then(|s| s.title().map(|t| t.to_string()))
+                    .unwrap_or_default()
+            };
 
-                let is_subscribed = unsafe { cal.isSubscribed() };
+            let is_subscribed = unsafe { cal.isSubscribed() };
 
-                result.push(CalendarInfo {
-                    id: unsafe { cal.calendarIdentifier().to_string() },
-                    title: unsafe { cal.title().to_string() },
-                    color: calendar_color_hex(cal),
-                    source_name,
-                    is_subscribed,
-                });
-            }
+            result.push(CalendarInfo {
+                id: unsafe { cal.calendarIdentifier().to_string() },
+                title: unsafe { cal.title().to_string() },
+                color: calendar_color_hex(&cal),
+                source_name,
+                is_subscribed,
+            });
         }
 
         Ok(result)
@@ -283,10 +277,8 @@ mod macos {
 
         let store = unsafe { EKEventStore::new() };
 
-        let start_date =
-            unsafe { NSDate::dateWithTimeIntervalSince1970(start_interval) };
-        let end_date =
-            unsafe { NSDate::dateWithTimeIntervalSince1970(end_interval) };
+        let start_date = unsafe { NSDate::dateWithTimeIntervalSince1970(start_interval) };
+        let end_date = unsafe { NSDate::dateWithTimeIntervalSince1970(end_interval) };
 
         let calendars = unsafe { store.calendarsForEntityType(EKEntityType::Event) };
         let calendars_ptr: Option<&NSArray<EKCalendar>> = Some(&calendars);
@@ -303,45 +295,45 @@ mod macos {
 
         let mut result = Vec::new();
         for i in 0..events.len() {
-            if let Some(event) = events.get(i) {
-                let calendar_name = unsafe {
-                    event
-                        .calendar()
-                        .map(|c| c.title().to_string())
-                        .unwrap_or_default()
-                };
+            let event = unsafe { events.objectAtIndex(i) };
+            
+            let calendar_name = unsafe {
+                event
+                    .calendar()
+                    .map(|c| c.title().to_string())
+                    .unwrap_or_default()
+            };
 
-                let calendar_color = unsafe { event.calendar().and_then(|c| calendar_color_hex(&c)) };
+            let calendar_color = unsafe { event.calendar().and_then(|c| calendar_color_hex(&c)) };
 
-                let start_time = unsafe {
-                    event
-                        .startDate()
-                        .map(|d| nsdate_to_iso(&d))
-                        .unwrap_or_default()
-                };
+            let start_time = unsafe {
+                event
+                    .startDate()
+                    .map(|d| nsdate_to_iso(&d))
+                    .unwrap_or_default()
+            };
 
-                let end_time = unsafe {
-                    event
-                        .endDate()
-                        .map(|d| nsdate_to_iso(&d))
-                        .unwrap_or_default()
-                };
+            let end_time = unsafe {
+                event
+                    .endDate()
+                    .map(|d| nsdate_to_iso(&d))
+                    .unwrap_or_default()
+            };
 
-                result.push(CalendarEvent {
-                    id: unsafe { event.eventIdentifier().map(|s| s.to_string()).unwrap_or_default() },
-                    title: unsafe { event.title().map(|s| s.to_string()).unwrap_or_else(|| "(No title)".to_string()) },
-                    start_time,
-                    end_time,
-                    is_all_day: unsafe { event.isAllDay() },
-                    location: unsafe { nsstring_to_string(event.location().as_deref()) },
-                    notes: unsafe { nsstring_to_string(event.notes().as_deref()) },
-                    calendar_name,
-                    calendar_color,
-                    meeting_url: extract_meeting_url(event),
-                    organizer: extract_organizer(event),
-                    attendees: extract_attendees(event),
-                });
-            }
+            result.push(CalendarEvent {
+                id: unsafe { event.eventIdentifier().map(|s| s.to_string()).unwrap_or_default() },
+                title: unsafe { event.title().map(|s| s.to_string()).unwrap_or_else(|| "(No title)".to_string()) },
+                start_time,
+                end_time,
+                is_all_day: unsafe { event.isAllDay() },
+                location: unsafe { nsstring_to_string(event.location().as_deref()) },
+                notes: unsafe { nsstring_to_string(event.notes().as_deref()) },
+                calendar_name,
+                calendar_color,
+                meeting_url: extract_meeting_url(&event),
+                organizer: extract_organizer(&event),
+                attendees: extract_attendees(&event),
+            });
         }
 
         result.sort_by(|a, b| a.start_time.cmp(&b.start_time));
