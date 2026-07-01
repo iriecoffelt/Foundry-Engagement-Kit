@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { CalendarEvent, CalendarInfo, CalendarAccessStatus } from "./calendarTypes";
 
 function isTauriApp(): boolean {
@@ -112,8 +113,14 @@ export async function getCurrentMeeting(
   );
 }
 
-export function openMeetingUrl(url: string): void {
-  window.open(url, "_blank");
+export async function openMeetingUrl(url: string): Promise<void> {
+  try {
+    await openUrl(url);
+  } catch (e) {
+    console.error("Failed to open meeting URL:", e);
+    // Fallback to window.open
+    window.open(url, "_blank");
+  }
 }
 
 export const calendarApi = {
