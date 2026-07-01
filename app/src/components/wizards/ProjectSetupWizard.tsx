@@ -11,7 +11,12 @@ import {
   generateScopingMd,
   slugify,
 } from "../../lib/markdown";
-import type { EngagementData, EngagementStatus, SuccessMetric } from "../../types";
+import {
+  ENGAGEMENT_TYPES,
+  getEngagementTypeConfig,
+  type EngagementType,
+} from "../../lib/engagementTypes";
+import type { EngagementData, EngagementStatus, SuccessMetric, Milestone } from "../../types";
 import { emptyStakeholder } from "../../lib/stakeholders";
 import { emptyTeamMember } from "../../lib/projectUsers";
 import { Field, FormCard, SelectInput, TextArea, TextInput } from "../forms/FormField";
@@ -31,6 +36,7 @@ const defaultData = (): EngagementData => ({
   startDate: new Date().toISOString().slice(0, 10),
   targetGoLive: "",
   status: "discovery",
+  engagementType: "greenfield",
   description: "",
   asIs: "",
   pain: "",
@@ -40,6 +46,16 @@ const defaultData = (): EngagementData => ({
   stakeholders: [emptyStakeholder()],
   successMetrics: [emptyMetric()],
 });
+
+function buildMilestonesFromType(engagementType: EngagementType): Milestone[] {
+  const config = getEngagementTypeConfig(engagementType);
+  return config.suggestedMilestones.map((m, i) => ({
+    id: `m${i}`,
+    name: m.name,
+    targetDate: "",
+    status: "pending" as const,
+  }));
+}
 
 interface ProjectSetupWizardProps {
   onComplete: (projectPath: string) => void;
@@ -65,9 +81,14 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
     setError("");
     try {
       const slug = slugify(data.displayName);
+      const milestones = buildMilestonesFromType(data.engagementType || "greenfield");
+      const engagementJson = {
+        ...engagementToJson(data),
+        milestones,
+      };
       const path = await api.setupEngagementProject(
         slug,
-        engagementToJson(data),
+        engagementJson,
         generateProjectReadme(slug, data),
         generateDiscoveryMd(data),
         generateScopingMd(data),
@@ -124,7 +145,7 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
               placeholder="Acme Order Management"
             />
           </Field>
-          <Field label="Customer">
+          <Field label="Customer" classification="customer-specific">
             <TextInput
               value={data.customer}
               onChange={(v) => setData({ ...data, customer: v })}
@@ -160,6 +181,19 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
               placeholder="What will users be able to do when this is done?"
               rows={2}
             />
+          </Field>
+          <Field label="Engagement type" hint="Tailors milestones and phase emphasis">
+            <SelectInput
+              value={data.engagementType || "greenfield"}
+              onChange={(v) => setData({ ...data, engagementType: v as EngagementType })}
+              options={ENGAGEMENT_TYPES.map((t) => ({
+                value: t.id,
+                label: t.label,
+              }))}
+            />
+            <p className="mt-1.5 text-xs text-fg-muted">
+              {getEngagementTypeConfig(data.engagementType).description}
+            </p>
           </Field>
           <Field label="Current phase">
             <SelectInput
@@ -336,6 +370,10 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
             <div>
               <dt className="text-fg-muted">Customer</dt>
               <dd className="text-fg-primary">{data.customer}</dd>
+            </div>
+            <div>
+              <dt className="text-fg-muted">Engagement type</dt>
+              <dd className="text-fg-primary">{getEngagementTypeConfig(data.engagementType).label}</dd>
             </div>
             <div>
               <dt className="text-fg-muted">Folder</dt>

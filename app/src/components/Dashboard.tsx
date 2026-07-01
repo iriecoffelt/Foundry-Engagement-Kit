@@ -8,6 +8,7 @@ import { PrimaryButton } from "./forms/FormField";
 import { RecentActivity } from "./RecentActivity";
 import { StatusBadge } from "./StatusBadge";
 import { ShortcutKbd } from "./ShortcutKbd";
+import { Tooltip } from "./Tooltip";
 
 import { TodayPanel } from "./today/TodayPanel";
 
@@ -90,6 +91,7 @@ export function Dashboard({
             description="Pick a project and walk through your day"
             onClick={onStartStandup}
             accent="from-blue-600/20 to-blue-900/10"
+            tooltip="Track blockers, priorities, and customer touchpoints"
           />
           <ActionCard
             icon={CalendarDays}
@@ -97,6 +99,7 @@ export function Dashboard({
             description="Reflect on wins, risks, and next week"
             onClick={onStartWeekly}
             accent="from-violet-600/20 to-violet-900/10"
+            tooltip="Saves to weekly/ with export options for PDF/DOCX"
           />
           <ActionCard
             icon={Users}
@@ -104,6 +107,7 @@ export function Dashboard({
             description="Prep agenda, demo, and decisions"
             onClick={onStartCustomerSync}
             accent="from-amber-600/20 to-amber-900/10"
+            tooltip="Generate shareable summaries for stakeholder meetings"
           />
           <ActionCard
             icon={FolderKanban}
@@ -111,6 +115,7 @@ export function Dashboard({
             description="Step-by-step project setup"
             onClick={onNewProject}
             accent="from-emerald-600/20 to-emerald-900/10"
+            tooltip="Creates folder structure, engagement.json, and starter docs"
           />
         </div>
 
@@ -167,14 +172,16 @@ function ActionCard({
   description,
   onClick,
   accent,
+  tooltip,
 }: {
   icon: typeof Calendar;
   title: string;
   description: string;
   onClick: () => void;
   accent: string;
+  tooltip?: string;
 }) {
-  return (
+  const card = (
     <button
       onClick={onClick}
       className={`card-kit-interactive bg-gradient-to-br p-5 text-left ${accent}`}
@@ -184,4 +191,9 @@ function ActionCard({
       <p className="mt-1 text-sm text-fg-secondary">{description}</p>
     </button>
   );
+
+  if (tooltip) {
+    return <Tooltip content={tooltip} position="bottom">{card}</Tooltip>;
+  }
+  return card;
 }

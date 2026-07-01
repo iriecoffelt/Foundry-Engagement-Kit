@@ -50,8 +50,8 @@
     --fg-primary: 15 23 42;
     --fg-body: 51 65 85;
     --fg-secondary: 71 85 105;
-    --fg-muted: 100 116 139;
-    --fg-faint: 148 163 184;
+    --fg-muted: 71 85 105;
+    --fg-faint: 100 116 139;
     --fg-on-accent: 255 255 255;
     --ring-subtle: 0 0 0;
     --glow-strength: 0.05;
@@ -249,7 +249,7 @@
   }
 
   .tab-segment-item {
-    @apply relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition duration-150;
+    @apply relative flex min-h-[44px] items-center gap-2 px-4 py-2.5 text-sm font-medium transition duration-150;
   }
 
   .tab-segment-active {
@@ -507,4 +507,17 @@
   50% {
     opacity: 0.5;
   }
+}
+
+/* Sigma.js graph explorer — match app dark theme */
+.ontology-sigma-explorer {
+  --sigma-background-color: #0f172a;
+  --sigma-controls-background-color: #1e293b;
+  --sigma-controls-background-color-hover: #334155;
+  --sigma-controls-border-color: #475569;
+  --sigma-controls-color: #e2e8f0;
+}
+
+.ontology-sigma-explorer .react-sigma-controls button {
+  color: #e2e8f0;
 }

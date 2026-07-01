@@ -37,6 +37,7 @@ export interface ProjectMeta {
   customer: string;
   status: string;
   target_go_live: string;
+  engagement_type?: EngagementType;
 }
 
 export type EngagementStatus =
@@ -74,6 +75,8 @@ export interface SuccessMetric {
   target: string;
 }
 
+export type EngagementType = 'greenfield' | 'migration' | 'enhancement' | 'enablement';
+
 export interface EngagementData {
   displayName: string;
   customer: string;
@@ -81,6 +84,7 @@ export interface EngagementData {
   startDate: string;
   targetGoLive: string;
   status: EngagementStatus;
+  engagementType?: EngagementType;
   description: string;
   asIs: string;
   pain: string;
@@ -154,6 +158,10 @@ export interface OntologyElement {
   linkFrom?: string;
   linkTo?: string;
   targetObject?: string;
+  /** Foundry resource RID from ontology import (object type, action, etc.) */
+  foundryRid?: string;
+  /** Foundry API name — used to wire ontology link types to object type nodes */
+  foundryApiName?: string;
 }
 
 /** @deprecated Use OntologyElement */
@@ -189,6 +197,10 @@ export interface DeliveryCard {
   /** Stable link to architecture.json node id */
   architectureNodeId?: string;
   blockerId?: string;
+  /** Reference to an ADR file path (e.g. 02-design/adrs/adr-001-*.md) */
+  adrRef?: string;
+  /** Link to an ontology element from ontology-elements.json */
+  ontologyElementId?: string;
   createdAt: string;
   updatedAt: string;
 }

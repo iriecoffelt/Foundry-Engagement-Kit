@@ -7,7 +7,7 @@ import { computePhaseProgress } from "../../lib/phaseChecklist";
 import { copyToClipboard, generateCustomerSummary } from "../../lib/customerSummary";
 import { buildWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
-import type { EngagementStatus, ProjectMeta } from "../../types";
+import type { EngagementStatus, EngagementType, ProjectMeta } from "../../types";
 import {
   engagementFromJson,
   generateProjectReadme,
@@ -53,6 +53,10 @@ interface ProjectWorkspaceProps {
   onBack: () => void;
 }
 
+function getTabStorageKey(projectPath: string) {
+  return `project-tab-${projectPath.replace(/[^a-zA-Z0-9]/g, "-")}`;
+}
+
 export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspaceProps) {
   return (
     <ProjectDataProvider projectPath={project.path}>
@@ -63,9 +67,30 @@ export function ProjectWorkspace({ project, initialTab, onBack }: ProjectWorkspa
 
 function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspaceProps) {
   const { uploads, docTree, loadDocTree, reloadDocTree, refreshUploads } = useProjectData();
-  const [tab, setTab] = useState<ProjectTab>(initialTab ?? "overview");
+  const [tab, setTabInternal] = useState<ProjectTab>(() => {
+    if (initialTab) return initialTab;
+    try {
+      const stored = localStorage.getItem(getTabStorageKey(project.path));
+      if (stored && Object.keys(PROJECT_TAB_LABELS).includes(stored)) {
+        return stored as ProjectTab;
+      }
+    } catch {
+      // localStorage unavailable
+    }
+    return "overview";
+  });
   const tabHistoryRef = useRef<ProjectTab[]>([]);
+
+  const setTab = useCallback((nextTab: ProjectTab) => {
+    setTabInternal(nextTab);
+    try {
+      localStorage.setItem(getTabStorageKey(project.path), nextTab);
+    } catch {
+      // localStorage unavailable
+    }
+  }, [project.path]);
   const [tabBackLabel, setTabBackLabel] = useState<string | undefined>();
+  const [architectureMounted, setArchitectureMounted] = useState(initialTab === "architecture");
   const [projectMeta, setProjectMeta] = useState(project);
   const [overview, setOverview] = useState("");
   const [openFile, setOpenFile] = useState<{ path: string; content: string; dirty: boolean } | null>(
@@ -78,6 +103,8 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [checklistVersion, setChecklistVersion] = useState(0);
   const [deliveryCardId, setDeliveryCardId] = useState<string | null>(null);
+  const [architectureNodeId, setArchitectureNodeId] = useState<string | null>(null);
+  const [engagementType, setEngagementType] = useState<EngagementType | undefined>(undefined);
   const hydrateGenRef = useRef(0);
 
   useEffect(() => {
@@ -94,19 +121,32 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
   useEffect(() => {
     tabHistoryRef.current = [];
     setTabBackLabel(undefined);
-    if (initialTab) setTab(initialTab);
-    else setTab("overview");
-  }, [initialTab, project.path]);
+    if (initialTab) {
+      setTab(initialTab);
+    } else {
+      try {
+        const stored = localStorage.getItem(getTabStorageKey(project.path));
+        if (stored && Object.keys(PROJECT_TAB_LABELS).includes(stored)) {
+          setTab(stored as ProjectTab);
+          return;
+        }
+      } catch {
+        // localStorage unavailable
+      }
+      setTab("overview");
+    }
+  }, [initialTab, project.path, setTab]);
 
   const changeTab = useCallback((next: ProjectTab) => {
-    setTab((current) => {
-      if (current !== next) {
-        tabHistoryRef.current = pushNavHistory(tabHistoryRef.current, current);
-        setTabBackLabel(PROJECT_TAB_LABELS[current]);
-      }
-      return next;
-    });
-  }, []);
+    if (next === "architecture") {
+      setArchitectureMounted(true);
+    }
+    if (tab !== next) {
+      tabHistoryRef.current = pushNavHistory(tabHistoryRef.current, tab);
+      setTabBackLabel(PROJECT_TAB_LABELS[tab]);
+    }
+    setTab(next);
+  }, [tab, setTab]);
 
   const handleBack = useCallback(() => {
     const history = tabHistoryRef.current;
@@ -160,6 +200,9 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
             targetGoLive: projectMeta.target_go_live,
           });
           overviewContent = generateProjectReadme(projectMeta.slug, data);
+          if (eng.engagementType) {
+            setEngagementType(eng.engagementType as EngagementType);
+          }
         } catch {
           overviewContent = unfilledTemplateNotice(projectMeta.display_name);
         }
@@ -168,6 +211,17 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
       trackRecent(`${projectMeta.path}/README.md`, projectMeta.display_name, "Overview");
     } catch {
       setOverview(unfilledTemplateNotice(projectMeta.display_name));
+    }
+
+    try {
+      const eng = await api.readJson<Record<string, unknown>>(
+        `${projectMeta.path}/engagement.json`,
+      );
+      if (eng.engagementType) {
+        setEngagementType(eng.engagementType as EngagementType);
+      }
+    } catch {
+      /* engagement type not set */
     }
   }, [
     projectMeta.path,
@@ -248,6 +302,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
         phaseProgress={phaseProgress}
         message={message}
         backLabel={tabBackLabel}
+        engagementType={engagementType}
         onBack={handleBack}
         onTabChange={changeTab}
         onCopySummary={copySummary}
@@ -264,13 +319,17 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
                 <PhaseStepper
                   projectPath={projectMeta.path}
                   currentStatus={projectMeta.status}
+                  engagementType={engagementType}
                   onProgressChange={handleProgressChange}
                   onStatusChange={handleStatusChange}
                   onChecklistSaved={bumpChecklist}
                 />
               </div>
               <div className="overview-section">
-                <MilestoneTracker projectPath={projectMeta.path} />
+                <MilestoneTracker
+                  projectPath={projectMeta.path}
+                  engagementType={engagementType}
+                />
               </div>
               <div className="overview-section">
                 <EngagementTimeline
@@ -302,6 +361,12 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
           <DeliveryBoardView
             projectPath={projectMeta.path}
             initialSelectedCardId={deliveryCardId}
+            onNavigateToArchitecture={(nodeId) => {
+              setArchitectureNodeId(nodeId);
+              setDeliveryCardId(null);
+              changeTab("architecture");
+            }}
+            onOpenDocument={openDoc}
           />
         )}
 
@@ -326,16 +391,21 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
           />
         )}
 
-        {tab === "architecture" && (
+        {architectureMounted && (
+        <div className={tab === "architecture" ? "h-full min-h-0" : "hidden"}>
           <Suspense fallback={<SectionFallback />}>
             <ArchitectureEditor
               projectPath={projectMeta.path}
+              visible={tab === "architecture"}
+              initialSelectedNodeId={architectureNodeId}
               onOpenDelivery={(cardId) => {
                 setDeliveryCardId(cardId);
+                setArchitectureNodeId(null);
                 changeTab("delivery");
               }}
             />
           </Suspense>
+        </div>
         )}
 
         {tab === "documents" && (
@@ -357,6 +427,7 @@ function ProjectWorkspaceInner({ project, initialTab, onBack }: ProjectWorkspace
               <FileTree
                 entries={docTree}
                 selectedPath={openFile?.path}
+                storageKey={`project-docs-${project.slug}`}
                 onSelect={async (path) => {
                   const content = await api.readFile(path);
                   setOpenFile({ path, content, dirty: false });

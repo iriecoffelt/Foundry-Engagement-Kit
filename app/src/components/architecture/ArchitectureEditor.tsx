@@ -1,34 +1,35 @@
 import {
-  ReactFlow,
   ReactFlowProvider,
-  Background,
-  Controls,
-  MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
-  useReactFlow,
   getNodesBounds,
   getViewportForBounds,
-  Handle,
-  Position,
   type Connection,
   type Edge,
   type Node,
-  type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { toPng } from "html-to-image";
-import { ExternalLink, ImageDown, Link2, RefreshCw } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import {
   deliveryStatusByArchNodeId,
   syncArchitectureAndDelivery,
   loadArchitectureGraph,
   removeDeliveryCardsForArchitectureNodes,
+  pruneOrphanDeliveryArchitectureNodes,
+  saveArchitectureGraph,
+  refreshOntologyArchitectureGraph,
 } from "../../lib/architectureSync";
+import {
+  architectureRelativePath,
+  architectureViewById,
+  loadStoredArchitectureView,
+  storeArchitectureView,
+  type ArchitectureViewId,
+} from "../../lib/architectureViews";
 import type { ResolvedArchNodeType } from "../../lib/architectureNodeTypes";
 import { loadResolvedArchNodeTypes } from "../../lib/architectureNodeTypes";
 import {
@@ -38,149 +39,63 @@ import {
   supportsFoundryLink,
 } from "../../lib/foundryLinks";
 import { generateDesignOverviewMermaid } from "../../lib/markdown";
+import { createFoundryClient } from "../../lib/foundryApi";
 import {
-  DELIVERY_STATUS_BADGE,
-  DELIVERY_STATUS_LABELS,
-  loadDeliveryBoard,
-} from "../../lib/deliveryBoard";
+  isOntologyImportStale,
+  loadFoundryConnection,
+  saveImportedOntologyRid,
+} from "../../lib/foundryConnection";
+import { fetchOntologyMetadata } from "../../lib/foundrySync";
+import { loadOntologyElements } from "../../lib/ontologyElements";
+import {
+  isLargeOntologyGraph,
+  trimOntologyGraphForCanvas,
+  dedupeOntologyGraph,
+} from "../../lib/ontologyGraphDisplay";
+import { layoutOntologyGraph } from "../../lib/ontologyGraphLayout";
+import {
+  hydrateOntologyNodesInChunks,
+  prepareOntologyBrowseGraph,
+  createFetchingProgress,
+  type OntologyGraphPrepareProgress,
+} from "../../lib/ontologyGraphPrepare";
+import {
+  countOntologyNodeConnections,
+  extractOntologyFocusNeighborhood,
+  filterOntologyNodesBySearch,
+  layoutOntologyBrowseGrid,
+} from "../../lib/ontologyGraphBrowse";
+import { gexfToBytes, serializeOntologyGexf } from "../../lib/ontologyGraphGexf";
+import { loadDeliveryBoard } from "../../lib/deliveryBoard";
 import type { ArchitectureGraph, DeliveryCard } from "../../types";
-import { SecondaryButton } from "../forms/FormField";
 import { useEscapeKey } from "../../lib/useEscapeKey";
+
+import { ArchEditorContext, type ArchEditorContextValue } from "./ArchitectureEditorContext";
+import { ArchNode } from "./ArchNode";
+import { OntologyLiteNode } from "./OntologyLiteNode";
+import { OntologyGraphOverview } from "./OntologyGraphOverview";
+import { OntologySigmaExplorer } from "./OntologySigmaExplorer";
 import { ArchNodeDetailsPanel, EdgeDetailsPanel } from "./ArchNodeDetailsPanel";
-import { ProjectFoundryStackField } from "../projects/ProjectFoundryStackField";
+import {
+  TopToolbar,
+  WorkingDiagramToolbar,
+  OntologyToolbar,
+  MessageBar,
+} from "./ArchitectureEditorToolbar";
+import { ArchitectureCanvas, FooterHint } from "./ArchitectureEditorCanvas";
 
 const IMAGE_WIDTH = 1920;
 const IMAGE_HEIGHT = 1080;
 
-interface ArchEditorContextValue {
-  stackUrl: string;
-  typeById: Map<string, ResolvedArchNodeType>;
-  deliveryByNodeId: Map<string, DeliveryCard>;
-  onOpenDelivery?: (cardId: string) => void;
-}
+const nodeTypes = { arch: ArchNode, ontologyLite: OntologyLiteNode };
 
-const ArchEditorContext = createContext<ArchEditorContextValue>({
-  stackUrl: "",
-  typeById: new Map(),
-  deliveryByNodeId: new Map(),
-});
-
-function ArchNode({ id, data, selected }: NodeProps) {
-  const { setNodes } = useReactFlow();
-  const { stackUrl, typeById, deliveryByNodeId, onOpenDelivery } = useContext(ArchEditorContext);
-  const nodeType = String(data.nodeType || "dataset");
-  const meta = typeById.get(nodeType) ?? typeById.values().next().value;
-  const Icon = meta?.Icon;
-  const hexColor = meta?.hexColor ?? "#94a3b8";
-  const labelFallback = meta?.label ?? nodeType;
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(data.label || labelFallback));
-  const foundryLink = String(data.foundryLink || "");
-  const hasLink = foundryLink.trim().length > 0;
-  const linkable = meta?.linkable ?? false;
-  const deliveryCard = deliveryByNodeId.get(id);
-
-  const commitLabel = () => {
-    const label = draft.trim() || labelFallback;
-    setNodes((nds) =>
-      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, label } } : n)),
-    );
-    setDraft(label);
-    setEditing(false);
-  };
-
-  const startEditing = () => {
-    setDraft(String(data.label || labelFallback));
-    setEditing(true);
-  };
-
-  const jumpToFoundry = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await openFoundryLink(stackUrl, foundryLink, api.openUrl);
-    } catch (err) {
-      alert(String(err));
-    }
-  };
-
-  const openDelivery = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (deliveryCard && onOpenDelivery) onOpenDelivery(deliveryCard.id);
-  };
-
-  return (
-    <div
-      className={`relative min-w-[140px] rounded-xl border-2 bg-surface-raised px-3 py-2 shadow-lg ${
-        selected ? "ring-2 ring-brand-400/60" : ""
-      }`}
-      style={{ borderColor: hexColor }}
-      onDoubleClick={(e) => {
-        e.stopPropagation();
-        startEditing();
-      }}
-    >
-      <Handle type="target" position={Position.Left} className="!bg-surface-subtle" />
-      {linkable && hasLink && (
-        <button
-          type="button"
-          onClick={jumpToFoundry}
-          title="Open in Foundry"
-          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-surface-border bg-brand-600 text-fg-on-accent shadow hover:bg-brand-500"
-        >
-          <ExternalLink size={12} />
-        </button>
-      )}
-      {editing ? (
-        <input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commitLabel}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitLabel();
-            if (e.key === "Escape") {
-              setDraft(String(data.label || labelFallback));
-              setEditing(false);
-            }
-          }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full rounded border border-surface-border-strong bg-surface-base px-2 py-1 text-sm text-fg-primary outline-none focus:border-brand-500"
-        />
-      ) : (
-        <div>
-          <div className="flex items-center gap-2">
-            {Icon && <Icon size={16} style={{ color: hexColor }} />}
-            <span className="text-sm font-medium text-fg-primary">{data.label as string}</span>
-          </div>
-          {linkable && hasLink && (
-            <p className="mt-1 flex items-center gap-1 truncate text-[10px] text-brand-400">
-              <Link2 size={10} className="shrink-0" />
-              <span className="truncate">{foundryLink}</span>
-            </p>
-          )}
-          {deliveryCard && (
-            <button
-              type="button"
-              onClick={openDelivery}
-              className={`mt-1.5 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ${DELIVERY_STATUS_BADGE[deliveryCard.status]}`}
-              title="Open on delivery board"
-            >
-              {DELIVERY_STATUS_LABELS[deliveryCard.status]}
-            </button>
-          )}
-        </div>
-      )}
-      <Handle type="source" position={Position.Right} className="!bg-surface-subtle" />
-    </div>
-  );
-}
-
-const nodeTypes = { arch: ArchNode };
-
-function toFlowNodes(graph: ArchitectureGraph): Node[] {
+function toFlowNodes(
+  graph: ArchitectureGraph,
+  options?: { lite?: boolean; searchMatches?: Set<string> | null; centerId?: string },
+): Node[] {
   return graph.nodes.map((n) => ({
     id: n.id,
-    type: "arch",
+    type: options?.lite ? "ontologyLite" : "arch",
     position: n.position,
     data: {
       label: n.data.label,
@@ -188,23 +103,39 @@ function toFlowNodes(graph: ArchitectureGraph): Node[] {
       foundryLink: n.data.foundryLink || "",
       notes: n.data.notes || "",
       ontologyElementId: n.data.ontologyElementId || n.data.ontologyObjectId || "",
+      dimmed: options?.searchMatches ? !options.searchMatches.has(n.id) : false,
+      isCenter: options?.centerId === n.id,
     },
   }));
 }
 
-function toFlowEdges(graph: ArchitectureGraph) {
-  return graph.edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    label: e.label,
-    animated: true,
-    style: { stroke: "#64748b" },
-    labelStyle: { fill: "#94a3b8", fontSize: 11 },
-    labelBgStyle: { fill: "#0f172a", fillOpacity: 0.85 },
-    labelBgPadding: [4, 6] as [number, number],
-    labelBgBorderRadius: 4,
-  }));
+function toFlowEdges(graph: ArchitectureGraph, lite = false) {
+  const useLite = lite || graph.edges.length > 250 || graph.nodes.length > 120;
+  const usePreview = graph.nodes.length > 20 && graph.nodes.length <= 80;
+  return graph.edges.map((e) => {
+    if (useLite || usePreview) {
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: "smoothstep",
+        style: { stroke: "#38bdf8", strokeWidth: 1.5, opacity: 0.45 },
+      };
+    }
+    return {
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      label: e.label,
+      animated: false,
+      style: { stroke: "#38bdf8", strokeWidth: 2 },
+      markerEnd: { type: "arrowclosed" as const, color: "#38bdf8", width: 16, height: 16 },
+      labelStyle: { fill: "#e2e8f0", fontSize: 10 },
+      labelBgStyle: { fill: "#0f172a", fillOpacity: 0.92 },
+      labelBgPadding: [4, 6] as [number, number],
+      labelBgBorderRadius: 4,
+    };
+  });
 }
 
 function fromFlow(nodes: Node[], edges: Edge[]): ArchitectureGraph {
@@ -260,35 +191,322 @@ const defaultGraph: ArchitectureGraph = {
 interface ArchitectureEditorProps {
   projectPath: string;
   onOpenDelivery?: (cardId: string) => void;
+  initialSelectedNodeId?: string | null;
+  visible?: boolean;
 }
 
-function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEditorProps) {
-  const jsonPath = `${projectPath}/02-design/architecture.json`;
+function getArchNodeStorageKey(projectPath: string) {
+  return `arch-selected-node-${projectPath.replace(/[^a-zA-Z0-9]/g, "-")}`;
+}
+
+function ArchitectureEditorInner({
+  projectPath,
+  onOpenDelivery,
+  initialSelectedNodeId,
+  visible = true,
+}: ArchitectureEditorProps) {
+  const [architectureView, setArchitectureView] = useState<ArchitectureViewId>(() =>
+    loadStoredArchitectureView(projectPath),
+  );
+  const viewDef = architectureViewById(architectureView);
+  const jsonPath = architectureRelativePath(projectPath, architectureView);
   const overviewPath = `${projectPath}/02-design/design-overview.md`;
   const pngPath = `${projectPath}/02-design/architecture.png`;
   const projectSlug = projectPath.split("/").pop() || "architecture";
+  const deliveryLinked = viewDef.deliveryLinked;
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [selectedNodeId, setSelectedNodeIdInternal] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(getArchNodeStorageKey(projectPath));
+    } catch {
+      return null;
+    }
+  });
+  const [selectedNodeState, setSelectedNodeState] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  const [initialNodeHandled, setInitialNodeHandled] = useState(false);
+
+  const setSelectedNode = useCallback((node: Node | null) => {
+    setSelectedNodeState(node);
+    setSelectedNodeIdInternal(node?.id ?? null);
+    try {
+      if (node) {
+        localStorage.setItem(getArchNodeStorageKey(projectPath), node.id);
+      } else {
+        localStorage.removeItem(getArchNodeStorageKey(projectPath));
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, [projectPath]);
+
+  const selectedNode = selectedNodeState;
   const [resolvedTypes, setResolvedTypes] = useState<ResolvedArchNodeType[]>([]);
   const [deliveryByNodeId, setDeliveryByNodeId] = useState<Map<string, DeliveryCard>>(new Map());
   const [stackUrl, setStackUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingGexf, setExportingGexf] = useState(false);
+  const [refreshingOntology, setRefreshingOntology] = useState(false);
+  const [graphLoading, setGraphLoading] = useState(true);
+  const [graphReady, setGraphReady] = useState(false);
+  const [canvasMode, setCanvasMode] = useState<"canvas" | "overview" | "explorer">("canvas");
+  const [overviewGraph, setOverviewGraph] = useState<ArchitectureGraph | null>(null);
+  const [ontologyCanvasMode, setOntologyCanvasMode] = useState<"preview" | "full" | null>(null);
+  const [ontologyBrowseMode, setOntologyBrowseMode] = useState<"all" | "focus">("all");
+  const [ontologySearch, setOntologySearch] = useState("");
+  const [ontologyPrepareProgress, setOntologyPrepareProgress] =
+    useState<OntologyGraphPrepareProgress | null>(null);
   const [message, setMessage] = useState("");
+  const loadedPathRef = useRef<string | null>(null);
+  const fullGraphLoadRef = useRef(0);
+  const fullOntologyGraphRef = useRef<ArchitectureGraph | null>(null);
+
+  const applyGraphToCanvas = useCallback(
+    (graph: ArchitectureGraph, ontologyView: boolean) => {
+      if (ontologyView) {
+        const display = trimOntologyGraphForCanvas(graph);
+        const laidOut = layoutOntologyGraph(display.graph);
+        setOntologyCanvasMode("preview");
+        setNodes(toFlowNodes(laidOut));
+        setEdges(toFlowEdges(laidOut));
+        setGraphReady(true);
+        setCanvasMode("canvas");
+        if (display.trimmed) {
+          setMessage(
+            `Showing ${display.graph.nodes.length} of ${display.totalNodes} object types (most connected). Full graph is too large for the canvas.`,
+          );
+        } else {
+          setMessage("");
+        }
+        return;
+      }
+      setOntologyCanvasMode(null);
+      setOntologyBrowseMode("all");
+      setOntologySearch("");
+      fullOntologyGraphRef.current = null;
+      setNodes(toFlowNodes(graph));
+      setEdges(toFlowEdges(graph));
+      setGraphReady(true);
+      setCanvasMode("canvas");
+    },
+    [setNodes, setEdges],
+  );
+
+  const loadFullOntologyToCanvas = useCallback(
+    async (graph: ArchitectureGraph) => {
+      const loadId = ++fullGraphLoadRef.current;
+      fullOntologyGraphRef.current = graph;
+      setOntologyPrepareProgress(createFetchingProgress(0, graph.nodes.length));
+      setOntologyCanvasMode("full");
+      setOntologyBrowseMode("all");
+      setOntologySearch("");
+      setCanvasMode("canvas");
+      setGraphReady(false);
+      setNodes([]);
+      setEdges([]);
+      setMessage("");
+
+      try {
+        const laidOut = await prepareOntologyBrowseGraph(graph, (progress) => {
+          if (loadId === fullGraphLoadRef.current) {
+            setOntologyPrepareProgress(progress);
+          }
+        });
+        if (loadId !== fullGraphLoadRef.current) return;
+
+        const flowNodes = toFlowNodes(laidOut, { lite: true });
+        await hydrateOntologyNodesInChunks(flowNodes, setNodes, (progress) => {
+          if (loadId === fullGraphLoadRef.current) {
+            setOntologyPrepareProgress(progress);
+          }
+        });
+        if (loadId !== fullGraphLoadRef.current) return;
+
+        setEdges([]);
+        setGraphReady(true);
+        setMessage(
+          `All ${graph.nodes.length} object types — search or double-click a type to explore its links (${graph.edges.length} total connections).`,
+        );
+      } catch (e) {
+        if (loadId !== fullGraphLoadRef.current) return;
+        setMessage(e instanceof Error ? e.message : "Failed to load ontology browser");
+        setCanvasMode("overview");
+        setOntologyCanvasMode(null);
+        fullOntologyGraphRef.current = null;
+      } finally {
+        if (loadId === fullGraphLoadRef.current) {
+          setOntologyPrepareProgress(null);
+        }
+      }
+    },
+    [setNodes, setEdges],
+  );
+
+  const showOntologyFocus = useCallback(
+    (nodeId: string) => {
+      const graph = fullOntologyGraphRef.current;
+      if (!graph) return;
+
+      const center = graph.nodes.find((n) => n.id === nodeId);
+      const subgraph = extractOntologyFocusNeighborhood(graph, nodeId);
+      const laidOut = layoutOntologyGraph(subgraph);
+
+      setOntologyBrowseMode("focus");
+      setOntologySearch("");
+      setNodes(toFlowNodes(laidOut, { lite: true, centerId: nodeId }));
+      setEdges(toFlowEdges(laidOut, true));
+      setGraphReady(true);
+      setMessage(
+        `Links for ${center?.data.label ?? "type"} — ${laidOut.nodes.length} types, ${laidOut.edges.length} connections.`,
+      );
+    },
+    [setNodes, setEdges],
+  );
+
+  const returnToOntologyBrowse = useCallback(() => {
+    const graph = fullOntologyGraphRef.current;
+    if (!graph) return;
+
+    const laidOut = layoutOntologyBrowseGrid(graph);
+    setOntologyBrowseMode("all");
+    setOntologySearch("");
+    setNodes(toFlowNodes(laidOut, { lite: true }));
+    setEdges([]);
+    setGraphReady(true);
+    setMessage(
+      `All ${graph.nodes.length} object types — search or double-click a type to explore its links.`,
+    );
+  }, [setNodes, setEdges]);
+
+  const openGraphExplorer = useCallback(() => {
+    if (!overviewGraph) return;
+    setCanvasMode("explorer");
+    setMessage("");
+  }, [overviewGraph]);
+
+  const returnToOntologyOverview = useCallback(() => {
+    setCanvasMode("overview");
+    setOntologyCanvasMode(null);
+    setOntologyBrowseMode("all");
+    setOntologySearch("");
+    setNodes([]);
+    setEdges([]);
+    setGraphReady(false);
+    setMessage("");
+  }, [setNodes, setEdges]);
+
+  const exportOntologyGexf = useCallback(
+    async (graph: ArchitectureGraph) => {
+      setExportingGexf(true);
+      setMessage("");
+      try {
+        const content = serializeOntologyGexf(graph);
+        const bytes = gexfToBytes(content);
+
+        const dest = await saveDialog({
+          title: "Export ontology graph",
+          defaultPath: `${projectSlug}-ontology.gexf`,
+          filters: [{ name: "GEXF graph", extensions: ["gexf"] }],
+        });
+        if (!dest) return;
+
+        await api.writeBytesAbsolute(dest, bytes);
+        setMessage(`GEXF exported to ${dest} — open in Gephi or Cytoscape.`);
+      } catch (e) {
+        setMessage(String(e));
+      } finally {
+        setExportingGexf(false);
+      }
+    },
+    [projectSlug],
+  );
+
+  useEffect(() => {
+    if (ontologyCanvasMode !== "full" || ontologyBrowseMode !== "all") return;
+    const graph = fullOntologyGraphRef.current;
+    if (!graph) return;
+
+    const matches = filterOntologyNodesBySearch(graph, ontologySearch);
+    setNodes((nds) =>
+      nds.map((n) => ({
+        ...n,
+        data: {
+          ...n.data,
+          dimmed: matches ? !matches.has(n.id) : false,
+        },
+      })),
+    );
+  }, [ontologySearch, ontologyCanvasMode, ontologyBrowseMode, setNodes]);
+
+  const onNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      if (ontologyCanvasMode === "full" && ontologyBrowseMode === "all") {
+        showOntologyFocus(node.id);
+      }
+    },
+    [ontologyCanvasMode, ontologyBrowseMode, showOntologyFocus],
+  );
 
   const typeById = useMemo(
     () => new Map(resolvedTypes.map((t) => [t.id, t])),
     [resolvedTypes],
   );
 
+  const selectedOntologyConnectionCount = useMemo(() => {
+    if (!selectedNode || ontologyCanvasMode !== "full") return 0;
+    const graph = fullOntologyGraphRef.current;
+    if (!graph) return 0;
+    return countOntologyNodeConnections(graph, selectedNode.id);
+  }, [selectedNode, ontologyCanvasMode]);
+
   const refreshDelivery = useCallback(async () => {
     const board = await loadDeliveryBoard(projectPath);
     setDeliveryByNodeId(deliveryStatusByArchNodeId(board));
   }, [projectPath]);
+
+  const refreshOntologyGraph = useCallback(async () => {
+    setRefreshingOntology(true);
+    try {
+      const elements = await loadOntologyElements(projectPath);
+      const conn = await loadFoundryConnection(projectPath);
+      if (!conn?.ontologyRid || !conn.token) {
+        setMessage("Connect to Foundry and select an ontology on the Ontology tab first.");
+        return;
+      }
+      const client = createFoundryClient(conn);
+      const ontologyRid = conn.ontologyRid;
+      const result = await refreshOntologyArchitectureGraph(projectPath, elements, async () =>
+        fetchOntologyMetadata(client, ontologyRid),
+      );
+      if (conn.ontologyRid) {
+        await saveImportedOntologyRid(projectPath, conn.ontologyRid);
+      }
+      const graph = await loadArchitectureGraph(projectPath, "ontology");
+      if (graph) {
+        const normalized = dedupeOntologyGraph(graph);
+        setOverviewGraph(normalized);
+        if (isLargeOntologyGraph(normalized)) {
+          setCanvasMode("overview");
+          setNodes([]);
+          setEdges([]);
+          setGraphReady(false);
+        } else {
+          applyGraphToCanvas(normalized, true);
+        }
+      }
+      setMessage(
+        `Ontology graph refreshed — ${result.nodesAdded} nodes, ${result.edgesAdded} connections`,
+      );
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Failed to refresh ontology graph");
+    } finally {
+      setRefreshingOntology(false);
+    }
+  }, [projectPath, setNodes, setEdges, applyGraphToCanvas]);
 
   useEffect(() => {
     loadProjectStackUrl(projectPath).then(setStackUrl);
@@ -297,17 +515,114 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
   }, [projectPath, refreshDelivery]);
 
   useEffect(() => {
-    api
-      .readJson<ArchitectureGraph>(jsonPath)
-      .then((g) => {
-        setNodes(toFlowNodes(g));
-        setEdges(toFlowEdges(g));
-      })
-      .catch(() => {
-        setNodes(toFlowNodes(defaultGraph));
-        setEdges(toFlowEdges(defaultGraph));
-      });
-  }, [projectPath, jsonPath, setNodes, setEdges]);
+    if (!visible) return;
+
+    let cancelled = false;
+
+    async function loadGraph() {
+      setGraphLoading(true);
+      setGraphReady(false);
+
+      if (!deliveryLinked) {
+        const stale = await isOntologyImportStale(projectPath);
+        if (stale) {
+          if (!cancelled) {
+            setOverviewGraph(null);
+            setCanvasMode("canvas");
+            setNodes([]);
+            setEdges([]);
+            setGraphLoading(false);
+            loadedPathRef.current = jsonPath;
+            setMessage(
+              "Selected ontology has not been imported yet — import on the Ontology tab first.",
+            );
+          }
+          return;
+        }
+      }
+
+      try {
+        if (deliveryLinked) {
+          await pruneOrphanDeliveryArchitectureNodes(projectPath);
+        }
+        const g = deliveryLinked
+          ? (await loadArchitectureGraph(projectPath, "working")) ?? { nodes: [], edges: [] }
+          : dedupeOntologyGraph(await api.readJson<ArchitectureGraph>(jsonPath));
+        if (cancelled) return;
+
+        loadedPathRef.current = jsonPath;
+
+        if (!deliveryLinked && isLargeOntologyGraph(g)) {
+          setOverviewGraph(g);
+          setCanvasMode("overview");
+          setNodes([]);
+          setEdges([]);
+          setGraphReady(false);
+          setMessage(
+            `Ontology has ${g.nodes.length} object types — use the index below or preview a subset on the canvas.`,
+          );
+        } else {
+          setOverviewGraph(null);
+          applyGraphToCanvas(g, !deliveryLinked);
+          if (selectedNodeId) {
+            const flowNodes = toFlowNodes(g);
+            const restoredNode = flowNodes.find((n) => n.id === selectedNodeId);
+            if (restoredNode) {
+              setSelectedNodeState(restoredNode);
+            } else {
+              setSelectedNodeIdInternal(null);
+              try {
+                localStorage.removeItem(getArchNodeStorageKey(projectPath));
+              } catch {
+                // localStorage unavailable
+              }
+            }
+          }
+        }
+      } catch {
+        if (cancelled) return;
+        setOverviewGraph(null);
+        setCanvasMode("canvas");
+        if (deliveryLinked) {
+          applyGraphToCanvas(defaultGraph, false);
+        } else {
+          setNodes([]);
+          setEdges([]);
+        }
+      } finally {
+        if (!cancelled) setGraphLoading(false);
+      }
+    }
+
+    void loadGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, projectPath, jsonPath, deliveryLinked, applyGraphToCanvas, selectedNodeId, setNodes, setEdges]);
+
+  const changeArchitectureView = useCallback(
+    (viewId: ArchitectureViewId) => {
+      setArchitectureView(viewId);
+      storeArchitectureView(projectPath, viewId);
+      setSelectedNode(null);
+      setSelectedEdge(null);
+      setMessage("");
+      setOverviewGraph(null);
+      setCanvasMode("canvas");
+      loadedPathRef.current = null;
+    },
+    [projectPath, setSelectedNode],
+  );
+
+  useEffect(() => {
+    if (initialSelectedNodeId && nodes.length > 0 && !initialNodeHandled) {
+      const node = nodes.find((n) => n.id === initialSelectedNodeId);
+      if (node) {
+        setSelectedNode(node);
+        setInitialNodeHandled(true);
+      }
+    }
+  }, [initialSelectedNodeId, nodes, initialNodeHandled, setSelectedNode]);
 
   const onConnect = useCallback(
     (connection: Connection) =>
@@ -334,7 +649,7 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
       setSelectedNode(selNodes.length === 1 ? selNodes[0] : null);
       setSelectedEdge(selNodes.length === 0 && selEdges.length === 1 ? selEdges[0] : null);
     },
-    [],
+    [setSelectedNode],
   );
 
   useEscapeKey(() => {
@@ -347,11 +662,11 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
       setNodes((nds) =>
         nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [field]: value } } : n)),
       );
-      setSelectedNode((current) =>
-        current?.id === nodeId ? { ...current, data: { ...current.data, [field]: value } } : current,
-      );
+      if (selectedNode?.id === nodeId) {
+        setSelectedNode({ ...selectedNode, data: { ...selectedNode.data, [field]: value } });
+      }
     },
-    [setNodes],
+    [setNodes, selectedNode, setSelectedNode],
   );
 
   const updateEdgeLabel = useCallback(
@@ -384,20 +699,26 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
     setSaving(true);
     setMessage("");
     try {
-      const previousGraph = await loadArchitectureGraph(projectPath);
       const graph = fromFlow(nodes, edges);
-      const previousIds = new Set(previousGraph?.nodes.map((n) => n.id) ?? []);
-      const nextIds = new Set(graph.nodes.map((n) => n.id));
-      const removedNodeIds = [...previousIds].filter((id) => !nextIds.has(id));
-      if (removedNodeIds.length) {
-        await removeDeliveryCardsForArchitectureNodes(projectPath, removedNodeIds);
+      if (deliveryLinked) {
+        const previousGraph = await loadArchitectureGraph(projectPath, "working");
+        const previousIds = new Set(previousGraph?.nodes.map((n) => n.id) ?? []);
+        const nextIds = new Set(graph.nodes.map((n) => n.id));
+        const removedNodeIds = [...previousIds].filter((id) => !nextIds.has(id));
+        if (removedNodeIds.length) {
+          await removeDeliveryCardsForArchitectureNodes(projectPath, removedNodeIds);
+        }
       }
-      await api.writeJson(jsonPath, graph);
-      await api.writeFile(overviewPath, generateDesignOverviewMermaid(graph, resolvedTypes));
-      if (removedNodeIds.length) {
+      await saveArchitectureGraph(projectPath, graph, architectureView);
+      if (deliveryLinked) {
+        await api.writeFile(overviewPath, generateDesignOverviewMermaid(graph, resolvedTypes));
         await refreshDelivery();
       }
-      setMessage("Saved — architecture.json and design-overview.md updated.");
+      setMessage(
+        deliveryLinked
+          ? "Saved — architecture.json and design-overview.md updated."
+          : `Saved — ${viewDef.label} (${viewDef.path}).`,
+      );
     } catch (e) {
       setMessage(String(e));
     } finally {
@@ -418,6 +739,7 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
       setEdges(toFlowEdges(result.graph));
       setDeliveryByNodeId(deliveryStatusByArchNodeId(result.board));
       const parts: string[] = [];
+      if (result.archPruned) parts.push(`${result.archPruned} stale diagram node(s) removed`);
       if (result.archAdded) parts.push(`${result.archAdded} diagram node(s) added`);
       if (result.archLinked) parts.push(`${result.archLinked} linked on diagram`);
       if (result.deliveryAdded) parts.push(`${result.deliveryAdded} board card(s) added`);
@@ -519,86 +841,114 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
     () => ({
       stackUrl,
       typeById,
-      deliveryByNodeId,
+      deliveryByNodeId: deliveryLinked ? deliveryByNodeId : new Map(),
       onOpenDelivery,
     }),
-    [stackUrl, typeById, deliveryByNodeId, onOpenDelivery],
+    [stackUrl, typeById, deliveryLinked, deliveryByNodeId, onOpenDelivery],
   );
+
+  const handleOntologyChange = useCallback(() => {
+    setNodes([]);
+    setEdges([]);
+    setGraphReady(false);
+    setMessage("Ontology changed — import on the Ontology tab, then use Refresh graph links.");
+  }, [setNodes, setEdges]);
 
   return (
     <ArchEditorContext.Provider value={contextValue}>
       <div className="flex h-full flex-col">
-        <div className="flex flex-wrap items-end gap-3 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
-          <ProjectFoundryStackField
-            projectPath={projectPath}
-            value={stackUrl}
-            onChange={setStackUrl}
-            compact
+        <TopToolbar
+          architectureView={architectureView}
+          onViewChange={changeArchitectureView}
+          projectPath={projectPath}
+          stackUrl={stackUrl}
+          onStackUrlChange={setStackUrl}
+          deliveryLinked={deliveryLinked}
+          onOntologyChange={handleOntologyChange}
+        />
+
+        {deliveryLinked && (
+          <WorkingDiagramToolbar
+            resolvedTypes={resolvedTypes}
+            onAddNode={addNode}
+            onSync={syncDelivery}
+            syncing={syncing}
+            onSavePng={savePngToProject}
+            onExportPng={exportPng}
+            exporting={exporting}
+            onSave={save}
+            saving={saving}
+            nodesCount={nodes.length}
           />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-b border-surface-border bg-surface-raised/40 px-4 py-3">
-          <span className="mr-2 text-sm text-fg-secondary">Add:</span>
-          {resolvedTypes.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              onClick={() => addNode(n.id)}
-              className="rounded-lg border border-surface-border-strong px-3 py-1.5 text-xs text-fg-body hover:border-surface-border-strong hover:text-fg-primary"
-              style={{ borderLeftWidth: 3, borderLeftColor: n.hexColor }}
-            >
-              {n.label}
-            </button>
-          ))}
-          <div className="ml-auto flex flex-wrap gap-2">
-            <SecondaryButton onClick={syncDelivery} disabled={syncing}>
-              <span className="inline-flex items-center gap-1.5">
-                <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
-                {syncing ? "Syncing…" : "Sync with delivery board"}
-              </span>
-            </SecondaryButton>
-            <SecondaryButton onClick={savePngToProject} disabled={exporting || nodes.length === 0}>
-              <span className="inline-flex items-center gap-1.5">
-                <ImageDown size={14} />
-                {exporting ? "Exporting…" : "Save PNG to project"}
-              </span>
-            </SecondaryButton>
-            <SecondaryButton onClick={exportPng} disabled={exporting || nodes.length === 0}>
-              <span className="inline-flex items-center gap-1.5">
-                <ImageDown size={14} />
-                Export PNG…
-              </span>
-            </SecondaryButton>
-            <SecondaryButton onClick={save} disabled={saving}>
-              {saving ? "Saving…" : "Save diagram"}
-            </SecondaryButton>
-          </div>
-        </div>
-        {message && (
-          <div className="border-b border-surface-border bg-surface-raised/30 px-4 py-2 text-sm text-brand-300">
-            {message}
-          </div>
         )}
+
+        {!deliveryLinked && (
+          <OntologyToolbar
+            ontologyCanvasMode={ontologyCanvasMode}
+            ontologyBrowseMode={ontologyBrowseMode}
+            ontologySearch={ontologySearch}
+            onOntologySearchChange={setOntologySearch}
+            overviewGraph={overviewGraph}
+            onBackToOverview={returnToOntologyOverview}
+            onBackToAllTypes={returnToOntologyBrowse}
+            onOpenGraphExplorer={openGraphExplorer}
+            onRefreshOntology={refreshOntologyGraph}
+            refreshingOntology={refreshingOntology}
+            onExportGexf={() => overviewGraph && void exportOntologyGexf(overviewGraph)}
+            exportingGexf={exportingGexf}
+            onExportPng={exportPng}
+            exporting={exporting}
+            onSave={save}
+            saving={saving}
+            nodesCount={nodes.length}
+          />
+        )}
+
+        <MessageBar message={message} />
+
         <div className="flex min-h-0 flex-1">
           <div className="min-h-0 min-w-0 flex-1">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onSelectionChange={onSelectionChange}
-              nodeTypes={nodeTypes}
-              zoomOnScroll={false}
-              panOnScroll
-              fitView
-              className="bg-surface-base"
-            >
-              <Background color="#334155" gap={20} />
-              <Controls className="!bg-surface-raised !border-surface-border-strong" />
-              <MiniMap className="!bg-surface-raised" />
-            </ReactFlow>
+            {!visible ? null : graphLoading ? (
+              <div className="flex h-full items-center justify-center text-sm text-fg-muted">
+                Loading diagram…
+              </div>
+            ) : canvasMode === "overview" && overviewGraph ? (
+              <OntologyGraphOverview
+                graph={overviewGraph}
+                onOpenExplorer={openGraphExplorer}
+                onOpenPreview={() => applyGraphToCanvas(overviewGraph, true)}
+                onLoadFullGraph={() => void loadFullOntologyToCanvas(overviewGraph)}
+                onExportGexf={() => void exportOntologyGexf(overviewGraph)}
+                loadingFullGraph={ontologyPrepareProgress !== null}
+                exportingGexf={exportingGexf}
+                onOpenWorkingView={() => changeArchitectureView("working")}
+              />
+            ) : canvasMode === "explorer" && overviewGraph ? (
+              <OntologySigmaExplorer
+                graph={overviewGraph}
+                onBack={returnToOntologyOverview}
+                onExportGexf={() => void exportOntologyGexf(overviewGraph)}
+                exportingGexf={exportingGexf}
+              />
+            ) : (
+              <ArchitectureCanvas
+                nodes={nodes}
+                edges={edges}
+                nodeTypes={nodeTypes}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onSelectionChange={onSelectionChange}
+                onNodeDoubleClick={onNodeDoubleClick}
+                graphReady={graphReady}
+                ontologyCanvasMode={ontologyCanvasMode}
+                ontologyBrowseMode={ontologyBrowseMode}
+                deliveryLinked={deliveryLinked}
+                ontologyPrepareProgress={ontologyPrepareProgress}
+              />
+            )}
           </div>
-          {selectedNode ? (
+          {canvasMode === "canvas" && selectedNode ? (
             <ArchNodeDetailsPanel
               node={selectedNode}
               stackUrl={stackUrl}
@@ -616,8 +966,16 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
                 }
               }}
               onClose={() => setSelectedNode(null)}
+              ontologyConnectionCount={
+                ontologyCanvasMode === "full" ? selectedOntologyConnectionCount : undefined
+              }
+              onShowOntologyLinks={
+                ontologyCanvasMode === "full" && ontologyBrowseMode === "all"
+                  ? () => showOntologyFocus(selectedNode.id)
+                  : undefined
+              }
             />
-          ) : selectedEdge ? (
+          ) : canvasMode === "canvas" && selectedEdge ? (
             <EdgeDetailsPanel
               edge={selectedEdge}
               onUpdateLabel={updateEdgeLabel}
@@ -625,10 +983,12 @@ function ArchitectureEditorInner({ projectPath, onOpenDelivery }: ArchitectureEd
             />
           ) : null}
         </div>
-        <p className="border-t border-surface-border px-4 py-2 text-xs text-fg-muted">
-          Drag nodes to arrange. Double-click to rename. Select a node for notes and Foundry links,
-          or an edge to add a label. Use Sync to keep the diagram and delivery board aligned both ways.
-        </p>
+
+        <FooterHint
+          deliveryLinked={deliveryLinked}
+          ontologyCanvasMode={ontologyCanvasMode}
+          ontologyBrowseMode={ontologyBrowseMode}
+        />
       </div>
     </ArchEditorContext.Provider>
   );

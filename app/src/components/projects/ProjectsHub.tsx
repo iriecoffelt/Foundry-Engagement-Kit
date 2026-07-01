@@ -1,9 +1,11 @@
 import { Copy, FolderKanban, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
-import type { ProjectMeta } from "../../types";
+import type { EngagementType, ProjectMeta } from "../../types";
 import { PrimaryButton } from "../forms/FormField";
 import { StatusBadge } from "../StatusBadge";
+import { Tooltip } from "../Tooltip";
+import { EngagementTypeBadge } from "../EngagementTypeBadge";
 import { ProjectSetupWizard } from "../wizards/ProjectSetupWizard";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 import type { ProjectTab } from "./ProjectWorkspaceHeader";
@@ -30,11 +32,33 @@ export function ProjectsHub({
   onBack,
 }: ProjectsHubProps) {
   const [showWizard, setShowWizard] = useState(false);
+  const [engagementTypes, setEngagementTypes] = useState<Record<string, EngagementType>>({});
 
   const activeProject = useMemo(
     () => (activeProjectSlug ? projects.find((p) => p.slug === activeProjectSlug) ?? null : null),
     [activeProjectSlug, projects],
   );
+
+  const loadEngagementTypes = async () => {
+    const types: Record<string, EngagementType> = {};
+    for (const p of projects) {
+      try {
+        const eng = await api.readJson<{ engagementType?: EngagementType }>(
+          `${p.path}/engagement.json`,
+        );
+        if (eng.engagementType) {
+          types[p.slug] = eng.engagementType;
+        }
+      } catch {
+        /* no engagement type set */
+      }
+    }
+    setEngagementTypes(types);
+  };
+
+  useEffect(() => {
+    loadEngagementTypes();
+  }, [projects]);
 
   useEffect(() => {
     if (startWizard) {
@@ -118,7 +142,12 @@ export function ProjectsHub({
                   onClick={() => onOpenProject(p.slug)}
                   className="w-full p-5 text-left"
                 >
-                  <p className="font-semibold text-fg-primary">{p.display_name}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-fg-primary">{p.display_name}</p>
+                    {engagementTypes[p.slug] && (
+                      <EngagementTypeBadge type={engagementTypes[p.slug]} size="sm" />
+                    )}
+                  </div>
                   <p className="mt-1 text-sm text-fg-secondary">{p.customer || "No customer set"}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <StatusBadge status={p.status} />
@@ -127,13 +156,14 @@ export function ProjectsHub({
                     )}
                   </div>
                 </button>
-                <button
-                  onClick={(e) => cloneProject(p, e)}
-                  title="Clone engagement"
-                  className="absolute right-3 top-3 rounded-lg p-1.5 text-fg-muted opacity-0 transition hover:bg-surface-elevated hover:text-fg-primary group-hover:opacity-100"
-                >
-                  <Copy size={16} />
-                </button>
+                <Tooltip content="Clone this engagement as a new project" position="left">
+                  <button
+                    onClick={(e) => cloneProject(p, e)}
+                    className="absolute right-3 top-3 rounded-lg p-1.5 text-fg-muted opacity-0 transition hover:bg-surface-elevated hover:text-fg-primary group-hover:opacity-100"
+                  >
+                    <Copy size={16} />
+                  </button>
+                </Tooltip>
               </div>
             ))}
           </div>

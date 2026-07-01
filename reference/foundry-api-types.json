@@ -1,0 +1,106 @@
+{
+  "apiCategories": [
+    {
+      "id": "ontologySchema",
+      "label": "Ontology Schema",
+      "description": "Object type, link type, action type definitions (metadata only)",
+      "sdkPackage": "@osdk/foundry.ontologies",
+      "engagementPhases": ["discovery", "design", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/ontologies", "description": "List ontologies" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/fullMetadata", "description": "Get complete schema" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/objectTypes", "description": "List object types" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/objectTypes/{objectType}", "description": "Get object type details" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/linkTypes", "description": "List link types" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/actionTypes", "description": "List action types" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/interfaceTypes", "description": "List interfaces" },
+        { "method": "GET", "path": "/v2/ontologies/{ontology}/queryTypes", "description": "List functions" }
+      ]
+    },
+    {
+      "id": "datasetMetadata",
+      "label": "Dataset Metadata",
+      "description": "Dataset schema and configuration (no row data)",
+      "sdkPackage": "@osdk/foundry.datasets",
+      "engagementPhases": ["discovery", "scoping", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}", "description": "Get dataset info" },
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}/schema", "description": "Get column schema" },
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}/branches", "description": "List branches" }
+      ]
+    },
+    {
+      "id": "filesystem",
+      "label": "Project Structure",
+      "description": "Projects, folders, resource metadata",
+      "sdkPackage": "@osdk/foundry.filesystem",
+      "engagementPhases": ["discovery", "scoping", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/filesystem/resources/{resourceRid}", "description": "Get resource metadata" },
+        { "method": "GET", "path": "/v2/filesystem/resources/getByPath", "description": "Get resource by path" },
+        { "method": "GET", "path": "/v2/filesystem/folders/{folderRid}/children", "description": "List folder contents" },
+        { "method": "GET", "path": "/v2/filesystem/projects/{projectRid}", "description": "Get project info" },
+        { "method": "GET", "path": "/v2/filesystem/projects/{projectRid}/organizations", "description": "List organizations" }
+      ]
+    },
+    {
+      "id": "dataHealth",
+      "label": "Health Status",
+      "description": "Pipeline health check pass/fail status",
+      "sdkPackage": "@osdk/foundry.datahealth",
+      "engagementPhases": ["build", "deploy", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}/getHealthChecks", "description": "List check RIDs" },
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}/getHealthCheckReports", "description": "Get health status" },
+        { "method": "GET", "path": "/v2/dataHealth/checks/{checkRid}", "description": "Get check config" },
+        { "method": "GET", "path": "/v2/dataHealth/checks/{checkRid}/checkReports/getLatest", "description": "Get latest status" }
+      ]
+    },
+    {
+      "id": "orchestration",
+      "label": "Schedules & Builds",
+      "description": "Schedule configuration and build status",
+      "sdkPackage": "@osdk/foundry.orchestration",
+      "engagementPhases": ["build", "deploy", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/datasets/{datasetRid}/getSchedules", "description": "List schedules" },
+        { "method": "GET", "path": "/v2/orchestration/builds/{buildRid}", "description": "Get build status" }
+      ]
+    },
+    {
+      "id": "permissions",
+      "label": "Permission Documentation",
+      "description": "Read-only access to document security model",
+      "sdkPackage": "@osdk/foundry.filesystem",
+      "engagementPhases": ["deploy", "handoff"],
+      "endpoints": [
+        { "method": "GET", "path": "/v2/filesystem/resources/{resourceRid}/roles", "description": "List who has access" },
+        { "method": "GET", "path": "/v2/filesystem/resources/{resourceRid}/getAccessRequirements", "description": "Get required orgs/markings" }
+      ]
+    }
+  ],
+  "excludedApis": {
+    "reason": "These APIs expose customer business data or modify systems - use only within Foundry",
+    "categories": [
+      "Object search/list/get (returns customer data)",
+      "readTable / dataset export (row-level data)",
+      "Action execution (modifies data)",
+      "Audit logs (sensitive access patterns)",
+      "Permission modifications (admin domain)",
+      "User/group management (admin domain)",
+      "AIP with customer context (data to LLM providers)"
+    ]
+  },
+  "sdkPackages": {
+    "core": "@osdk/client",
+    "oauth": "@osdk/oauth",
+    "foundry": "@osdk/foundry"
+  },
+  "requiredScopes": [
+    "api:ontologies-read",
+    "api:filesystem-read",
+    "api:datasets-read",
+    "api:orchestration-read",
+    "api:data-health-read"
+  ]
+}

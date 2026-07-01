@@ -18,6 +18,8 @@ interface ArchNodeDetailsPanelProps {
   onOpenDelivery?: (cardId: string) => void;
   onOpenFoundry: () => void;
   onClose: () => void;
+  ontologyConnectionCount?: number;
+  onShowOntologyLinks?: () => void;
 }
 
 export function ArchNodeDetailsPanel({
@@ -31,6 +33,8 @@ export function ArchNodeDetailsPanel({
   onOpenDelivery,
   onOpenFoundry,
   onClose,
+  ontologyConnectionCount,
+  onShowOntologyLinks,
 }: ArchNodeDetailsPanelProps) {
   if (!node) return null;
 
@@ -58,6 +62,19 @@ export function ArchNodeDetailsPanel({
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        {onShowOntologyLinks && (
+          <div className="rounded-lg border border-brand-500/30 bg-brand-950/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-brand-300">Ontology links</p>
+            <p className="mt-1 text-sm text-fg-secondary">
+              {ontologyConnectionCount ?? 0} connection
+              {(ontologyConnectionCount ?? 0) === 1 ? "" : "s"} to other object types
+            </p>
+            <div className="mt-3">
+              <SecondaryButton onClick={onShowOntologyLinks}>Show links</SecondaryButton>
+            </div>
+          </div>
+        )}
+
         {deliveryCard && (
           <div className="rounded-lg border border-surface-border-strong bg-surface-base/50 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Delivery board</p>

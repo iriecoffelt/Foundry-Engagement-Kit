@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   loadProjectStackUrl,
@@ -38,11 +39,20 @@ export function ProjectFoundryStackField({
     }
   };
 
+  const sensitiveIndicator = (
+    <span className="inline-flex items-center gap-1 rounded-md bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+      <Lock size={10} />
+      Customer-specific
+    </span>
+  );
+
   if (compact) {
     return (
       <div className="flex min-w-0 flex-1 items-end gap-2">
         <label className="min-w-0 flex-1">
-          <span className="mb-1 block text-xs text-fg-muted">Stack URL</span>
+          <span className="mb-1 flex items-center gap-2 text-xs text-fg-muted">
+            Stack URL {sensitiveIndicator}
+          </span>
           <TextInput
             value={draft}
             onChange={setDraft}
@@ -58,7 +68,9 @@ export function ProjectFoundryStackField({
   return (
     <div className="space-y-2">
       <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-fg-body">Foundry stack URL</span>
+        <span className="mb-1.5 flex items-center gap-2 text-sm font-medium text-fg-body">
+          Foundry stack URL {sensitiveIndicator}
+        </span>
         <TextInput
           value={draft}
           onChange={setDraft}

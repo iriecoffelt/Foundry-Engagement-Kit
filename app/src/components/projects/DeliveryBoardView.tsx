@@ -1,5 +1,5 @@
-import { ExternalLink, GripVertical, Layers, Plus, X } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { ArrowRight, BookOpen, ExternalLink, FileText, GripVertical, Layers, Network, Plus, X } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import {
   boardByStatus,
@@ -11,6 +11,7 @@ import {
   seedFromArchitecture,
   syncArchitectureAndDelivery,
   removeArchitectureForDeliveryCard,
+  pruneOrphanDeliveryArchitectureNodes,
 } from "../../lib/deliveryBoard";
 import {
   deliveryTypeLabel,
@@ -19,12 +20,18 @@ import {
   type DeliveryTypeDefinition,
 } from "../../lib/deliveryTypes";
 import { loadRegister, openBlockers } from "../../lib/engagementRegister";
+import { hasFoundryConnection } from "../../lib/foundryConnection";
+import { extractDatasetRid } from "../../lib/foundryLinks";
+import { loadDecisions } from "../../lib/decisions";
+import { loadOntologyElements } from "../../lib/ontologyElements";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
 import type {
   BlockerEntry,
+  DecisionSummary,
   DeliveryBoard,
   DeliveryCard,
   DeliveryStatus,
+  OntologyElement,
 } from "../../types";
 import { DeliveryTypeSelect } from "../DeliveryTypeSelect";
 import {
@@ -34,12 +41,17 @@ import {
   TextArea,
   TextInput,
 } from "../forms/FormField";
+import { DeliveryBoardSkeleton } from "../Skeleton";
 import { UserPicker } from "./UserPicker";
 import { useEscapeKey } from "../../lib/useEscapeKey";
+import { FoundryHealthBadge, FoundryHealthSummary } from "../foundry";
 
 interface DeliveryBoardViewProps {
   projectPath: string;
   initialSelectedCardId?: string | null;
+  onNavigateToArchitecture?: (nodeId: string) => void;
+  onOpenDocument?: (path: string) => void;
+  onNavigateToOntology?: (elementId: string) => void;
 }
 
 const DRAG_THRESHOLD_PX = 8;
@@ -59,17 +71,38 @@ type PointerSession = {
   moved: boolean;
 };
 
-export function DeliveryBoardView({ projectPath, initialSelectedCardId }: DeliveryBoardViewProps) {
+function getStorageKey(projectPath: string) {
+  return `delivery-selected-${projectPath.replace(/[^a-zA-Z0-9]/g, "-")}`;
+}
+
+export function DeliveryBoardView({
+  projectPath,
+  initialSelectedCardId,
+  onNavigateToArchitecture,
+  onOpenDocument,
+  onNavigateToOntology,
+}: DeliveryBoardViewProps) {
   const [board, setBoard] = useState<DeliveryBoard>({ cards: [] });
   const [deliveryTypes, setDeliveryTypes] = useState<DeliveryTypeDefinition[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState("pipeline");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedIdInternal] = useState<string | null>(() => {
+    if (initialSelectedCardId) return initialSelectedCardId;
+    try {
+      return localStorage.getItem(getStorageKey(projectPath));
+    } catch {
+      return null;
+    }
+  });
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DeliveryStatus | null>(null);
   const [blockers, setBlockers] = useState<BlockerEntry[]>([]);
+  const [foundryConnected, setFoundryConnected] = useState(false);
+  const [adrs, setAdrs] = useState<DecisionSummary[]>([]);
+  const [ontologyElements, setOntologyElements] = useState<OntologyElement[]>([]);
   const boardRef = useRef(board);
   boardRef.current = board;
   const dropTargetRef = useRef<DeliveryStatus | null>(null);
@@ -77,15 +110,39 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   const draggingIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef(false);
 
+  const setSelectedId = useCallback((id: string | null) => {
+    setSelectedIdInternal(id);
+    try {
+      if (id) {
+        localStorage.setItem(getStorageKey(projectPath), id);
+      } else {
+        localStorage.removeItem(getStorageKey(projectPath));
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, [projectPath]);
+
   const load = useCallback(async () => {
-    const [data, types] = await Promise.all([
-      loadDeliveryBoard(projectPath),
-      loadDeliveryTypes(),
-    ]);
-    setDeliveryTypes(types);
-    setBoard(data.cards.length ? data : await seedFromArchitecture(projectPath));
-    const register = await loadRegister(projectPath);
-    setBlockers(openBlockers(register));
+    setLoading(true);
+    try {
+      const [, types, decisions, elements] = await Promise.all([
+        loadDeliveryBoard(projectPath),
+        loadDeliveryTypes(),
+        loadDecisions(projectPath),
+        loadOntologyElements(projectPath),
+      ]);
+      setDeliveryTypes(types);
+      setAdrs(decisions);
+      setOntologyElements(elements);
+      await pruneOrphanDeliveryArchitectureNodes(projectPath);
+      const boardAfterPrune = await loadDeliveryBoard(projectPath);
+      setBoard(boardAfterPrune.cards.length ? boardAfterPrune : await seedFromArchitecture(projectPath));
+      const register = await loadRegister(projectPath);
+      setBlockers(openBlockers(register));
+    } finally {
+      setLoading(false);
+    }
   }, [projectPath]);
 
   useEffect(() => {
@@ -93,10 +150,28 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
   }, [load]);
 
   useEffect(() => {
+    hasFoundryConnection(projectPath).then(setFoundryConnected);
+  }, [projectPath, board.cards]);
+
+  const datasetRids = useMemo(
+    () =>
+      [
+        ...new Set(
+          board.cards
+            .map((card) => extractDatasetRid(card.resourceId))
+            .filter((rid): rid is string => Boolean(rid)),
+        ),
+      ],
+    [board.cards],
+  );
+
+  useEffect(() => {
     if (initialSelectedCardId && board.cards.some((c) => c.id === initialSelectedCardId)) {
       setSelectedId(initialSelectedCardId);
+    } else if (selectedId && board.cards.length > 0 && !board.cards.some((c) => c.id === selectedId)) {
+      setSelectedId(null);
     }
-  }, [initialSelectedCardId, board.cards]);
+  }, [initialSelectedCardId, board.cards, selectedId, setSelectedId]);
 
   const { schedule: scheduleSave, flushNow: flushSave } = useDebouncedPersist<DeliveryBoard>({
     save: (next) => saveDeliveryBoard(projectPath, next),
@@ -271,6 +346,10 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
 
   useEscapeKey(() => setSelectedId(null), Boolean(selectedId));
 
+  if (loading) {
+    return <DeliveryBoardSkeleton />;
+  }
+
   return (
     <div className={`flex h-full min-h-0 ${draggingId ? "select-none" : ""}`}>
       <div className="min-w-0 flex-1 overflow-y-auto overscroll-y-contain p-6">
@@ -281,6 +360,18 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
               <p className="mt-1 text-sm text-fg-secondary">
                 Click a card to edit details. Drag a card (or its grip) between columns to change status.
               </p>
+              {datasetRids.length > 0 ? (
+                <div className="mt-2">
+                  <FoundryHealthSummary projectPath={projectPath} datasetRids={datasetRids} />
+                </div>
+              ) : foundryConnected ? (
+                <p className="mt-2 text-xs text-fg-muted">
+                  Foundry health checks appear when a card has a dataset RID in{" "}
+                  <span className="text-fg-secondary">Resource / RID</span> (e.g.{" "}
+                  <code className="text-brand-300">ri.foundry.main.dataset.…</code>) or when a linked
+                  architecture node points at a dataset.
+                </p>
+              ) : null}
             </div>
             <button
               type="button"
@@ -288,6 +379,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
                 const result = await syncArchitectureAndDelivery(projectPath);
                 setBoard(result.board);
                 const parts: string[] = [];
+                if (result.archPruned) parts.push(`${result.archPruned} removed from diagram`);
                 if (result.archAdded) parts.push(`${result.archAdded} added to diagram`);
                 if (result.deliveryAdded) parts.push(`${result.deliveryAdded} added to board`);
                 if (result.deliveryUpdated) parts.push(`${result.deliveryUpdated} board cards updated`);
@@ -327,6 +419,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
                       key={card.id}
                       card={card}
                       deliveryTypes={deliveryTypes}
+                      projectPath={projectPath}
                       selected={selectedId === card.id}
                       dragging={draggingId === card.id}
                       onClick={() => onCardClick(card.id)}
@@ -375,9 +468,14 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
           projectPath={projectPath}
           card={selectedCard}
           blockers={blockers}
+          adrs={adrs}
+          ontologyElements={ontologyElements}
           onClose={() => setSelectedId(null)}
           onUpdate={(patch) => updateCard(selectedCard.id, patch)}
           onDelete={() => removeCard(selectedCard.id)}
+          onNavigateToArchitecture={onNavigateToArchitecture}
+          onOpenDocument={onOpenDocument}
+          onNavigateToOntology={onNavigateToOntology}
         />
       )}
     </div>
@@ -387,6 +485,7 @@ export function DeliveryBoardView({ projectPath, initialSelectedCardId }: Delive
 const DeliveryCardItem = memo(function DeliveryCardItem({
   card,
   deliveryTypes,
+  projectPath,
   selected,
   dragging,
   onClick,
@@ -396,6 +495,7 @@ const DeliveryCardItem = memo(function DeliveryCardItem({
 }: {
   card: DeliveryCard;
   deliveryTypes: DeliveryTypeDefinition[];
+  projectPath: string;
   selected: boolean;
   dragging: boolean;
   onClick: () => void;
@@ -404,6 +504,7 @@ const DeliveryCardItem = memo(function DeliveryCardItem({
   onRemove: () => void;
 }) {
   const typeStyle = deliveryTypeStyles(deliveryTypes, card.type);
+  const datasetRid = extractDatasetRid(card.resourceId);
 
   return (
     <div
@@ -425,7 +526,7 @@ const DeliveryCardItem = memo(function DeliveryCardItem({
           aria-label="Drag to change status"
           onPointerDown={onDragHandlePointerDown}
           onClick={(e) => e.stopPropagation()}
-          className="mt-0.5 shrink-0 cursor-grab rounded p-0.5 text-fg-faint transition hover:text-fg-muted active:cursor-grabbing"
+          className="-ml-2 -mt-2 flex min-h-[44px] min-w-[44px] shrink-0 cursor-grab items-center justify-center rounded text-fg-faint transition hover:text-fg-muted active:cursor-grabbing"
         >
           <GripVertical size={15} aria-hidden />
         </button>
@@ -440,6 +541,14 @@ const DeliveryCardItem = memo(function DeliveryCardItem({
             {card.owner && (
               <span className="truncate text-[10px] text-fg-secondary">{card.owner}</span>
             )}
+            {datasetRid && (
+              <FoundryHealthBadge
+                projectPath={projectPath}
+                datasetRid={datasetRid}
+                showLabel={true}
+                size="sm"
+              />
+            )}
           </div>
         </div>
         <button
@@ -449,7 +558,7 @@ const DeliveryCardItem = memo(function DeliveryCardItem({
             e.stopPropagation();
             onRemove();
           }}
-          className={`shrink-0 rounded-md p-1 text-fg-faint transition hover:bg-red-500/10 hover:text-red-400 ${
+          className={`-mr-2 -mt-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md text-fg-faint transition hover:bg-red-500/10 hover:text-red-400 ${
             selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           }`}
           title="Remove card"
@@ -465,19 +574,37 @@ function DeliveryCardDetail({
   projectPath,
   card,
   blockers,
+  adrs,
+  ontologyElements,
   onClose,
   onUpdate,
   onDelete,
+  onNavigateToArchitecture,
+  onOpenDocument,
+  onNavigateToOntology,
 }: {
   projectPath: string;
   card: DeliveryCard;
   blockers: BlockerEntry[];
+  adrs: DecisionSummary[];
+  ontologyElements: OntologyElement[];
   onClose: () => void;
   onUpdate: (patch: Partial<DeliveryCard>) => void;
   onDelete: () => void;
+  onNavigateToArchitecture?: (nodeId: string) => void;
+  onOpenDocument?: (path: string) => void;
+  onNavigateToOntology?: (elementId: string) => void;
 }) {
   const resourceUrl = card.resourceId?.trim();
+  const datasetRid = extractDatasetRid(resourceUrl);
   const isUrl = resourceUrl?.startsWith("http://") || resourceUrl?.startsWith("https://");
+  const hasArchitectureLink = card.architectureNodeId && onNavigateToArchitecture;
+  const hasDesignDoc = card.designRef?.trim() && onOpenDocument;
+  const linkedAdr = card.adrRef ? adrs.find((a) => a.path === card.adrRef) : null;
+  const linkedOntologyElement = card.ontologyElementId
+    ? ontologyElements.find((e) => e.id === card.ontologyElementId)
+    : null;
+  const hasOntologyLink = linkedOntologyElement && onNavigateToOntology;
 
   return (
     <aside className="flex w-[22rem] shrink-0 flex-col border-l border-surface-border bg-surface-raised/40">
@@ -540,21 +667,35 @@ function DeliveryCardDetail({
           />
         </Field>
 
-        <Field label="Resource / RID" hint="Foundry resource ID or URL">
+        <Field
+          label="Resource / RID"
+          hint="Dataset RID enables Foundry health checks on this card (requires api:data-health-read)"
+          classification="customer-specific"
+        >
           <TextInput
             value={card.resourceId || ""}
             onChange={(v) => onUpdate({ resourceId: v })}
             placeholder="ri.foundry.main.dataset.xxx or https://…"
           />
-          {isUrl && resourceUrl && (
-            <button
-              type="button"
-              onClick={() => api.openUrl(resourceUrl)}
-              className="mt-2 inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300"
-            >
-              <ExternalLink size={12} /> Open in browser
-            </button>
-          )}
+          <div className="mt-2 flex items-center gap-3">
+            {isUrl && resourceUrl && (
+              <button
+                type="button"
+                onClick={() => api.openUrl(resourceUrl)}
+                className="inline-flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300"
+              >
+                <ExternalLink size={12} /> Open in browser
+              </button>
+            )}
+            {datasetRid && (
+              <FoundryHealthBadge
+                projectPath={projectPath}
+                datasetRid={datasetRid}
+                showLabel={true}
+                size="sm"
+              />
+            )}
+          </div>
         </Field>
 
         {blockers.length > 0 && (
@@ -570,6 +711,58 @@ function DeliveryCardDetail({
           </Field>
         )}
 
+        {adrs.length > 0 && (
+          <Field label="ADR reference" hint="Link this component to an architecture decision">
+            <SelectInput
+              value={card.adrRef || ""}
+              onChange={(v) => onUpdate({ adrRef: v || undefined })}
+              options={[
+                { value: "", label: "None" },
+                ...adrs.map((a) => ({
+                  value: a.path,
+                  label: `ADR-${String(a.number).padStart(3, "0")}: ${a.title}`,
+                })),
+              ]}
+            />
+            {linkedAdr && onOpenDocument && (
+              <button
+                type="button"
+                onClick={() => onOpenDocument(linkedAdr.path)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300"
+              >
+                <BookOpen size={12} />
+                View ADR
+              </button>
+            )}
+          </Field>
+        )}
+
+        {ontologyElements.length > 0 && (
+          <Field label="Ontology element" hint="Link to an ontology object type, action, or link type">
+            <SelectInput
+              value={card.ontologyElementId || ""}
+              onChange={(v) => onUpdate({ ontologyElementId: v || undefined })}
+              options={[
+                { value: "", label: "None" },
+                ...ontologyElements.map((e) => ({
+                  value: e.id,
+                  label: `${e.name} (${e.kind})`,
+                })),
+              ]}
+            />
+            {hasOntologyLink && (
+              <button
+                type="button"
+                onClick={() => onNavigateToOntology!(linkedOntologyElement.id)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300"
+              >
+                <Network size={12} />
+                View in Ontology
+              </button>
+            )}
+          </Field>
+        )}
+
         <Field label="Notes">
           <TextArea
             value={card.notes || ""}
@@ -578,6 +771,52 @@ function DeliveryCardDetail({
             placeholder="Implementation notes, dependencies, UAT context…"
           />
         </Field>
+
+        {(hasArchitectureLink || hasDesignDoc || hasOntologyLink) && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-fg-muted">Related views</p>
+            <div className="flex flex-wrap gap-2">
+              {hasArchitectureLink && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToArchitecture!(card.architectureNodeId!)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border-strong bg-surface-base/60 px-3 py-1.5 text-xs text-fg-body transition hover:border-brand-500/50 hover:text-brand-400"
+                >
+                  <Layers size={12} />
+                  View in Architecture
+                  <ArrowRight size={10} className="opacity-50" />
+                </button>
+              )}
+              {hasDesignDoc && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const docPath = card.designRef!.startsWith("/")
+                      ? card.designRef!
+                      : `${projectPath}/${card.designRef}`;
+                    onOpenDocument!(docPath);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border-strong bg-surface-base/60 px-3 py-1.5 text-xs text-fg-body transition hover:border-brand-500/50 hover:text-brand-400"
+                >
+                  <FileText size={12} />
+                  Open design doc
+                  <ArrowRight size={10} className="opacity-50" />
+                </button>
+              )}
+              {hasOntologyLink && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToOntology!(linkedOntologyElement!.id)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-surface-border-strong bg-surface-base/60 px-3 py-1.5 text-xs text-fg-body transition hover:border-brand-500/50 hover:text-brand-400"
+                >
+                  <Network size={12} />
+                  View in Ontology
+                  <ArrowRight size={10} className="opacity-50" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="rounded-lg bg-surface-base/60 px-3 py-2 text-[10px] text-fg-muted">
           <p>Created {formatDate(card.createdAt)}</p>
