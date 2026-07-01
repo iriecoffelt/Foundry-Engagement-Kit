@@ -13,8 +13,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [features]
-default = []
-# Enable macOS EventKit integration for native calendar access (Rust 1.85+)
+# EventKit enabled by default for native macOS calendar integration
+default = ["eventkit"]
+# macOS EventKit integration (requires Rust 1.85+)
 eventkit = ["dep:objc2", "dep:objc2-foundation", "dep:objc2-event-kit", "dep:block2"]
 
 [dependencies]
