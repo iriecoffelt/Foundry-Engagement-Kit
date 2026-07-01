@@ -278,8 +278,8 @@ mod macos {
 
         let store = unsafe { EKEventStore::new() };
 
-        let start_date = unsafe { NSDate::dateWithTimeIntervalSince1970(start_interval) };
-        let end_date = unsafe { NSDate::dateWithTimeIntervalSince1970(end_interval) };
+        let start_date = NSDate::dateWithTimeIntervalSince1970(start_interval);
+        let end_date = NSDate::dateWithTimeIntervalSince1970(end_interval);
 
         let calendars = unsafe { store.calendarsForEntityType(EKEntityType::Event) };
         let calendars_ptr: Option<&NSArray<EKCalendar>> = Some(&calendars);
@@ -296,7 +296,7 @@ mod macos {
 
         let mut result = Vec::new();
         for i in 0..events.len() {
-            let event = unsafe { events.objectAtIndex(i) };
+            let event = events.objectAtIndex(i);
             
             let calendar_name = unsafe {
                 event
