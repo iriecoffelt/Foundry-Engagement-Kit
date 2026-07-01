@@ -208,8 +208,8 @@ const AppMain = memo(function AppMain() {
         }}
         workspaceRoot={workspaceRoot}
         projectPath={
-          current.projectSlug && workspaceRoot
-            ? `${workspaceRoot}/${current.projectSlug}`
+          current.projectSlug
+            ? `project/${current.projectSlug}`
             : undefined
         }
         onRefresh={bump}
