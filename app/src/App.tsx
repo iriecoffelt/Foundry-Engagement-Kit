@@ -9,7 +9,8 @@ import {
   subscribeAppSection,
 } from "./lib/appSectionStore";
 import { getCadenceAlerts } from "./lib/cadence";
-import { startCadenceNotificationPoller } from "./lib/notifications";
+import { startCadenceNotificationPoller, startMeetingReminderPoller } from "./lib/notifications";
+import { calendarApi } from "./lib/calendarApi";
 import { trackRecent } from "./lib/recent";
 import { subscribeEngagementSaved } from "./lib/engagementData";
 import {
@@ -162,6 +163,12 @@ const AppMain = memo(function AppMain() {
     if (!projectSlugs) return;
     return startCadenceNotificationPoller(() => getCadenceAlerts(projects));
   }, [projectSlugs, projects]);
+
+  // Meeting reminder notifications (15 and 30 minutes before)
+  useEffect(() => {
+    if (!workspaceReady) return;
+    return startMeetingReminderPoller(() => calendarApi.getTodaysEvents());
+  }, [workspaceReady]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
