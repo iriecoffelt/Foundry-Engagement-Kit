@@ -36,7 +36,6 @@ interface MilestoneTrackerProps {
 export function MilestoneTracker({ projectPath, engagementType }: MilestoneTrackerProps) {
   const [milestones, setMilestones] = useState<Milestone[]>(DEFAULT_MILESTONES);
   const [saving, setSaving] = useState(false);
-<<<<<<< HEAD
   const [hasLoaded, setHasLoaded] = useState(false);
   const milestonesRef = useRef(milestones);
   milestonesRef.current = milestones;
