@@ -24,7 +24,6 @@ import { hasFoundryConnection } from "../../lib/foundryConnection";
 import { extractDatasetRid } from "../../lib/foundryLinks";
 import { loadDecisions } from "../../lib/decisions";
 import { loadOntologyElements } from "../../lib/ontologyElements";
-import { loadOntologyElementTypes, ontologyElementTypeLabel } from "../../lib/ontologyTypes";
 import { useDebouncedPersist } from "../../hooks/useDebouncedPersist";
 import type {
   BlockerEntry,

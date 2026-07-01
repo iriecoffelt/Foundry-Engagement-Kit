@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { ArchitectureGraph, DeliveryBoard, DeliveryCard, OntologyElement } from "../../types";
+import type { ArchitectureGraph, DeliveryBoard, OntologyElement } from "../../types";
 
 vi.mock("../api", () => ({
   api: {
@@ -59,7 +59,7 @@ import {
   addOntologyElementToDiagram,
 } from "../architectureSync";
 
-const mockApi = api as {
+const mockApi = api as unknown as {
   readJson: ReturnType<typeof vi.fn>;
   writeJson: ReturnType<typeof vi.fn>;
 };

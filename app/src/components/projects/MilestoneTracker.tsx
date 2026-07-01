@@ -96,7 +96,7 @@ export function MilestoneTracker({ projectPath, engagementType }: MilestoneTrack
   };
 
   const useSuggestedMilestones = () => {
-    save(buildSuggestedMilestones(engagementType));
+    applyMilestones(buildSuggestedMilestones(engagementType), true);
   };
 
   const allEmpty = milestones.every(

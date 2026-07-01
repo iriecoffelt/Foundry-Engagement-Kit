@@ -39,12 +39,9 @@ export function ProjectsHub({
     [activeProjectSlug, projects],
   );
 
-  const load = async () => {
-    const list = await api.listProjectsWithMeta();
-    setProjects(list);
-
+  const loadEngagementTypes = async () => {
     const types: Record<string, EngagementType> = {};
-    for (const p of list) {
+    for (const p of projects) {
       try {
         const eng = await api.readJson<{ engagementType?: EngagementType }>(
           `${p.path}/engagement.json`,
@@ -60,8 +57,8 @@ export function ProjectsHub({
   };
 
   useEffect(() => {
-    load();
-  }, []);
+    loadEngagementTypes();
+  }, [projects]);
 
   useEffect(() => {
     if (startWizard) {

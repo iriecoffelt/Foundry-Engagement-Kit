@@ -1,4 +1,4 @@
-import { AlertCircle, Check, ChevronDown, ChevronRight, Edit, Plus, X } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, ChevronRight, Edit, Plus } from "lucide-react";
 import { useState } from "react";
 import type { OntologyElement } from "../../types";
 import { Modal } from "../Modal";

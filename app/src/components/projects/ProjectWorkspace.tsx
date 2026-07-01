@@ -7,7 +7,7 @@ import { computePhaseProgress } from "../../lib/phaseChecklist";
 import { copyToClipboard, generateCustomerSummary } from "../../lib/customerSummary";
 import { buildWeeklyRollup } from "../../lib/weeklyRollup";
 import { trackRecent } from "../../lib/recent";
-import type { EngagementStatus, EngagementType, FileEntry, ProjectMeta } from "../../types";
+import type { EngagementStatus, EngagementType, ProjectMeta } from "../../types";
 import {
   engagementFromJson,
   generateProjectReadme,
