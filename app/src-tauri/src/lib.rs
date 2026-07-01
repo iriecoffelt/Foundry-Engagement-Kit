@@ -5,6 +5,7 @@ use std::path::{Component, Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use walkdir::WalkDir;
 
+mod calendar;
 mod foundry_api;
 mod handoff_pack;
 mod report_export;
@@ -783,6 +784,11 @@ pub fn run() {
             import_workspace_archive,
             search_workspace,
             foundry_api::foundry_api_request,
+            calendar::calendar_get_access_status,
+            calendar::calendar_request_access,
+            calendar::calendar_list_calendars,
+            calendar::calendar_get_events_for_date,
+            calendar::calendar_get_todays_events,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,6 +11,7 @@ import { ShortcutKbd } from "./ShortcutKbd";
 import { Tooltip } from "./Tooltip";
 
 import { TodayPanel } from "./today/TodayPanel";
+import { TodayMeetingsPanel } from "./today/TodayMeetings";
 
 interface DashboardProps {
   projects: ProjectMeta[];
@@ -83,6 +84,8 @@ export function Dashboard({
           loading={loading}
           onOpenProject={onOpenProject}
         />
+
+        <TodayMeetingsPanel />
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <ActionCard
