@@ -36,12 +36,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "macOS": {
-      "entitlements": null,
-      "infoPlist": {
-        "NSCalendarsFullAccessUsageDescription": "Foundry Engagement Kit needs calendar access to show your meetings for the day and help you prepare for customer syncs."
-      }
-    }
+    ]
   }
 }
