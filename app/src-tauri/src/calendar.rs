@@ -209,7 +209,8 @@ mod macos {
         });
 
         unsafe {
-            store.requestFullAccessToEventsWithCompletion(&*callback);
+            let ptr = std::ptr::from_ref(&*callback) as *mut _;
+            store.requestFullAccessToEventsWithCompletion(ptr);
         }
 
         rx.recv()
@@ -233,7 +234,7 @@ mod macos {
             let cal = unsafe { calendars.objectAtIndex(i) };
             let source_name = unsafe {
                 cal.source()
-                    .and_then(|s| s.title().map(|t| t.to_string()))
+                    .map(|s| s.title().to_string())
                     .unwrap_or_default()
             };
 
@@ -306,23 +307,12 @@ mod macos {
 
             let calendar_color = unsafe { event.calendar().and_then(|c| calendar_color_hex(&c)) };
 
-            let start_time = unsafe {
-                event
-                    .startDate()
-                    .map(|d| nsdate_to_iso(&d))
-                    .unwrap_or_default()
-            };
-
-            let end_time = unsafe {
-                event
-                    .endDate()
-                    .map(|d| nsdate_to_iso(&d))
-                    .unwrap_or_default()
-            };
+            let start_time = unsafe { nsdate_to_iso(&event.startDate()) };
+            let end_time = unsafe { nsdate_to_iso(&event.endDate()) };
 
             result.push(CalendarEvent {
-                id: unsafe { event.eventIdentifier().map(|s| s.to_string()).unwrap_or_default() },
-                title: unsafe { event.title().map(|s| s.to_string()).unwrap_or_else(|| "(No title)".to_string()) },
+                id: unsafe { event.eventIdentifier().to_string() },
+                title: unsafe { event.title().to_string() },
                 start_time,
                 end_time,
                 is_all_day: unsafe { event.isAllDay() },
