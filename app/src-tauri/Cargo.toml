@@ -12,6 +12,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# EventKit enabled by default for native macOS calendar integration
+default = ["eventkit"]
+# macOS EventKit integration (requires Rust 1.85+)
+eventkit = ["dep:objc2", "dep:objc2-foundation", "dep:objc2-event-kit", "dep:block2"]
+
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
@@ -26,3 +32,11 @@ printpdf = "0.7"
 docx-rs = "0.4"
 zip = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# macOS Calendar Integration (EventKit)
+# Requires Rust 1.85+ due to transitive dependency requirements
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6", optional = true }
+objc2-foundation = { version = "0.3", features = ["NSDate", "NSArray", "NSString", "NSCalendar", "NSError", "NSEnumerator", "NSURL"], optional = true }
+objc2-event-kit = { version = "0.3", features = ["EKEventStore", "EKCalendar", "EKEvent", "EKObject", "EKSource", "EKTypes", "EKParticipant", "block2"], optional = true }
+block2 = { version = "0.6", optional = true }

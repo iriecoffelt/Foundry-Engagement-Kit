@@ -5,8 +5,8 @@ Native desktop UI (macOS, Windows, Linux) for the [Foundry Engagement Kit](../RE
 ## Requirements
 
 - Node.js 20+ (CI uses 24)
-- Rust — [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS
-  - **macOS** — Xcode command line tools
+- Rust 1.85+ — [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS
+  - **macOS** — Xcode command line tools; Rust 1.85+ required for native calendar integration (EventKit)
   - **Windows** — Microsoft Edge WebView2 (usually pre-installed on Windows 10/11)
   - **Linux** — `webkit2gtk` and related packages (see Tauri docs)
 
@@ -62,7 +62,7 @@ The [Release workflow](../.github/workflows/release.yml) creates a **draft** Git
 
 ## Features
 
-- **Home** — standup, weekly review, customer sync; cadence alerts; insights; recent activity
+- **Home** — standup, weekly review, customer sync; cadence alerts; insights; recent activity; today's meetings (macOS)
 - **Portfolio** — cross-engagement health and phase counts
 - **Projects** — engagement workspace, stakeholders, phase stepper, milestones, handoff readiness, ontology, architecture (with Foundry deep links), documents, library
 - **Daily / Weekly** — guided wizards; double-click standup entries to edit after saving

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { api } from "../../lib/api";
+import type { CalendarEvent } from "../../lib/calendarTypes";
 import { generateCustomerSyncMd, todayISO } from "../../lib/markdown";
 import type { CustomerSyncData } from "../../types";
 import { Field, FormCard, TextArea, TextInput } from "../forms/FormField";
+import { MeetingPicker, type MeetingFormData } from "../forms/MeetingPicker";
 import { ProjectPicker } from "../forms/ProjectPicker";
 import { WizardShell } from "../wizard/WizardShell";
 
@@ -22,6 +24,7 @@ export function CustomerSyncWizard({ onComplete, onCancel }: CustomerSyncWizardP
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectedMeeting, setSelectedMeeting] = useState<CalendarEvent | null>(null);
   const [data, setData] = useState<CustomerSyncData>({
     projectSlug: "",
     projectDisplay: "",
@@ -34,6 +37,18 @@ export function CustomerSyncWizard({ onComplete, onCancel }: CustomerSyncWizardP
     decisionsNeeded: "",
     risks: "",
   });
+
+  const handleMeetingSelect = (event: CalendarEvent | null, formData: MeetingFormData) => {
+    setSelectedMeeting(event);
+    if (event) {
+      setData((d) => ({
+        ...d,
+        meetingName: formData.meetingName,
+        attendees: formData.attendees,
+        duration: formData.duration,
+      }));
+    }
+  };
 
   const finish = async () => {
     setLoading(true);
@@ -84,32 +99,36 @@ export function CustomerSyncWizard({ onComplete, onCancel }: CustomerSyncWizardP
 
       {step === 1 && (
         <FormCard title="Meeting details">
-          <Field label="Meeting name">
-            <TextInput
-              value={data.meetingName}
-              onChange={(v) => setData({ ...data, meetingName: v })}
-            />
-          </Field>
-          <Field label="Attendees">
-            <TextInput
-              value={data.attendees}
-              onChange={(v) => setData({ ...data, attendees: v })}
-              placeholder="Jane (sponsor), Bob (IT)"
-            />
-          </Field>
-          <Field label="Duration">
-            <TextInput
-              value={data.duration}
-              onChange={(v) => setData({ ...data, duration: v })}
-            />
-          </Field>
-          <Field label="Meeting objective">
-            <TextArea
-              value={data.objective}
-              onChange={(v) => setData({ ...data, objective: v })}
-              placeholder="What should be true when this meeting ends?"
-            />
-          </Field>
+          <MeetingPicker value={selectedMeeting} onChange={handleMeetingSelect} />
+
+          <div className="mt-4 border-t border-surface-border pt-4">
+            <Field label="Meeting name">
+              <TextInput
+                value={data.meetingName}
+                onChange={(v) => setData({ ...data, meetingName: v })}
+              />
+            </Field>
+            <Field label="Attendees">
+              <TextInput
+                value={data.attendees}
+                onChange={(v) => setData({ ...data, attendees: v })}
+                placeholder="Jane (sponsor), Bob (IT)"
+              />
+            </Field>
+            <Field label="Duration">
+              <TextInput
+                value={data.duration}
+                onChange={(v) => setData({ ...data, duration: v })}
+              />
+            </Field>
+            <Field label="Meeting objective">
+              <TextArea
+                value={data.objective}
+                onChange={(v) => setData({ ...data, objective: v })}
+                placeholder="What should be true when this meeting ends?"
+              />
+            </Field>
+          </div>
         </FormCard>
       )}
 
