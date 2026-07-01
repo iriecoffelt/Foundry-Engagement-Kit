@@ -159,9 +159,12 @@ function CalendarAccessPrompt({
   if (status.status === "unsupported_platform") {
     return (
       <div className="card-kit border-dashed p-6 text-center">
-        <ShieldAlert size={24} className="mx-auto text-fg-muted" />
+        <Calendar size={24} className="mx-auto text-fg-muted" />
         <p className="mt-2 text-sm text-fg-secondary">
-          Calendar integration is only available on macOS
+          Calendar integration not enabled
+        </p>
+        <p className="mt-1 text-xs text-fg-faint">
+          Requires building with EventKit support (Rust 1.85+)
         </p>
       </div>
     );
