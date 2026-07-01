@@ -231,7 +231,7 @@ mod macos {
 
         let mut result = Vec::new();
         for i in 0..calendars.len() {
-            let cal = unsafe { calendars.objectAtIndex(i) };
+            let cal = calendars.objectAtIndex(i);
             let source_name = unsafe {
                 cal.source()
                     .map(|s| s.title().to_string())
@@ -311,7 +311,7 @@ mod macos {
             let end_time = unsafe { nsdate_to_iso(&event.endDate()) };
 
             result.push(CalendarEvent {
-                id: unsafe { event.eventIdentifier().to_string() },
+                id: unsafe { event.eventIdentifier().map(|s| s.to_string()).unwrap_or_default() },
                 title: unsafe { event.title().to_string() },
                 start_time,
                 end_time,
